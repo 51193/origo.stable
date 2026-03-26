@@ -1,0 +1,74 @@
+using System;
+using System.Collections.Generic;
+using Origo.Core.Abstractions;
+using Origo.Core.Snd;
+
+namespace Origo.Core.Save;
+
+internal sealed class SaveGamePayloadFactory
+{
+    private readonly BlackboardJsonSerializer _blackboardSerializer;
+    private readonly IBlackboard _progress;
+    private readonly SndSceneJsonSerializer _sceneSerializer;
+    private readonly IBlackboard _session;
+
+    public SaveGamePayloadFactory(
+        IBlackboard progress,
+        IBlackboard session,
+        SndWorld sndWorld)
+    {
+        _progress = progress ?? throw new ArgumentNullException(nameof(progress));
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        ArgumentNullException.ThrowIfNull(sndWorld);
+
+        _blackboardSerializer = new BlackboardJsonSerializer(sndWorld.JsonOptions);
+        _sceneSerializer = new SndSceneJsonSerializer(sndWorld);
+    }
+
+    public SaveGamePayload Create(
+        ISndSceneAccess sceneAccess,
+        string saveId,
+        string currentLevelId,
+        IReadOnlyDictionary<string, string>? customMeta,
+        string progressStateMachinesJson,
+        string sessionStateMachinesJson)
+    {
+        ArgumentNullException.ThrowIfNull(sceneAccess);
+        if (string.IsNullOrWhiteSpace(saveId))
+            throw new ArgumentException("Save id cannot be null or whitespace.", nameof(saveId));
+        if (string.IsNullOrWhiteSpace(currentLevelId))
+            throw new ArgumentException("Current level id cannot be null or whitespace.", nameof(currentLevelId));
+        if (string.IsNullOrWhiteSpace(progressStateMachinesJson))
+            throw new ArgumentException(
+                "Progress state machines json cannot be null or whitespace (strict mode).",
+                nameof(progressStateMachinesJson));
+        if (string.IsNullOrWhiteSpace(sessionStateMachinesJson))
+            throw new ArgumentException(
+                "Session state machines json cannot be null or whitespace (strict mode).",
+                nameof(sessionStateMachinesJson));
+
+        var progressJson = _blackboardSerializer.Serialize(_progress);
+        var sessionJson = _blackboardSerializer.Serialize(_session);
+        var sndSceneJson = _sceneSerializer.Serialize(sceneAccess);
+
+        var levelPayload = new LevelPayload
+        {
+            LevelId = currentLevelId,
+            SndSceneJson = sndSceneJson,
+            SessionJson = sessionJson,
+            SessionStateMachinesJson = sessionStateMachinesJson
+        };
+
+        return new SaveGamePayload
+        {
+            SaveId = saveId,
+            ActiveLevelId = currentLevelId,
+            ProgressJson = progressJson,
+            ProgressStateMachinesJson = progressStateMachinesJson,
+            CustomMeta = customMeta == null
+                ? null
+                : new Dictionary<string, string>(customMeta, StringComparer.Ordinal),
+            Levels = new Dictionary<string, LevelPayload> { [currentLevelId] = levelPayload }
+        };
+    }
+}

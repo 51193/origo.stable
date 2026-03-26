@@ -1,0 +1,204 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using Origo.Core.Abstractions;
+using Origo.Core.Logging;
+using Origo.Core.Snd;
+using Origo.Core.Snd.Strategy;
+
+namespace Origo.Core.Runtime;
+
+/// <summary>
+///     提供运行时自动初始化能力：
+///     反射扫描 BaseSndStrategy 子类并注册到策略池，
+///     从 JSON 配置文件加载 SndMetaData 数组并自动 Spawn 实体。
+/// </summary>
+public static class OrigoAutoInitializer
+{
+    private const string LogTag = nameof(OrigoAutoInitializer);
+    private static readonly string[] DefaultSkipPrefixes =
+        ["System", "Microsoft", "netstandard"];
+
+    public static int DiscoverAndRegisterStrategies(
+        SndWorld world,
+        ILogger? logger = null,
+        IEnumerable<string>? additionalSkipPrefixes = null)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        var watch = Stopwatch.StartNew();
+
+        var baseType = typeof(BaseSndStrategy);
+        var pool = world.StrategyPool;
+        var registered = 0;
+
+        var skipPrefixes = additionalSkipPrefixes != null
+            ? DefaultSkipPrefixes.Concat(additionalSkipPrefixes).ToArray()
+            : DefaultSkipPrefixes;
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (ShouldSkipAssembly(assembly, skipPrefixes))
+                continue;
+
+            Type[] types;
+            try
+            {
+                types = assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                var wrapped = new InvalidOperationException(
+                    $"Failed to enumerate types from assembly '{assembly.FullName}'.", ex);
+                logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                    .AddSuffix("filePath", assembly.FullName)
+                    .Build($"Discover strategy types failed: {wrapped.Message}"));
+                throw wrapped;
+            }
+
+            foreach (var type in types)
+            {
+                if (type.IsAbstract || !baseType.IsAssignableFrom(type))
+                    continue;
+                if (type.GetConstructor(Type.EmptyTypes) == null)
+                {
+                    var ex = new InvalidOperationException(
+                        $"Strategy type '{type.FullName}' must declare a public parameterless constructor.");
+                    logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                        .Build($"Invalid strategy constructor: {ex.Message}"));
+                    throw ex;
+                }
+                if (!IsStatelessStrategyType(type, out var mutableFieldNames))
+                {
+                    var ex = new InvalidOperationException(
+                        $"Strategy type '{type.FullName}' declares instance fields ({mutableFieldNames}); " +
+                        "shared pooled strategies must be stateless.");
+                    logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                        .Build($"Strategy state validation failed: {ex.Message}"));
+                    throw ex;
+                }
+
+                var index = ResolveStrategyIndex(type);
+                var capturedType = type;
+
+                pool.Register(capturedType, () => (BaseSndStrategy)Activator.CreateInstance(capturedType)!);
+                registered++;
+
+                logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+                    .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
+                    .AddSuffix("strategyIndex", index)
+                    .Build("Strategy auto-registered."));
+            }
+        }
+
+        watch.Stop();
+        logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+            .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
+            .Build("Strategy auto-discovery complete."));
+
+        return registered;
+    }
+
+    /// <summary>
+    ///     从单个 JSON 文件中读取 SndMetaData 数组并通过 SndRuntime 批量 Spawn。
+    ///     支持完整的 SndMetaData 对象和模板引用简写。
+    /// </summary>
+    public static int LoadAndSpawnFromFile(
+        string filePath,
+        SndRuntime snd,
+        IFileSystem fileSystem,
+        ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(snd);
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        var watch = Stopwatch.StartNew();
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            var ex = new ArgumentException("Config file path cannot be null or whitespace.", nameof(filePath));
+            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                .AddSuffix("filePath", filePath)
+                .Build($"Invalid config path: {ex.Message}"));
+            throw ex;
+        }
+
+        if (!fileSystem.Exists(filePath))
+        {
+            var ex = new InvalidOperationException($"Config file '{filePath}' not found.");
+            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                .AddSuffix("filePath", filePath)
+                .Build($"Config file not found: {ex.Message}"));
+            throw ex;
+        }
+
+        var json = fileSystem.ReadAllText(filePath).Trim();
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            var ex = new InvalidOperationException($"Config file '{filePath}' is empty.");
+            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                .AddSuffix("filePath", filePath)
+                .Build($"Config file is empty: {ex.Message}"));
+            throw ex;
+        }
+
+        var jsonOptions = snd.World.JsonOptions;
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");
+            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                .AddSuffix("filePath", filePath)
+                .Build($"Config json root is not array: {ex.Message}"));
+            throw ex;
+        }
+
+        var metaList = snd.World.ResolveMetaListFromJsonArray(doc.RootElement, logger);
+        snd.SpawnMany(metaList);
+
+        watch.Stop();
+        logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+            .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
+            .AddSuffix("filePath", filePath)
+            .Build($"Spawned entities from config: {metaList.Count}."));
+        return metaList.Count;
+    }
+
+    private static bool ShouldSkipAssembly(Assembly assembly, string[] skipPrefixes)
+    {
+        var name = assembly.GetName().Name;
+        if (name == null) return true;
+        if (name == "mscorlib") return true;
+
+        foreach (var prefix in skipPrefixes)
+            if (name.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+
+        return false;
+    }
+
+    internal static bool IsStatelessStrategyType(Type strategyType, out string mutableFieldNames)
+    {
+        var instanceFields = strategyType
+            .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .Where(f => !f.IsStatic)
+            .Select(f => f.Name)
+            .ToArray();
+
+        mutableFieldNames = string.Join(", ", instanceFields);
+        return instanceFields.Length == 0;
+    }
+
+    private static string ResolveStrategyIndex(Type strategyType)
+    {
+        var attr = strategyType.GetCustomAttribute<StrategyIndexAttribute>();
+        if (attr == null)
+            throw new InvalidOperationException(
+                $"Strategy '{strategyType.FullName}' missing required StrategyIndexAttribute.");
+        if (string.IsNullOrWhiteSpace(attr.Index))
+            throw new InvalidOperationException(
+                $"Strategy '{strategyType.FullName}' has an empty StrategyIndexAttribute value.");
+        return attr.Index;
+    }
+}

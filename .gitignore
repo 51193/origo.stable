@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+/packages/
+*.user
+*.suo
+
+# JetBrains Rider / IntelliJ
+.idea/
+_ReSharper.Caches/
+riderModule.iml
+
+# Godot
+.godot/
+
+# UID files: ignore all by default, then whitelist [GlobalClass] Node scripts
+*.uid
+!Origo.GodotAdapter/Bootstrap/*.uid
+!Origo.GodotAdapter/Snd/GodotSndEntity.cs.uid
+!Origo.GodotAdapter/Snd/GodotSndManager.cs.uid
+
+# Build output
+publish/
+
+# OS
+.DS_Store
+Thumbs.db

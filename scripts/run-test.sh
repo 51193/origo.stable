@@ -1,0 +1,1 @@
+dotnet test "../Origo.sln"

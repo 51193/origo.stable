@@ -1,0 +1,154 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Origo.Core.Abstractions;
+using Origo.Core.Logging;
+
+namespace Origo.Core.Snd.Strategy;
+
+/// <summary>
+///     管理单个实体上的策略集合以及其生命周期回调。
+///     仅作为 Core 内部实现细节，对程序集外不可见。
+/// </summary>
+internal sealed class SndStrategyManager
+{
+    private const string LogTag = nameof(SndStrategyManager);
+    private readonly ILogger? _logger;
+    private readonly SndStrategyPool _pool;
+    private readonly List<StrategyEntry> _strategies = new();
+
+    public SndStrategyManager(SndStrategyPool pool, ILogger? logger = null)
+    {
+        _pool = pool;
+        _logger = logger;
+    }
+
+    public void Load(IEnumerable<string> indices, ISndEntity entity, SndContext ctx)
+    {
+        Recover(indices);
+        TriggerAfterLoad(entity, ctx);
+    }
+
+    public void Spawn(IEnumerable<string> indices, ISndEntity entity, SndContext ctx)
+    {
+        Recover(indices);
+        TriggerAfterSpawn(entity, ctx);
+    }
+
+    public void Quit(ISndEntity entity, SndContext ctx)
+    {
+        TriggerBeforeQuit(entity, ctx);
+        Release();
+    }
+
+    public void Dead(ISndEntity entity, SndContext ctx)
+    {
+        TriggerBeforeDead(entity, ctx);
+        Release();
+    }
+
+    public void Add(ISndEntity entity, string index, SndContext ctx)
+    {
+        var strategy = _pool.GetStrategy(index);
+        if (strategy == null)
+        {
+            var ex = new InvalidOperationException($"Strategy '{index}' not found.");
+            _logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                .AddSuffix("entityName", entity.Name)
+                .AddSuffix("strategyIndex", index)
+                .Build($"Add strategy failed: {ex.Message}"));
+            throw ex;
+        }
+
+        _strategies.Add(new StrategyEntry { Index = index, Strategy = strategy });
+        strategy.AfterAdd(entity, ctx);
+        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+            .AddSuffix("entityName", entity.Name)
+            .AddSuffix("strategyIndex", index)
+            .Build("Strategy added."));
+    }
+
+    public void Remove(ISndEntity entity, string index, SndContext ctx)
+    {
+        var i = _strategies.FindLastIndex(s => s.Index == index);
+        if (i < 0) return;
+
+        var entry = _strategies[i];
+        entry.Strategy.BeforeRemove(entity, ctx);
+        _strategies.RemoveAt(i);
+        _pool.ReleaseStrategy(index);
+        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+            .AddSuffix("entityName", entity.Name)
+            .AddSuffix("strategyIndex", index)
+            .Build("Strategy removed."));
+    }
+
+    public IReadOnlyCollection<string> ExportIndices(ISndEntity entity, SndContext ctx)
+    {
+        TriggerBeforeSave(entity, ctx);
+        return _strategies.Select(s => s.Index).ToArray();
+    }
+
+    public void Process(ISndEntity entity, double delta, SndContext ctx)
+    {
+        // 允许策略在 Process 中通过实体接口增删策略，因此基于快照进行迭代。
+        foreach (var entry in _strategies.ToArray())
+            entry.Strategy.Process(entity, delta, ctx);
+    }
+
+    private void Recover(IEnumerable<string> indices)
+    {
+        Release();
+        foreach (var index in indices)
+        {
+            var strategy = _pool.GetStrategy(index)
+                           ?? throw new InvalidOperationException($"Strategy '{index}' not found.");
+            _strategies.Add(new StrategyEntry { Index = index, Strategy = strategy });
+        }
+
+        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));
+    }
+
+    private void Release()
+    {
+        foreach (var entry in _strategies) _pool.ReleaseStrategy(entry.Index);
+
+        _strategies.Clear();
+    }
+
+    private void TriggerAfterSpawn(ISndEntity entity, SndContext ctx)
+    {
+        // 允许 AfterSpawn 中增删策略/清场等导致集合变化，因此对快照迭代。
+        foreach (var s in _strategies.ToArray()) s.Strategy.AfterSpawn(entity, ctx);
+    }
+
+    private void TriggerAfterLoad(ISndEntity entity, SndContext ctx)
+    {
+        // 允许 AfterLoad 中增删策略/清场等导致集合变化，因此对快照迭代。
+        foreach (var s in _strategies.ToArray()) s.Strategy.AfterLoad(entity, ctx);
+    }
+
+    private void TriggerBeforeSave(ISndEntity entity, SndContext ctx)
+    {
+        // 允许 BeforeSave 中增删策略，因此对快照迭代。
+        foreach (var s in _strategies.ToArray()) s.Strategy.BeforeSave(entity, ctx);
+    }
+
+    private void TriggerBeforeQuit(ISndEntity entity, SndContext ctx)
+    {
+        // 允许 BeforeQuit 中触发清场/销毁导致集合变化，因此对快照迭代。
+        foreach (var s in _strategies.ToArray()) s.Strategy.BeforeQuit(entity, ctx);
+    }
+
+    private void TriggerBeforeDead(ISndEntity entity, SndContext ctx)
+    {
+        // 允许 BeforeDead 中触发销毁导致集合变化，因此对快照迭代。
+        foreach (var s in _strategies.ToArray()) s.Strategy.BeforeDead(entity, ctx);
+    }
+
+    private sealed class StrategyEntry
+    {
+        public required string Index { get; init; }
+        public required BaseSndStrategy Strategy { get; init; }
+    }
+}

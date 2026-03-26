@@ -1,0 +1,58 @@
+using System;
+using System.Collections.Generic;
+
+namespace Origo.Core.Serialization;
+
+/// <summary>
+///     在 JSON 中为常用类型分配稳定的字符串标识。
+///     作为实例挂载在 <see cref="Snd.SndWorld" /> 上，生命周期随运行时管理。
+///     引擎适配层可在启动时通过 <see cref="RegisterType{T}" /> 注册额外类型。
+/// </summary>
+public sealed class TypeStringMapping
+{
+    private readonly Dictionary<Type, string> _reverseTypeMap = new();
+    private readonly Dictionary<string, Type> _typeMap = new();
+
+    public TypeStringMapping()
+    {
+        RegisterType<byte>("Byte");
+        RegisterType<short>("Int16");
+        RegisterType<int>("Int32");
+        RegisterType<long>("Int64");
+        RegisterType<bool>("Boolean");
+        RegisterType<float>("Single");
+        RegisterType<double>("Double");
+        RegisterType<string>("String");
+        RegisterType<string[]>("ArrayString");
+    }
+
+    public void RegisterType<T>(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName))
+            throw new ArgumentException("Type name cannot be null or whitespace.", nameof(typeName));
+
+        var type = typeof(T);
+
+        if (_typeMap.TryGetValue(typeName, out var existingType) && existingType != type)
+            throw new InvalidOperationException(
+                $"Type name '{typeName}' is already mapped to '{existingType.FullName}', cannot remap to '{type.FullName}'.");
+
+        if (_reverseTypeMap.TryGetValue(type, out var existingName) &&
+            !string.Equals(existingName, typeName, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Type '{type.FullName}' is already mapped to '{existingName}', cannot remap to '{typeName}'.");
+
+        _typeMap[typeName] = type;
+        _reverseTypeMap[type] = typeName;
+    }
+
+    public Type? GetTypeByName(string typeName)
+    {
+        return _typeMap.TryGetValue(typeName, out var type) ? type : null;
+    }
+
+    public string? GetNameByType(Type type)
+    {
+        return _reverseTypeMap.TryGetValue(type, out var typeName) ? typeName : null;
+    }
+}

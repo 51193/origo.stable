@@ -1,0 +1,153 @@
+using System.Collections.Generic;
+using Origo.Core.Runtime;
+using Origo.Core.Runtime.Console;
+using Origo.Core.Serialization;
+using Origo.Core.Snd;
+using Xunit;
+
+namespace Origo.Core.Tests;
+
+public class ConsoleTests
+{
+    [Fact]
+    public void ConsoleCommandParser_Positional_SpawnMapsNameAndTemplate()
+    {
+        Assert.True(ConsoleCommandParser.TryParse("spawn myEntity myTpl", out var inv, out var err));
+        Assert.Null(err);
+        Assert.NotNull(inv);
+        Assert.Equal("spawn", inv!.Command);
+        Assert.Equal(2, inv.PositionalArgs.Count);
+        Assert.Equal("myEntity", inv.PositionalArgs[0]);
+        Assert.Equal("myTpl", inv.PositionalArgs[1]);
+        Assert.Empty(inv.NamedArgs);
+    }
+
+    [Fact]
+    public void ConsoleCommandParser_Named_SpawnMapsNameAndTemplate()
+    {
+        Assert.True(ConsoleCommandParser.TryParse("spawn name=e1 template=tpl_a", out var inv, out var err));
+        Assert.Null(err);
+        Assert.NotNull(inv);
+        Assert.Equal("spawn", inv!.Command);
+        Assert.Empty(inv.PositionalArgs);
+        Assert.Equal("e1", inv.NamedArgs["name"]);
+        Assert.Equal("tpl_a", inv.NamedArgs["template"]);
+    }
+
+    [Fact]
+    public void OrigoConsole_SpawnTemplate_Positional_SpawnsWithResolvedName()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("maps/templates.map", "enemy_template: templates/enemy.json");
+        fs.SeedFile("templates/enemy.json",
+            """
+            {
+              "name": "TemplateEnemy",
+              "node": { "pairs": {} },
+              "strategy": { "indices": [] },
+              "data": { "pairs": {} }
+            }
+            """);
+
+        var logger = new TestLogger();
+        var sceneHost = new TestSndSceneHost();
+        var typeMapping = new TypeStringMapping();
+        var options = OrigoJson.CreateDefaultOptions(typeMapping);
+
+        var runtime = new OrigoRuntime(
+            logger,
+            sceneHost,
+            _ => { },
+            null,
+            new ConsoleInputQueue(),
+            new ConsoleOutputChannel());
+
+        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+
+        var input = runtime.ConsoleInput!;
+        var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
+        var messages = new List<string>();
+        output.Subscribe(messages.Add);
+
+        input.Enqueue("spawn Boss1 enemy_template");
+        runtime.Console!.ProcessPending();
+
+        Assert.Single(sceneHost.ExportMetaList());
+        Assert.Equal("Boss1", sceneHost.ExportMetaList()[0].Name);
+        Assert.Contains(messages, m => m.Contains("Spawned 'Boss1'", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OrigoConsole_SpawnTemplate_MissingTemplate_WritesError()
+    {
+        var logger = new TestLogger();
+        var sceneHost = new TestSndSceneHost();
+        var typeMapping = new TypeStringMapping();
+        var options = OrigoJson.CreateDefaultOptions(typeMapping);
+
+        var fs = new TestFileSystem();
+        fs.SeedFile("maps/empty.map", "");
+
+        var runtime = new OrigoRuntime(
+            logger,
+            sceneHost,
+            _ => { },
+            null,
+            new ConsoleInputQueue(),
+            new ConsoleOutputChannel());
+
+        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/empty.map", options, logger);
+
+        var input = runtime.ConsoleInput!;
+        var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
+        var messages = new List<string>();
+        output.Subscribe(messages.Add);
+
+        input.Enqueue("spawn X missing_tpl");
+        runtime.Console!.ProcessPending();
+
+        Assert.Empty(sceneHost.ExportMetaList());
+        Assert.Contains(messages, l => l.Contains("not found", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void OrigoConsole_SpawnTemplate_DuplicateName_WritesErrorAndSkipsSecondSpawn()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("maps/templates.map", "enemy_template: templates/enemy.json");
+        fs.SeedFile("templates/enemy.json",
+            """
+            {
+              "name": "TemplateEnemy",
+              "node": { "pairs": {} },
+              "strategy": { "indices": [] },
+              "data": { "pairs": {} }
+            }
+            """);
+
+        var logger = new TestLogger();
+        var sceneHost = new TestSndSceneHost();
+        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+
+        var runtime = new OrigoRuntime(
+            logger,
+            sceneHost,
+            _ => { },
+            null,
+            new ConsoleInputQueue(),
+            new ConsoleOutputChannel());
+
+        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+        var input = runtime.ConsoleInput!;
+        var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
+        var messages = new List<string>();
+        output.Subscribe(messages.Add);
+
+        input.Enqueue("spawn Dup enemy_template");
+        input.Enqueue("spawn Dup enemy_template");
+        runtime.Console!.ProcessPending();
+
+        Assert.Single(sceneHost.ExportMetaList());
+        Assert.Contains(messages, l => l.Contains("already exists", System.StringComparison.OrdinalIgnoreCase));
+    }
+}

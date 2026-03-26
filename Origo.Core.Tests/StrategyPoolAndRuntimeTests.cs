@@ -1,0 +1,111 @@
+using System;
+using System.Collections.Generic;
+using Origo.Core.Runtime;
+using Origo.Core.Snd;
+using Origo.Core.Snd.Strategy;
+using Xunit;
+
+namespace Origo.Core.Tests;
+
+public class StrategyPoolAndRuntimeTests
+{
+    [Fact]
+    public void SndStrategyPool_ReusesAndReleasesByReferenceCount()
+    {
+        var pool = new SndStrategyPool();
+        pool.Register(() => new DemoStrategy());
+
+        var first = pool.GetStrategy("demo");
+        var second = pool.GetStrategy("demo");
+        Assert.NotNull(first);
+        Assert.Same(first, second);
+
+        pool.ReleaseStrategy("demo");
+        var stillSame = pool.GetStrategy("demo");
+        Assert.Same(first, stillSame);
+
+        pool.ReleaseStrategy("demo");
+        pool.ReleaseStrategy("demo");
+        var recreated = pool.GetStrategy("demo");
+        Assert.NotSame(first, recreated);
+    }
+
+    [Fact]
+    public void SndStrategyPool_GetUnknownStrategy_ThrowsInvalidOperation()
+    {
+        var logger = new TestLogger();
+        var pool = new SndStrategyPool(logger);
+
+        Assert.Throws<InvalidOperationException>(() => pool.GetStrategy("missing"));
+    }
+
+    [Fact]
+    public void SndRuntime_DelegatesToSceneHost()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = new SndRuntime(new SndWorld(logger), host);
+        var metaA = new SndMetaData { Name = "A" };
+        var metaB = new SndMetaData { Name = "B" };
+
+        runtime.Spawn(metaA);
+        runtime.SpawnMany(new[] { metaB });
+
+        Assert.Equal(2, runtime.GetEntities().Count);
+        Assert.Equal(2, runtime.ExportMetaList().Count);
+
+        runtime.ClearAll();
+        Assert.Empty(runtime.GetEntities());
+        Assert.Equal(1, host.ClearAllCount);
+    }
+
+    [Fact]
+    public void SndRuntime_Spawn_DuplicateName_ThrowsInvalidOperation()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = new SndRuntime(new SndWorld(logger), host);
+
+        runtime.Spawn(new SndMetaData { Name = "Dup" });
+        Assert.Throws<InvalidOperationException>(() => runtime.Spawn(new SndMetaData { Name = "Dup" }));
+    }
+
+    [Fact]
+    public void OrigoRuntime_CreatesSndWorldAndSupportsInjectedSystemBlackboard()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var injectedSystemBoard = new Origo.Core.Blackboard.Blackboard();
+        var runtime = new OrigoRuntime(logger, host, null, injectedSystemBoard);
+
+        Assert.NotNull(runtime.Snd);
+        Assert.NotNull(runtime.SndWorld);
+        Assert.Same(injectedSystemBoard, runtime.SystemBlackboard);
+    }
+
+    [Fact]
+    public void OrigoRuntime_ResetConsoleState_ClearsInputQueueOnly()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var input = new Origo.Core.Runtime.Console.ConsoleInputQueue();
+        var output = new Origo.Core.Runtime.Console.ConsoleOutputChannel();
+        var runtime = new OrigoRuntime(logger, host, null, null, input, output);
+        var messages = new List<string>();
+        output.Subscribe(messages.Add);
+
+        input.Enqueue("spawn a b");
+        output.Publish("old");
+
+        runtime.ResetConsoleState();
+
+        Assert.False(input.TryDequeueCommand(out _));
+        Assert.Single(messages);
+        Assert.Equal("old", messages[0]);
+    }
+
+    [StrategyIndex("demo")]
+    private sealed class DemoStrategy : BaseSndStrategy
+    {
+    }
+}
