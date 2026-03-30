@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Origo.Core.Abstractions;
 
@@ -10,15 +11,19 @@ public sealed class GodotPackedSceneNodeFactory : INodeFactory
 {
     private readonly Node _parent;
 
-    public GodotPackedSceneNodeFactory(Node parent, ILogger? logger = null)
+    public GodotPackedSceneNodeFactory(Node parent)
     {
         _parent = parent;
     }
 
-    public INodeHandle? Create(string logicalName, string resourceId)
+    public INodeHandle Create(string logicalName, string resourceId)
     {
         var scene = ResourceLoader.Load<PackedScene>(resourceId);
-        if (scene == null) return null;
+        if (scene is null)
+        {
+            throw new InvalidOperationException(
+                $"PackedScene not found for logicalName='{logicalName}', resourceId='{resourceId}'.");
+        }
 
         var node = scene.Instantiate<Node>();
         node.Name = logicalName;

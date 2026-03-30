@@ -11,6 +11,8 @@ namespace Origo.Core.Runtime.Console;
 /// </summary>
 public static class ConsoleCommandParser
 {
+    private static readonly char[] TokenSeparators = [' ', '\t'];
+
     public static bool TryParse(string line, out CommandInvocation? invocation, out string? error)
     {
         invocation = null;
@@ -83,7 +85,7 @@ public static class ConsoleCommandParser
 
     private static List<string> Tokenize(string line)
     {
-        var parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = line.Trim().Split(TokenSeparators, StringSplitOptions.RemoveEmptyEntries);
         return new List<string>(parts);
     }
 }

@@ -1,6 +1,6 @@
 using System;
 using Origo.Core.Abstractions;
-using Origo.Core.Serialization;
+using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
@@ -13,7 +13,8 @@ public sealed class SpawnTemplateCommandHandler : IConsoleCommandHandler
 
     public SpawnTemplateCommandHandler(OrigoRuntime runtime)
     {
-        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        ArgumentNullException.ThrowIfNull(runtime);
+        _runtime = runtime;
     }
 
     public string Name => "spawn";
@@ -32,25 +33,9 @@ public sealed class SpawnTemplateCommandHandler : IConsoleCommandHandler
             return false;
         }
 
-        var jsonOptions = _runtime.SndWorld.JsonOptions;
-        Origo.Core.Snd.SndMetaData template;
-        try
-        {
-            template = _runtime.SndWorld.Mappings.ResolveTemplate(templateKey);
-        }
-        catch (Exception ex)
-        {
-            errorMessage = $"Failed to resolve template '{templateKey}': {ex.Message}";
-            return false;
-        }
+        var template = _runtime.SndWorld.ResolveTemplate(templateKey);
 
-        var clonedJson = OrigoJson.SerializeSndMetaData(template, jsonOptions);
-        var cloned = OrigoJson.DeserializeSndMetaData(clonedJson, jsonOptions);
-        if (cloned == null)
-        {
-            errorMessage = $"Template '{templateKey}' failed to deserialize.";
-            return false;
-        }
+        var cloned = SndWorld.CloneMetaData(template);
         cloned.Name = entityName;
 
         _runtime.Snd.Spawn(cloned);

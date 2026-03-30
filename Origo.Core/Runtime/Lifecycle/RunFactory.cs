@@ -8,9 +8,12 @@ namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
 ///     负责 SystemRun / ProgressRun / SessionRun 的依赖注入与构造。
+///     实际依赖由 <see cref="RunDependencies" /> 持有，本类仅作为薄创建门面。
 /// </summary>
 public sealed class RunFactory
 {
+    internal RunDependencies Dependencies { get; }
+
     public RunFactory(
         ILogger logger,
         IFileSystem fileSystem,
@@ -18,25 +21,21 @@ public sealed class RunFactory
         OrigoRuntime runtime,
         SndContext? sndContext = null)
     {
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        FileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        SaveRootPath = saveRootPath ?? throw new ArgumentNullException(nameof(saveRootPath));
-        Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-        SndContext = sndContext;
+        Dependencies = new RunDependencies(logger, fileSystem, saveRootPath, runtime, sndContext);
     }
 
-    public ILogger Logger { get; }
+    public ILogger Logger => Dependencies.Logger;
 
-    public IFileSystem FileSystem { get; }
+    public IFileSystem FileSystem => Dependencies.FileSystem;
 
-    public string SaveRootPath { get; }
+    public string SaveRootPath => Dependencies.SaveRootPath;
 
-    public OrigoRuntime Runtime { get; }
+    public OrigoRuntime Runtime => Dependencies.Runtime;
 
     /// <summary>
     ///     创建流程/会话时用于字符串栈状态机与策略池回调；由 <see cref="SndContext" /> 注入。
     /// </summary>
-    public SndContext? SndContext { get; }
+    public SndContext? SndContext => Dependencies.SndContext;
 
     public SystemRun CreateSystemRun()
     {
@@ -46,14 +45,14 @@ public sealed class RunFactory
     public ProgressRun CreateProgressRun(
         string saveId,
         string activeLevelId,
-        IBlackboard? progressBlackboard = null)
+        IBlackboard progressBlackboard)
     {
-        if (SndContext == null)
+        if (SndContext is null)
             throw new InvalidOperationException("SndContext must be set on RunFactory before creating ProgressRun.");
 
-        var bb = progressBlackboard ?? new Blackboard.Blackboard();
+        ArgumentNullException.ThrowIfNull(progressBlackboard);
         var progressMachines = new StateMachineContainer(Runtime.SndWorld.StrategyPool, SndContext);
-        var scope = new RunStateScope(bb, progressMachines);
+        var scope = new RunStateScope(progressBlackboard, progressMachines);
         return new ProgressRun(this, scope, saveId, activeLevelId);
     }
 
@@ -63,7 +62,7 @@ public sealed class RunFactory
         IBlackboard sessionBlackboard,
         ISndSceneAccess sceneAccess)
     {
-        if (SndContext == null)
+        if (SndContext is null)
             throw new InvalidOperationException("SndContext must be set on RunFactory before creating SessionRun.");
 
         var sessionMachines = new StateMachineContainer(Runtime.SndWorld.StrategyPool, SndContext);

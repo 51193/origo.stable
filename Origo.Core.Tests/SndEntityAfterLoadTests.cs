@@ -16,7 +16,7 @@ public class SndEntityAfterLoadTests
     public void SndEntity_Load_FromJson_InvokesAfterLoad_ForAllStrategies_InIndexOrder()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost());
+        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         runtime.SndWorld.RegisterStrategy(() => new AfterLoadProbeAStrategy());
         runtime.SndWorld.RegisterStrategy(() => new AfterLoadProbeBStrategy());
 
@@ -51,7 +51,7 @@ public class SndEntityAfterLoadTests
     }
 
     [StrategyIndex(AIndex)]
-    private sealed class AfterLoadProbeAStrategy : BaseSndStrategy
+    private sealed class AfterLoadProbeAStrategy : EntityStrategyBase
     {
         public static List<string>? Events { get; set; }
         public override void AfterLoad(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx)
@@ -59,7 +59,7 @@ public class SndEntityAfterLoadTests
     }
 
     [StrategyIndex(BIndex)]
-    private sealed class AfterLoadProbeBStrategy : BaseSndStrategy
+    private sealed class AfterLoadProbeBStrategy : EntityStrategyBase
     {
         public override void AfterLoad(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx)
         {

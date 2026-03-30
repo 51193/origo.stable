@@ -19,7 +19,7 @@ public sealed partial class ProgressRun
 
     public void LoadFromPayload(SaveGamePayload payload)
     {
-        if (payload == null) throw new ArgumentNullException(nameof(payload));
+        ArgumentNullException.ThrowIfNull(payload);
 
         var saveContext = _factory.CreateSaveContext(
             ProgressBlackboard,
@@ -29,7 +29,7 @@ public sealed partial class ProgressRun
         if (string.IsNullOrWhiteSpace(payload.ProgressStateMachinesJson))
             throw new InvalidOperationException("Save payload missing required ProgressStateMachinesJson.");
 
-        ProgressScope.StateMachines.ImportWithoutHooks(
+        ProgressScope.StateMachines.DeserializeWithoutHooks(
             payload.ProgressStateMachinesJson,
             _factory.Runtime.SndWorld.JsonOptions);
 
@@ -71,7 +71,7 @@ public sealed partial class ProgressRun
             sessionBlackboard);
         saveContext.DeserializeSession(levelPayload.SessionJson);
 
-        _currentSession = _factory.CreateSessionRun(
+        var newSession = _factory.CreateSessionRun(
             saveContext,
             ActiveLevelId,
             sessionBlackboard,
@@ -80,7 +80,7 @@ public sealed partial class ProgressRun
         if (string.IsNullOrWhiteSpace(levelPayload.SessionStateMachinesJson))
             throw new InvalidOperationException("Level payload missing required SessionStateMachinesJson.");
 
-        _currentSession.SessionScope.StateMachines.ImportWithoutHooks(
+        newSession.SessionScope.StateMachines.DeserializeWithoutHooks(
             levelPayload.SessionStateMachinesJson,
             _factory.Runtime.SndWorld.JsonOptions);
 
@@ -89,6 +89,9 @@ public sealed partial class ProgressRun
         saveContext.DeserializeSndScene(
             _factory.Runtime.Snd.SceneHost,
             levelPayload.SndSceneJson);
+
+        // Only assign after all initialization succeeds to prevent partial state.
+        _currentSession = newSession;
 
         FlushStateMachinesAfterSceneReady();
     }

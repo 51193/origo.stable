@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Origo.Core.Abstractions;
 using Origo.Core.Runtime;
+using Origo.Core.Serialization;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
@@ -12,21 +14,21 @@ public class StrategyPoolAndRuntimeTests
     [Fact]
     public void SndStrategyPool_ReusesAndReleasesByReferenceCount()
     {
-        var pool = new SndStrategyPool();
+        var pool = new SndStrategyPool(NullLogger.Instance);
         pool.Register(() => new DemoStrategy());
 
-        var first = pool.GetStrategy("demo");
-        var second = pool.GetStrategy("demo");
+        var first = pool.GetStrategy<EntityStrategyBase>("demo");
+        var second = pool.GetStrategy<EntityStrategyBase>("demo");
         Assert.NotNull(first);
         Assert.Same(first, second);
 
         pool.ReleaseStrategy("demo");
-        var stillSame = pool.GetStrategy("demo");
+        var stillSame = pool.GetStrategy<EntityStrategyBase>("demo");
         Assert.Same(first, stillSame);
 
         pool.ReleaseStrategy("demo");
         pool.ReleaseStrategy("demo");
-        var recreated = pool.GetStrategy("demo");
+        var recreated = pool.GetStrategy<EntityStrategyBase>("demo");
         Assert.NotSame(first, recreated);
     }
 
@@ -36,7 +38,20 @@ public class StrategyPoolAndRuntimeTests
         var logger = new TestLogger();
         var pool = new SndStrategyPool(logger);
 
-        Assert.Throws<InvalidOperationException>(() => pool.GetStrategy("missing"));
+        Assert.Throws<InvalidOperationException>(() => pool.GetStrategy<EntityStrategyBase>("missing"));
+    }
+
+    [Fact]
+    public void SndStrategyPool_ReleaseWithoutAcquire_OrDoubleRelease_ThrowsInvalidOperation()
+    {
+        var pool = new SndStrategyPool(NullLogger.Instance);
+        pool.Register(() => new DemoStrategy());
+
+        Assert.Throws<InvalidOperationException>(() => pool.ReleaseStrategy("demo"));
+
+        pool.GetStrategy<EntityStrategyBase>("demo");
+        pool.ReleaseStrategy("demo");
+        Assert.Throws<InvalidOperationException>(() => pool.ReleaseStrategy("demo"));
     }
 
     [Fact]
@@ -44,7 +59,7 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new SndRuntime(new SndWorld(logger), host);
+        var runtime = new SndRuntime(new SndWorld(new TypeStringMapping(), logger), host);
         var metaA = new SndMetaData { Name = "A" };
         var metaB = new SndMetaData { Name = "B" };
 
@@ -52,7 +67,7 @@ public class StrategyPoolAndRuntimeTests
         runtime.SpawnMany(new[] { metaB });
 
         Assert.Equal(2, runtime.GetEntities().Count);
-        Assert.Equal(2, runtime.ExportMetaList().Count);
+        Assert.Equal(2, runtime.SerializeMetaList().Count);
 
         runtime.ClearAll();
         Assert.Empty(runtime.GetEntities());
@@ -64,7 +79,7 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new SndRuntime(new SndWorld(logger), host);
+        var runtime = new SndRuntime(new SndWorld(new TypeStringMapping(), logger), host);
 
         runtime.Spawn(new SndMetaData { Name = "Dup" });
         Assert.Throws<InvalidOperationException>(() => runtime.Spawn(new SndMetaData { Name = "Dup" }));
@@ -76,7 +91,7 @@ public class StrategyPoolAndRuntimeTests
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
         var injectedSystemBoard = new Origo.Core.Blackboard.Blackboard();
-        var runtime = new OrigoRuntime(logger, host, null, injectedSystemBoard);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, injectedSystemBoard);
 
         Assert.NotNull(runtime.Snd);
         Assert.NotNull(runtime.SndWorld);
@@ -90,7 +105,7 @@ public class StrategyPoolAndRuntimeTests
         var host = new TestSndSceneHost();
         var input = new Origo.Core.Runtime.Console.ConsoleInputQueue();
         var output = new Origo.Core.Runtime.Console.ConsoleOutputChannel();
-        var runtime = new OrigoRuntime(logger, host, null, null, input, output);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard(), input, output);
         var messages = new List<string>();
         output.Subscribe(messages.Add);
 
@@ -105,7 +120,7 @@ public class StrategyPoolAndRuntimeTests
     }
 
     [StrategyIndex("demo")]
-    private sealed class DemoStrategy : BaseSndStrategy
+    private sealed class DemoStrategy : EntityStrategyBase
     {
     }
 }

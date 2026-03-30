@@ -24,10 +24,18 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
 
             switch (prop)
             {
-                case "r": r = reader.GetSingle(); break;
-                case "g": g = reader.GetSingle(); break;
-                case "b": b = reader.GetSingle(); break;
-                case "a": a = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.R:
+                    r = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.R, nameof(Color));
+                    break;
+                case GodotJsonPropertyNames.G:
+                    g = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.G, nameof(Color));
+                    break;
+                case GodotJsonPropertyNames.B:
+                    b = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.B, nameof(Color));
+                    break;
+                case GodotJsonPropertyNames.A:
+                    a = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.A, nameof(Color));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -38,10 +46,10 @@ public sealed class ColorJsonConverter : JsonConverter<Color>
     public override void Write(Utf8JsonWriter writer, Color value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("r", value.R);
-        writer.WriteNumber("g", value.G);
-        writer.WriteNumber("b", value.B);
-        writer.WriteNumber("a", value.A);
+        writer.WriteNumber(GodotJsonPropertyNames.R, value.R);
+        writer.WriteNumber(GodotJsonPropertyNames.G, value.G);
+        writer.WriteNumber(GodotJsonPropertyNames.B, value.B);
+        writer.WriteNumber(GodotJsonPropertyNames.A, value.A);
         writer.WriteEndObject();
     }
 }
@@ -66,8 +74,14 @@ public sealed class Rect2JsonConverter : JsonConverter<Rect2>
 
             switch (prop)
             {
-                case "position": position = JsonSerializer.Deserialize<Vector2>(ref reader, options); break;
-                case "size": size = JsonSerializer.Deserialize<Vector2>(ref reader, options); break;
+                case GodotJsonPropertyNames.Position:
+                    position = GodotJsonReaderStrict.DeserializeChild<Vector2>(ref reader, options,
+                        GodotJsonPropertyNames.Position, nameof(Rect2));
+                    break;
+                case GodotJsonPropertyNames.Size:
+                    size = GodotJsonReaderStrict.DeserializeChild<Vector2>(ref reader, options,
+                        GodotJsonPropertyNames.Size, nameof(Rect2));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -79,10 +93,10 @@ public sealed class Rect2JsonConverter : JsonConverter<Rect2>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("position");
+        writer.WritePropertyName(GodotJsonPropertyNames.Position);
         JsonSerializer.Serialize(writer, value.Position, options);
 
-        writer.WritePropertyName("size");
+        writer.WritePropertyName(GodotJsonPropertyNames.Size);
         JsonSerializer.Serialize(writer, value.Size, options);
 
         writer.WriteEndObject();
@@ -109,8 +123,14 @@ public sealed class Rect2IJsonConverter : JsonConverter<Rect2I>
 
             switch (prop)
             {
-                case "position": position = JsonSerializer.Deserialize<Vector2I>(ref reader, options); break;
-                case "size": size = JsonSerializer.Deserialize<Vector2I>(ref reader, options); break;
+                case GodotJsonPropertyNames.Position:
+                    position = GodotJsonReaderStrict.DeserializeChild<Vector2I>(ref reader, options,
+                        GodotJsonPropertyNames.Position, nameof(Rect2I));
+                    break;
+                case GodotJsonPropertyNames.Size:
+                    size = GodotJsonReaderStrict.DeserializeChild<Vector2I>(ref reader, options,
+                        GodotJsonPropertyNames.Size, nameof(Rect2I));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -122,10 +142,10 @@ public sealed class Rect2IJsonConverter : JsonConverter<Rect2I>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("position");
+        writer.WritePropertyName(GodotJsonPropertyNames.Position);
         JsonSerializer.Serialize(writer, value.Position, options);
 
-        writer.WritePropertyName("size");
+        writer.WritePropertyName(GodotJsonPropertyNames.Size);
         JsonSerializer.Serialize(writer, value.Size, options);
 
         writer.WriteEndObject();
@@ -152,8 +172,14 @@ public sealed class AabbJsonConverter : JsonConverter<Aabb>
 
             switch (prop)
             {
-                case "position": position = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
-                case "size": size = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
+                case GodotJsonPropertyNames.Position:
+                    position = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options,
+                        GodotJsonPropertyNames.Position, nameof(Aabb));
+                    break;
+                case GodotJsonPropertyNames.Size:
+                    size = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options,
+                        GodotJsonPropertyNames.Size, nameof(Aabb));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -165,10 +191,10 @@ public sealed class AabbJsonConverter : JsonConverter<Aabb>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("position");
+        writer.WritePropertyName(GodotJsonPropertyNames.Position);
         JsonSerializer.Serialize(writer, value.Position, options);
 
-        writer.WritePropertyName("size");
+        writer.WritePropertyName(GodotJsonPropertyNames.Size);
         JsonSerializer.Serialize(writer, value.Size, options);
 
         writer.WriteEndObject();
@@ -195,8 +221,13 @@ public sealed class PlaneJsonConverter : JsonConverter<Plane>
 
             switch (prop)
             {
-                case "normal": normal = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
-                case "d": d = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.Normal:
+                    normal = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options,
+                        GodotJsonPropertyNames.Normal, nameof(Plane));
+                    break;
+                case GodotJsonPropertyNames.D:
+                    d = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.D, nameof(Plane));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -208,10 +239,10 @@ public sealed class PlaneJsonConverter : JsonConverter<Plane>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("normal");
+        writer.WritePropertyName(GodotJsonPropertyNames.Normal);
         JsonSerializer.Serialize(writer, value.Normal, options);
 
-        writer.WriteNumber("d", value.D);
+        writer.WriteNumber(GodotJsonPropertyNames.D, value.D);
 
         writer.WriteEndObject();
     }

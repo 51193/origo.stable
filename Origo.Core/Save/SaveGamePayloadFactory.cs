@@ -15,14 +15,17 @@ internal sealed class SaveGamePayloadFactory
     public SaveGamePayloadFactory(
         IBlackboard progress,
         IBlackboard session,
-        SndWorld sndWorld)
+        BlackboardJsonSerializer blackboardSerializer,
+        SndSceneJsonSerializer sceneSerializer)
     {
-        _progress = progress ?? throw new ArgumentNullException(nameof(progress));
-        _session = session ?? throw new ArgumentNullException(nameof(session));
-        ArgumentNullException.ThrowIfNull(sndWorld);
-
-        _blackboardSerializer = new BlackboardJsonSerializer(sndWorld.JsonOptions);
-        _sceneSerializer = new SndSceneJsonSerializer(sndWorld);
+        ArgumentNullException.ThrowIfNull(progress);
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(blackboardSerializer);
+        ArgumentNullException.ThrowIfNull(sceneSerializer);
+        _progress = progress;
+        _session = session;
+        _blackboardSerializer = blackboardSerializer;
+        _sceneSerializer = sceneSerializer;
     }
 
     public SaveGamePayload Create(
@@ -65,7 +68,7 @@ internal sealed class SaveGamePayloadFactory
             ActiveLevelId = currentLevelId,
             ProgressJson = progressJson,
             ProgressStateMachinesJson = progressStateMachinesJson,
-            CustomMeta = customMeta == null
+            CustomMeta = customMeta is null
                 ? null
                 : new Dictionary<string, string>(customMeta, StringComparer.Ordinal),
             Levels = new Dictionary<string, LevelPayload> { [currentLevelId] = levelPayload }

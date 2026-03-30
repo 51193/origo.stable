@@ -15,8 +15,8 @@ public sealed class SndEntity : ISndEntity
     private const string LogTag = nameof(SndEntity);
     private readonly SndContext _context;
     private readonly SndDataManager _dataManager;
-    private readonly ILogger? _logger;
-    private readonly INodeHost _nodeHost;
+    private readonly ILogger _logger;
+    private readonly SndNodeManager _nodeHost;
     private readonly SndStrategyManager _strategyManager;
 
     internal SndEntity(
@@ -24,12 +24,14 @@ public sealed class SndEntity : ISndEntity
         SndStrategyPool strategyPool,
         SndMappings mappings,
         SndContext context,
-        ILogger? logger = null)
+        ILogger logger)
     {
-        if (nodeFactory == null) throw new ArgumentNullException(nameof(nodeFactory));
-        if (strategyPool == null) throw new ArgumentNullException(nameof(strategyPool));
-        if (mappings == null) throw new ArgumentNullException(nameof(mappings));
-        _context = context ?? throw new ArgumentNullException(nameof(context));
+        ArgumentNullException.ThrowIfNull(nodeFactory);
+        ArgumentNullException.ThrowIfNull(strategyPool);
+        ArgumentNullException.ThrowIfNull(mappings);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(logger);
+        _context = context;
         _logger = logger;
 
         _dataManager = new SndDataManager(this, logger);
@@ -49,7 +51,7 @@ public sealed class SndEntity : ISndEntity
         return _dataManager.GetData<T>(name);
     }
 
-    public (bool found, T value) TryGetData<T>(string name)
+    public (bool found, T? value) TryGetData<T>(string name)
     {
         return _dataManager.TryGetData<T>(name);
     }
@@ -65,7 +67,7 @@ public sealed class SndEntity : ISndEntity
         _dataManager.Unsubscribe(name, callback);
     }
 
-    public INodeHandle? GetNode(string name)
+    public INodeHandle GetNode(string name)
     {
         return _nodeHost.GetNode(name);
     }
@@ -87,56 +89,69 @@ public sealed class SndEntity : ISndEntity
 
     public void Load(SndMetaData metaData)
     {
-        Name = metaData.Name;
-        _dataManager.Recover(metaData.DataMetaData ?? new DataMetaData());
-        _nodeHost.Recover(metaData.NodeMetaData ?? new NodeMetaData());
-        _strategyManager.Load(metaData.StrategyMetaData?.Indices ?? Enumerable.Empty<string>(), this, _context);
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity loaded."));
+        RecoverFromMetaData(metaData);
+        var strategyMeta = metaData.StrategyMetaData ??
+                             throw new InvalidOperationException("StrategyMetaData is required.");
+        _strategyManager.Load(strategyMeta.Indices ?? Enumerable.Empty<string>(), this, _context);
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity loaded."));
     }
 
     public void Spawn(SndMetaData metaData)
     {
-        Name = metaData.Name;
-        _dataManager.Recover(metaData.DataMetaData ?? new DataMetaData());
-        _nodeHost.Recover(metaData.NodeMetaData ?? new NodeMetaData());
-        _strategyManager.Spawn(metaData.StrategyMetaData?.Indices ?? Enumerable.Empty<string>(), this, _context);
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity spawned."));
+        RecoverFromMetaData(metaData);
+        var strategyMeta = metaData.StrategyMetaData ??
+                             throw new InvalidOperationException("StrategyMetaData is required.");
+        _strategyManager.Spawn(strategyMeta.Indices ?? Enumerable.Empty<string>(), this, _context);
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity spawned."));
     }
 
     public void Quit()
     {
         _strategyManager.Quit(this, _context);
-        _nodeHost.Release();
-        _dataManager.Release();
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity quit."));
+        Teardown();
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity quit."));
     }
 
     public void Dead()
     {
         _strategyManager.Dead(this, _context);
-        _nodeHost.Release();
-        _dataManager.Release();
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity dead."));
+        Teardown();
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().AddSuffix("entityName", Name).Build("Entity dead."));
     }
 
-    public SndMetaData ExportMetaData()
+    public SndMetaData SerializeMetaData()
     {
-        var strategyIndices = _strategyManager.ExportIndices(this, _context);
+        var strategyIndices = _strategyManager.SerializeIndices(this, _context);
 
         return new SndMetaData
         {
             Name = Name,
-            NodeMetaData = _nodeHost.ExportMetaData(),
+            NodeMetaData = _nodeHost.SerializeMetaData(),
             StrategyMetaData = new StrategyMetaData
             {
                 Indices = new List<string>(strategyIndices)
             },
-            DataMetaData = _dataManager.ExportMeta()
+            DataMetaData = _dataManager.SerializeMeta()
         };
     }
 
     public void Process(double delta)
     {
         _strategyManager.Process(this, delta, _context);
+    }
+
+    private void RecoverFromMetaData(SndMetaData metaData)
+    {
+        Name = metaData.Name;
+        _dataManager.Recover(metaData.DataMetaData ??
+                              throw new InvalidOperationException("DataMetaData is required."));
+        _nodeHost.Recover(metaData.NodeMetaData ??
+                            throw new InvalidOperationException("NodeMetaData is required."));
+    }
+
+    private void Teardown()
+    {
+        _nodeHost.Release();
+        _dataManager.Release();
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using Origo.Core.Abstractions;
 
 namespace Origo.Core.Runtime.Lifecycle;
@@ -5,7 +6,7 @@ namespace Origo.Core.Runtime.Lifecycle;
 /// <summary>
 ///     关卡会话级运行时，持有会话黑板与 SND 场景访问。
 /// </summary>
-public interface ISessionRun
+public interface ISessionRun : IDisposable
 {
     RunStateScope SessionScope { get; }
 
@@ -16,6 +17,4 @@ public interface ISessionRun
     string LevelId { get; }
 
     void PersistLevelState();
-
-    void Dispose();
 }

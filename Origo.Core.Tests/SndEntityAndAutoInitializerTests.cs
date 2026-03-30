@@ -44,7 +44,7 @@ public class SndEntityAndAutoInitializerTests
         entity.SetData("hp", 20);
         entity.AddStrategy(LifecycleStrategyIndex);
         entity.RemoveStrategy(LifecycleStrategyIndex);
-        _ = entity.ExportMetaData();
+        _ = entity.SerializeMetaData();
         entity.Quit();
 
         Assert.Equal(1, callbackCount);
@@ -91,10 +91,10 @@ public class SndEntityAndAutoInitializerTests
         entity.Spawn(new SndMetaData { Name = "E", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
 
         entity.AddStrategy(LifecycleStrategyIndex);
-        Assert.Contains(LifecycleStrategyIndex, entity.ExportMetaData().StrategyMetaData!.Indices);
+        Assert.Contains(LifecycleStrategyIndex, entity.SerializeMetaData().StrategyMetaData!.Indices);
 
         entity.RemoveStrategy(LifecycleStrategyIndex);
-        Assert.DoesNotContain(LifecycleStrategyIndex, entity.ExportMetaData().StrategyMetaData!.Indices);
+        Assert.DoesNotContain(LifecycleStrategyIndex, entity.SerializeMetaData().StrategyMetaData!.Indices);
 
         // Removing a missing strategy should not throw.
         entity.RemoveStrategy(LifecycleStrategyIndex);
@@ -117,7 +117,7 @@ public class SndEntityAndAutoInitializerTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("config/entry.json",
             """
@@ -134,20 +134,20 @@ public class SndEntityAndAutoInitializerTests
         var loaded = OrigoAutoInitializer.LoadAndSpawnFromFile("config/entry.json", runtime.Snd, fs, logger);
 
         Assert.Equal(1, loaded);
-        Assert.Single(runtime.Snd.ExportMetaList());
-        Assert.Equal("BootEntity", runtime.Snd.ExportMetaList()[0].Name);
+        Assert.Single(runtime.Snd.SerializeMetaList());
+        Assert.Equal("BootEntity", runtime.Snd.SerializeMetaList()[0].Name);
     }
 
     private static SndContext CreateContext(TestLogger logger)
     {
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         return new SndContext(runtime, fs, "user://saveRoot", "res://initial", "res://entry/entry.json");
     }
 
     [StrategyIndex(LifecycleStrategyIndex)]
-    private sealed class LifecycleStrategy : BaseSndStrategy
+    private sealed class LifecycleStrategy : EntityStrategyBase
     {
         private readonly ICollection<string> _events;
         public LifecycleStrategy(ICollection<string> events) => _events = events;
@@ -160,21 +160,22 @@ public class SndEntityAndAutoInitializerTests
 }
 
 [StrategyIndex(AutoInitStrategyA.IndexConst)]
-public sealed class AutoInitStrategyA : BaseSndStrategy
+public sealed class AutoInitStrategyA : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.a";
 }
 
 [StrategyIndex(AutoInitStrategyB.IndexConst)]
-public sealed class AutoInitStrategyB : BaseSndStrategy
+public sealed class AutoInitStrategyB : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.b";
 }
 
 [StrategyIndex(StatefulAutoInitStrategy.IndexConst)]
-public abstract class StatefulAutoInitStrategy : BaseSndStrategy
+public abstract class StatefulAutoInitStrategy : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.stateful";
     private int _counter;
     public override void Process(Origo.Core.Abstractions.ISndEntity entity, double delta, SndContext ctx) => _counter++;
 }
+

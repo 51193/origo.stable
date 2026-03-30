@@ -19,20 +19,19 @@ public sealed class LogMessageBuilder
 
     public LogMessageBuilder AddPrefix(string key, object? value)
     {
-        if (!string.IsNullOrWhiteSpace(key) && value != null) _prefixContext[key] = value;
+        if (!string.IsNullOrWhiteSpace(key) && value is not null) _prefixContext[key] = value;
         return this;
     }
 
     public LogMessageBuilder AddSuffix(string key, object? value)
     {
-        if (!string.IsNullOrWhiteSpace(key) && value != null) _suffixContext[key] = value;
+        if (!string.IsNullOrWhiteSpace(key) && value is not null) _suffixContext[key] = value;
         return this;
     }
 
     public string Build(string message)
     {
         var builder = new StringBuilder();
-        builder.Append('[').Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")).Append("] ");
         if (_elapsedMs.HasValue) builder.Append("[+").Append(Math.Round(_elapsedMs.Value, 2)).Append("ms] ");
 
         if (_prefixContext.Count > 0)

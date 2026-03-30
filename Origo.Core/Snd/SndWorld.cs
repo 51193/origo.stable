@@ -12,13 +12,15 @@ namespace Origo.Core.Snd;
 /// </summary>
 public sealed class SndWorld
 {
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
 
-    public SndWorld(ILogger? logger = null, Action<JsonSerializerOptions>? configureJson = null)
+    public SndWorld(TypeStringMapping typeMapping, ILogger logger, Action<JsonSerializerOptions>? configureJson = null)
     {
+        ArgumentNullException.ThrowIfNull(typeMapping);
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
         StrategyPool = new SndStrategyPool(logger);
-        TypeMapping = new TypeStringMapping();
+        TypeMapping = typeMapping;
         JsonOptions = OrigoJson.CreateDefaultOptions(TypeMapping, configureJson);
         Mappings = new SndMappings();
     }
@@ -35,7 +37,7 @@ public sealed class SndWorld
 
     internal SndMappings Mappings { get; }
 
-    public void RegisterStrategy<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseSndStrategy
+    public void RegisterStrategy<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseStrategy
     {
         StrategyPool.Register(factory);
     }
@@ -51,19 +53,28 @@ public sealed class SndWorld
         return Mappings.ResolveTemplate(alias);
     }
 
-    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger? logger = null)
+    /// <summary>
+    ///     克隆 SND 元数据（与模板解析路径一致，便于将来统一替换实现）。
+    /// </summary>
+    public static SndMetaData CloneMetaData(SndMetaData meta)
+    {
+        ArgumentNullException.ThrowIfNull(meta);
+        return meta.DeepClone();
+    }
+
+    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger logger)
     {
         Mappings.LoadSceneAliases(fileSystem, mapFilePath, logger);
     }
 
-    public void LoadTemplates(IFileSystem fileSystem, string mapFilePath, ILogger? logger = null)
+    public void LoadTemplates(IFileSystem fileSystem, string mapFilePath, ILogger logger)
     {
         Mappings.LoadTemplates(fileSystem, mapFilePath, JsonOptions, logger);
     }
 
-    public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(JsonElement root, ILogger? logger = null)
+    public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(JsonElement root)
     {
-        return Mappings.ResolveMetaListFromJsonArray(root, JsonOptions, logger);
+        return Mappings.ResolveMetaListFromJsonArray(root, JsonOptions);
     }
 
     public IReadOnlyDictionary<string, TypedData> DeserializeTypedDataMap(string json)
@@ -75,9 +86,10 @@ public sealed class SndWorld
     public SndEntity CreateEntity(
         INodeFactory nodeFactory,
         SndContext context,
-        ILogger? logger = null)
+        ILogger logger)
     {
-        return new SndEntity(nodeFactory, StrategyPool, Mappings, context, logger ?? _logger);
+        ArgumentNullException.ThrowIfNull(logger);
+        return new SndEntity(nodeFactory, StrategyPool, Mappings, context, logger);
     }
 
     public string SerializeMeta(SndMetaData metaData)

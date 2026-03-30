@@ -11,20 +11,20 @@ public static class GodotJsonConverterRegistry
 {
     public static void RegisterTypeMappings(TypeStringMapping typeMapping)
     {
-        typeMapping.RegisterType<Vector2>("Vector2");
-        typeMapping.RegisterType<Vector2I>("Vector2I");
-        typeMapping.RegisterType<Vector3>("Vector3");
-        typeMapping.RegisterType<Vector3I>("Vector3I");
-        typeMapping.RegisterType<Vector4>("Vector4");
-        typeMapping.RegisterType<Quaternion>("Quaternion");
-        typeMapping.RegisterType<Basis>("Basis");
-        typeMapping.RegisterType<Transform2D>("Transform2D");
-        typeMapping.RegisterType<Transform3D>("Transform3D");
-        typeMapping.RegisterType<Color>("Color");
-        typeMapping.RegisterType<Rect2>("Rect2");
-        typeMapping.RegisterType<Rect2I>("Rect2I");
-        typeMapping.RegisterType<Aabb>("Aabb");
-        typeMapping.RegisterType<Plane>("Plane");
+        typeMapping.RegisterType<Vector2>(GodotEngineTypeNames.Vector2);
+        typeMapping.RegisterType<Vector2I>(GodotEngineTypeNames.Vector2I);
+        typeMapping.RegisterType<Vector3>(GodotEngineTypeNames.Vector3);
+        typeMapping.RegisterType<Vector3I>(GodotEngineTypeNames.Vector3I);
+        typeMapping.RegisterType<Vector4>(GodotEngineTypeNames.Vector4);
+        typeMapping.RegisterType<Quaternion>(GodotEngineTypeNames.Quaternion);
+        typeMapping.RegisterType<Basis>(GodotEngineTypeNames.Basis);
+        typeMapping.RegisterType<Transform2D>(GodotEngineTypeNames.Transform2D);
+        typeMapping.RegisterType<Transform3D>(GodotEngineTypeNames.Transform3D);
+        typeMapping.RegisterType<Color>(GodotEngineTypeNames.Color);
+        typeMapping.RegisterType<Rect2>(GodotEngineTypeNames.Rect2);
+        typeMapping.RegisterType<Rect2I>(GodotEngineTypeNames.Rect2I);
+        typeMapping.RegisterType<Aabb>(GodotEngineTypeNames.Aabb);
+        typeMapping.RegisterType<Plane>(GodotEngineTypeNames.Plane);
     }
 
     public static void AddConverters(JsonSerializerOptions options)

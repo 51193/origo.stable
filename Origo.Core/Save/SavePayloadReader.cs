@@ -10,34 +10,30 @@ internal static class SavePayloadReader
         IFileSystem fileSystem,
         string saveRootPath,
         string saveId,
-        string activeLevelId)
+        string activeLevelId,
+        ILogger? logger = null)
     {
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        ValidateSaveRoot(fileSystem, saveRootPath);
+        var baseRel = SavePathLayout.GetCurrentDirectory();
 
-        var currentRel = SavePathLayout.GetCurrentDirectory();
+        var markerRel = SavePathLayout.GetWriteInProgressMarker(baseRel);
+        var markerAbs = fileSystem.CombinePath(saveRootPath, markerRel);
+        if (fileSystem.Exists(markerAbs))
+        {
+            (logger ?? NullLogger.Instance).Log(LogLevel.Warning, nameof(SavePayloadReader),
+                "Detected .write_in_progress marker in current/; save data may be corrupt from an interrupted write.");
+        }
 
-        var progressRel = SavePathLayout.GetProgressFile(currentRel);
-        var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
-        if (!fileSystem.Exists(progressAbs))
-            throw new InvalidOperationException($"Missing required progress.json in current (path='{progressRel}').");
-        var progressJson = fileSystem.ReadAllText(progressAbs);
+        var progressRel = SavePathLayout.GetProgressFile(baseRel);
+        var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(baseRel);
+        var (progressJson, progressStateMachinesJson, customMeta) = ReadProgressAndCustomMeta(
+            fileSystem,
+            saveRootPath,
+            baseRel,
+            $"Missing required progress.json in current (path='{progressRel}').",
+            $"Missing required progress_state_machines.json in current (path='{progressSmRel}').");
 
-        var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(currentRel);
-        var progressSmAbs = fileSystem.CombinePath(saveRootPath, progressSmRel);
-        if (!fileSystem.Exists(progressSmAbs))
-            throw new InvalidOperationException(
-                $"Missing required progress_state_machines.json in current (path='{progressSmRel}').");
-        var progressStateMachinesJson = fileSystem.ReadAllText(progressSmAbs);
-
-        var customMetaRel = SavePathLayout.GetCustomMetaFile(currentRel);
-        var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
-        var customMeta = fileSystem.Exists(customMetaAbs)
-            ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(customMetaAbs))
-            : null;
-
-        var level = ReadLevelPayload(fileSystem, saveRootPath, currentRel, activeLevelId);
+        var level = ReadLevelPayload(fileSystem, saveRootPath, baseRel, activeLevelId);
 
         return new SaveGamePayload
         {
@@ -56,33 +52,18 @@ internal static class SavePayloadReader
         string saveId,
         string activeLevelId)
     {
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        ValidateSaveRoot(fileSystem, saveRootPath);
+        var baseRel = SavePathLayout.GetSaveDirectory(saveId);
+        var progressRel = SavePathLayout.GetProgressFile(baseRel);
+        var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(baseRel);
+        var (progressJson, progressStateMachinesJson, customMeta) = ReadProgressAndCustomMeta(
+            fileSystem,
+            saveRootPath,
+            baseRel,
+            $"Missing required progress.json in save '{saveId}' (path='{progressRel}').",
+            $"Missing required progress_state_machines.json in save '{saveId}' (path='{progressSmRel}').");
 
-        var saveRel = SavePathLayout.GetSaveDirectory(saveId);
-
-        var progressRel = SavePathLayout.GetProgressFile(saveRel);
-        var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
-        if (!fileSystem.Exists(progressAbs))
-            throw new InvalidOperationException(
-                $"Missing required progress.json in save '{saveId}' (path='{progressRel}').");
-        var progressJson = fileSystem.ReadAllText(progressAbs);
-
-        var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(saveRel);
-        var progressSmAbs = fileSystem.CombinePath(saveRootPath, progressSmRel);
-        if (!fileSystem.Exists(progressSmAbs))
-            throw new InvalidOperationException(
-                $"Missing required progress_state_machines.json in save '{saveId}' (path='{progressSmRel}').");
-        var progressStateMachinesJson = fileSystem.ReadAllText(progressSmAbs);
-
-        var customMetaRel = SavePathLayout.GetCustomMetaFile(saveRel);
-        var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
-        var customMeta = fileSystem.Exists(customMetaAbs)
-            ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(customMetaAbs))
-            : null;
-
-        var level = ReadLevelPayload(fileSystem, saveRootPath, saveRel, activeLevelId);
+        var level = ReadLevelPayload(fileSystem, saveRootPath, baseRel, activeLevelId);
 
         return new SaveGamePayload
         {
@@ -93,6 +74,42 @@ internal static class SavePayloadReader
             CustomMeta = customMeta,
             Levels = new Dictionary<string, LevelPayload> { [activeLevelId] = level }
         };
+    }
+
+    private static void ValidateSaveRoot(IFileSystem fileSystem, string saveRootPath)
+    {
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        if (string.IsNullOrWhiteSpace(saveRootPath))
+            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+    }
+
+    private static (string ProgressJson, string ProgressStateMachinesJson, IReadOnlyDictionary<string, string>? CustomMeta)
+        ReadProgressAndCustomMeta(
+            IFileSystem fileSystem,
+            string saveRootPath,
+            string baseDirectoryRel,
+            string missingProgressMessage,
+            string missingProgressStateMachinesMessage)
+    {
+        var progressRel = SavePathLayout.GetProgressFile(baseDirectoryRel);
+        var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
+        if (!fileSystem.Exists(progressAbs))
+            throw new InvalidOperationException(missingProgressMessage);
+        var progressJson = fileSystem.ReadAllText(progressAbs);
+
+        var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(baseDirectoryRel);
+        var progressSmAbs = fileSystem.CombinePath(saveRootPath, progressSmRel);
+        if (!fileSystem.Exists(progressSmAbs))
+            throw new InvalidOperationException(missingProgressStateMachinesMessage);
+        var progressStateMachinesJson = fileSystem.ReadAllText(progressSmAbs);
+
+        var customMetaRel = SavePathLayout.GetCustomMetaFile(baseDirectoryRel);
+        var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
+        var customMeta = fileSystem.Exists(customMetaAbs)
+            ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(customMetaAbs), NullLogger.Instance)
+            : null;
+
+        return (progressJson, progressStateMachinesJson, customMeta);
     }
 
     public static string? ReadProgressJsonFromSnapshot(
@@ -157,7 +174,8 @@ internal static class SavePayloadReader
         var hasSession = fileSystem.Exists(sessionAbs);
         var hasSessionSm = fileSystem.Exists(sessionSmAbs);
 
-        // Strict mode: partial payload is considered corrupted and must fail-fast.
+        // All three files absent: no saved level yet — return null (see ProgressRun.LevelSwitch).
+        // Strict mode: partial payload (some files present, some missing) is corrupted and must fail-fast.
         if (!hasSndScene && !hasSession && !hasSessionSm)
             return null;
         if (!hasSndScene)
@@ -185,35 +203,7 @@ internal static class SavePayloadReader
         string baseDirectoryRel,
         string levelId)
     {
-        var levelDirRel = SavePathLayout.GetLevelDirectory(baseDirectoryRel, levelId);
-        var sndSceneRel = SavePathLayout.GetLevelSndSceneFile(levelDirRel);
-        var sessionRel = SavePathLayout.GetLevelSessionFile(levelDirRel);
-        var sessionSmRel = SavePathLayout.GetLevelSessionStateMachinesFile(levelDirRel);
-
-        var sndSceneAbs = fileSystem.CombinePath(saveRootPath, sndSceneRel);
-        var sessionAbs = fileSystem.CombinePath(saveRootPath, sessionRel);
-        var sessionSmAbs = fileSystem.CombinePath(saveRootPath, sessionSmRel);
-
-        if (!fileSystem.Exists(sndSceneAbs))
-            throw new InvalidOperationException(
-                $"Missing required snd_scene.json for level '{levelId}' (path='{sndSceneRel}').");
-        if (!fileSystem.Exists(sessionAbs))
-            throw new InvalidOperationException(
-                $"Missing required session.json for level '{levelId}' (path='{sessionRel}').");
-        if (!fileSystem.Exists(sessionSmAbs))
-            throw new InvalidOperationException(
-                $"Missing required session_state_machines.json for level '{levelId}' (path='{sessionSmRel}').");
-
-        var sndSceneJson = fileSystem.ReadAllText(sndSceneAbs);
-        var sessionJson = fileSystem.ReadAllText(sessionAbs);
-        var sessionSmJson = fileSystem.ReadAllText(sessionSmAbs);
-
-        return new LevelPayload
-        {
-            LevelId = levelId,
-            SndSceneJson = sndSceneJson,
-            SessionJson = sessionJson,
-            SessionStateMachinesJson = sessionSmJson
-        };
+        return TryReadLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, levelId)
+               ?? throw new InvalidOperationException($"Missing level '{levelId}'.");
     }
 }

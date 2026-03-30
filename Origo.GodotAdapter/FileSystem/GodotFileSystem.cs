@@ -64,4 +64,14 @@ public sealed class GodotFileSystem : IFileSystem
     {
         return GodotPathHelper.GetParentDirectory(path);
     }
+
+    public void Rename(string sourcePath, string destinationPath)
+    {
+        GodotDirectoryOperations.Rename(sourcePath, destinationPath);
+    }
+
+    public void DeleteDirectory(string directoryPath)
+    {
+        GodotDirectoryOperations.DeleteRecursive(directoryPath);
+    }
 }

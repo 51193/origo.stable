@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using System.Diagnostics;
 using Origo.Core.Abstractions;
@@ -38,6 +39,11 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 
     public OrigoRuntime Runtime { get; private set; } = null!;
 
+    /// <summary>
+    ///     与 <see cref="Runtime" /> 同一次引导创建的 <see cref="GodotFileSystem" />，供子类（如 <see cref="OrigoDefaultEntry" />）复用。
+    /// </summary>
+    protected IFileSystem SharedFileSystem { get; private set; } = null!;
+
     public override void _Ready()
     {
         var readyWatch = Stopwatch.StartNew();
@@ -65,8 +71,9 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 
     private OrigoRuntime ResolveOrCreateRuntime()
     {
+        SharedFileSystem = new GodotFileSystem();
         var watch = Stopwatch.StartNew();
-        if (HostPath != null && !HostPath.IsEmpty)
+        if (HostPath is not null && !HostPath.IsEmpty)
         {
             var hostNode = GetNodeOrNull(HostPath);
             if (hostNode is IOrigoRuntimeProvider { Runtime: not null } provider)
@@ -79,9 +86,8 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
                 return provider.Runtime;
             }
 
-            CreateBootstrapLogger().Log(LogLevel.Warning, LogTag,
-                new LogMessageBuilder().AddSuffix("hostPath", HostPath.ToString())
-                    .Build("HostPath did not resolve to ready runtime provider, fallback to self-hosting."));
+            throw new InvalidOperationException(
+                $"HostPath '{HostPath}' did not resolve to a ready IOrigoRuntimeProvider with non-null Runtime.");
         }
 
         return CreateRuntime();
@@ -100,13 +106,14 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
         SndManager = sndManager;
         sndManager.SetProcess(true);
 
-        var fileSystem = new GodotFileSystem();
+        var fileSystem = SharedFileSystem;
         var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
-        var systemTypeMapping = new TypeStringMapping();
-        GodotJsonConverterRegistry.RegisterTypeMappings(systemTypeMapping);
+        var sharedTypeMapping = new TypeStringMapping();
+        GodotJsonConverterRegistry.RegisterTypeMappings(sharedTypeMapping);
         var systemJsonOptions =
-            OrigoJson.CreateDefaultOptions(systemTypeMapping, GodotJsonConverterRegistry.AddConverters);
-        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, systemJsonOptions);
+            OrigoJson.CreateDefaultOptions(sharedTypeMapping, GodotJsonConverterRegistry.AddConverters);
+        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, systemJsonOptions,
+            new Origo.Core.Blackboard.Blackboard());
         persistentBb.LoadFromDisk();
 
         var consoleInput = new ConsoleInputQueue();
@@ -115,6 +122,7 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
         var runtime = new OrigoRuntime(
             logger,
             sndManager,
+            sharedTypeMapping,
             GodotJsonConverterRegistry.AddConverters,
             persistentBb,
             consoleInput,
@@ -123,10 +131,6 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 
         ConsoleInput = consoleInput;
         ConsoleOutputChannel = consoleOutputChannel;
-
-        runtime.SndWorld.RegisterTypeMappings(GodotJsonConverterRegistry.RegisterTypeMappings);
-
-        sndManager.BindRuntimeDependencies(runtime.SndWorld, logger);
 
         var consolePump = new OrigoConsolePump { Runtime = runtime };
         AddChild(consolePump);
@@ -142,10 +146,10 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 
     private GodotSndManager ResolveOrCreateSndManager()
     {
-        if (SndManagerPath != null && !SndManagerPath.IsEmpty)
+        if (SndManagerPath is not null && !SndManagerPath.IsEmpty)
         {
             var node = GetNodeOrNull<GodotSndManager>(SndManagerPath);
-            if (node != null) return node;
+            if (node is not null) return node;
         }
 
         var manager = new GodotSndManager();

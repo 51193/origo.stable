@@ -23,18 +23,12 @@ public sealed class Blackboard : IBlackboard
     public (bool found, T value) TryGet<T>(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
-            return (false, default!);
+            throw new ArgumentException("Blackboard key cannot be null or whitespace.", nameof(key));
 
         if (_data.TryGetValue(key, out var typedData) && typedData.Data is T value)
             return (true, value);
 
         return (false, default!);
-    }
-
-    public T GetOrDefault<T>(string key, T defaultValue = default!)
-    {
-        var (found, value) = TryGet<T>(key);
-        return found ? value : defaultValue;
     }
 
     public void Clear()
@@ -47,12 +41,12 @@ public sealed class Blackboard : IBlackboard
         return _data.Keys;
     }
 
-    public IReadOnlyDictionary<string, TypedData> ExportAll()
+    public IReadOnlyDictionary<string, TypedData> SerializeAll()
     {
         return new Dictionary<string, TypedData>(_data, StringComparer.Ordinal);
     }
 
-    public void ImportAll(IReadOnlyDictionary<string, TypedData> data)
+    public void DeserializeAll(IReadOnlyDictionary<string, TypedData> data)
     {
         _data.Clear();
         foreach (var pair in data)

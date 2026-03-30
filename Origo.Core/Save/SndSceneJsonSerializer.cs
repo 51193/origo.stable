@@ -11,13 +11,14 @@ internal sealed class SndSceneJsonSerializer
 
     public SndSceneJsonSerializer(SndWorld world)
     {
-        _world = world ?? throw new ArgumentNullException(nameof(world));
+        ArgumentNullException.ThrowIfNull(world);
+        _world = world;
     }
 
     public string Serialize(ISndSceneAccess sceneAccess)
     {
         ArgumentNullException.ThrowIfNull(sceneAccess);
-        var metaList = sceneAccess.ExportMetaList();
+        var metaList = sceneAccess.SerializeMetaList();
         return _world.SerializeMetaList(metaList);
     }
 

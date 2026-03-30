@@ -17,7 +17,8 @@ public sealed class SystemRun : ISystemRun
 
     public SystemRun(RunFactory factory)
     {
-        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+        ArgumentNullException.ThrowIfNull(factory);
+        _factory = factory;
         SystemBlackboard = _factory.Runtime.SystemBlackboard;
     }
 
@@ -25,18 +26,14 @@ public sealed class SystemRun : ISystemRun
 
     public IProgressRun? LoadOrContinue(string? saveId)
     {
-        var effectiveSaveId = !string.IsNullOrWhiteSpace(saveId)
-            ? saveId
-            : (SystemBlackboard.TryGet<string>(WellKnownKeys.ActiveSaveId) is var active && active.found
-                ? active.value
-                : null) ?? string.Empty;
+        var effectiveSaveId = ResolveEffectiveSaveId(saveId);
 
         if (string.IsNullOrWhiteSpace(effectiveSaveId))
             return null;
 
         var progressJson = SaveStorageFacade.ReadProgressJsonFromSnapshot(
             _factory.FileSystem, _factory.SaveRootPath, effectiveSaveId);
-        if (progressJson == null)
+        if (progressJson is null)
             throw new InvalidOperationException(
                 $"Missing required progress.json in save '{effectiveSaveId}'.");
 
@@ -69,5 +66,14 @@ public sealed class SystemRun : ISystemRun
             throw new ArgumentException("Save id cannot be null or whitespace.", nameof(saveId));
 
         SystemBlackboard.Set(WellKnownKeys.ActiveSaveId, saveId);
+    }
+
+    private string ResolveEffectiveSaveId(string? providedSaveId)
+    {
+        if (!string.IsNullOrWhiteSpace(providedSaveId))
+            return providedSaveId;
+
+        var (found, activeSaveId) = SystemBlackboard.TryGet<string>(WellKnownKeys.ActiveSaveId);
+        return found && !string.IsNullOrWhiteSpace(activeSaveId) ? activeSaveId : string.Empty;
     }
 }

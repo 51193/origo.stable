@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Origo.Core.Abstractions;
@@ -16,14 +17,14 @@ internal sealed class BlackboardJsonSerializer
 
     public string Serialize(IBlackboard blackboard)
     {
-        var data = blackboard.ExportAll();
+        var data = blackboard.SerializeAll();
         return JsonSerializer.Serialize(data, _options);
     }
 
     public void DeserializeInto(IBlackboard blackboard, string json)
     {
         var dict = JsonSerializer.Deserialize<Dictionary<string, TypedData>>(json, _options)
-                   ?? new Dictionary<string, TypedData>();
-        blackboard.ImportAll(dict);
+                   ?? throw new JsonException("Failed to deserialize blackboard data.");
+        blackboard.DeserializeAll(dict);
     }
 }

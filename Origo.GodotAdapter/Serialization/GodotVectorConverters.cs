@@ -24,8 +24,12 @@ public sealed class Vector2JsonConverter : JsonConverter<Vector2>
 
             switch (prop)
             {
-                case "x": x = reader.GetSingle(); break;
-                case "y": y = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.X, nameof(Vector2));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Y, nameof(Vector2));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -36,8 +40,8 @@ public sealed class Vector2JsonConverter : JsonConverter<Vector2>
     public override void Write(Utf8JsonWriter writer, Vector2 value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
         writer.WriteEndObject();
     }
 }
@@ -61,8 +65,12 @@ public sealed class Vector2IJsonConverter : JsonConverter<Vector2I>
 
             switch (prop)
             {
-                case "x": x = reader.GetInt32(); break;
-                case "y": y = reader.GetInt32(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadInt32(ref reader, GodotJsonPropertyNames.X, nameof(Vector2I));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadInt32(ref reader, GodotJsonPropertyNames.Y, nameof(Vector2I));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -73,8 +81,8 @@ public sealed class Vector2IJsonConverter : JsonConverter<Vector2I>
     public override void Write(Utf8JsonWriter writer, Vector2I value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
         writer.WriteEndObject();
     }
 }
@@ -98,9 +106,15 @@ public sealed class Vector3JsonConverter : JsonConverter<Vector3>
 
             switch (prop)
             {
-                case "x": x = reader.GetSingle(); break;
-                case "y": y = reader.GetSingle(); break;
-                case "z": z = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.X, nameof(Vector3));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Y, nameof(Vector3));
+                    break;
+                case GodotJsonPropertyNames.Z:
+                    z = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Z, nameof(Vector3));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -111,9 +125,9 @@ public sealed class Vector3JsonConverter : JsonConverter<Vector3>
     public override void Write(Utf8JsonWriter writer, Vector3 value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
-        writer.WriteNumber("z", value.Z);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.Z, value.Z);
         writer.WriteEndObject();
     }
 }
@@ -137,9 +151,15 @@ public sealed class Vector3IJsonConverter : JsonConverter<Vector3I>
 
             switch (prop)
             {
-                case "x": x = reader.GetInt32(); break;
-                case "y": y = reader.GetInt32(); break;
-                case "z": z = reader.GetInt32(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadInt32(ref reader, GodotJsonPropertyNames.X, nameof(Vector3I));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadInt32(ref reader, GodotJsonPropertyNames.Y, nameof(Vector3I));
+                    break;
+                case GodotJsonPropertyNames.Z:
+                    z = GodotJsonReaderStrict.ReadInt32(ref reader, GodotJsonPropertyNames.Z, nameof(Vector3I));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -150,9 +170,9 @@ public sealed class Vector3IJsonConverter : JsonConverter<Vector3I>
     public override void Write(Utf8JsonWriter writer, Vector3I value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
-        writer.WriteNumber("z", value.Z);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.Z, value.Z);
         writer.WriteEndObject();
     }
 }
@@ -176,10 +196,18 @@ public sealed class Vector4JsonConverter : JsonConverter<Vector4>
 
             switch (prop)
             {
-                case "x": x = reader.GetSingle(); break;
-                case "y": y = reader.GetSingle(); break;
-                case "z": z = reader.GetSingle(); break;
-                case "w": w = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.X, nameof(Vector4));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Y, nameof(Vector4));
+                    break;
+                case GodotJsonPropertyNames.Z:
+                    z = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Z, nameof(Vector4));
+                    break;
+                case GodotJsonPropertyNames.W:
+                    w = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.W, nameof(Vector4));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -190,10 +218,10 @@ public sealed class Vector4JsonConverter : JsonConverter<Vector4>
     public override void Write(Utf8JsonWriter writer, Vector4 value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
-        writer.WriteNumber("z", value.Z);
-        writer.WriteNumber("w", value.W);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.Z, value.Z);
+        writer.WriteNumber(GodotJsonPropertyNames.W, value.W);
         writer.WriteEndObject();
     }
 }

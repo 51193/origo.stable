@@ -8,7 +8,7 @@ namespace Origo.Core.Abstractions;
 /// </summary>
 internal interface INodeHost
 {
-    INodeHandle? GetNode(string name);
+    INodeHandle GetNode(string name);
 
     IReadOnlyCollection<string> GetNodeNames();
 
@@ -16,5 +16,5 @@ internal interface INodeHost
 
     void Release();
 
-    NodeMetaData ExportMetaData();
+    NodeMetaData SerializeMetaData();
 }

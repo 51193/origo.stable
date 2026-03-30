@@ -5,5 +5,5 @@ namespace Origo.Core.Abstractions;
 /// </summary>
 public interface INodeFactory
 {
-    INodeHandle? Create(string logicalName, string resourceId);
+    INodeHandle Create(string logicalName, string resourceId);
 }

@@ -38,9 +38,9 @@ internal sealed class DataObserverManager
     {
         if (!_subscriptions.TryGetValue(name, out var list)) return;
 
-        foreach (var subscription in list)
+        foreach (var subscription in list.ToArray())
         {
-            if (subscription.Filter != null && !subscription.Filter(oldValue, newValue)) continue;
+            if (subscription.Filter is not null && !subscription.Filter(oldValue, newValue)) continue;
             subscription.Callback(oldValue, newValue);
         }
     }

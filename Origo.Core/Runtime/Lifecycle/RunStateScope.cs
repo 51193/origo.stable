@@ -11,8 +11,10 @@ public sealed class RunStateScope
 {
     public RunStateScope(IBlackboard blackboard, StateMachineContainer stateMachines)
     {
-        Blackboard = blackboard ?? throw new ArgumentNullException(nameof(blackboard));
-        StateMachines = stateMachines ?? throw new ArgumentNullException(nameof(stateMachines));
+        ArgumentNullException.ThrowIfNull(blackboard);
+        ArgumentNullException.ThrowIfNull(stateMachines);
+        Blackboard = blackboard;
+        StateMachines = stateMachines;
     }
 
     public IBlackboard Blackboard { get; }

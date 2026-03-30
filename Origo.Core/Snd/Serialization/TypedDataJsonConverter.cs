@@ -15,14 +15,13 @@ public sealed class TypedDataJsonConverter : JsonConverter<TypedData>
 
     public TypedDataJsonConverter(TypeStringMapping typeMapping)
     {
-        _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
+        ArgumentNullException.ThrowIfNull(typeMapping);
+        _typeMapping = typeMapping;
     }
 
     public override TypedData Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        using var doc = JsonDocument.ParseValue(ref reader);
-        var root = doc.RootElement;
-
+        var root = JsonSerializer.Deserialize<JsonElement>(ref reader, options);
         if (root.ValueKind != JsonValueKind.Object)
             throw new JsonException("Expected JSON object for TypedData.");
 
@@ -33,8 +32,7 @@ public sealed class TypedDataJsonConverter : JsonConverter<TypedData>
         if (string.IsNullOrEmpty(typeName))
             throw new JsonException("TypedData 'type' must be a non-empty string.");
 
-        var dataType = _typeMapping.GetTypeByName(typeName)
-                       ?? throw new JsonException($"Unknown type name '{typeName}'.");
+        var dataType = _typeMapping.GetTypeByName(typeName);
 
         if (!root.TryGetProperty("data", out var dataEl))
             return new TypedData(dataType, null);
@@ -60,8 +58,6 @@ public sealed class TypedDataJsonConverter : JsonConverter<TypedData>
         writer.WriteStartObject();
 
         var typeName = _typeMapping.GetNameByType(value.DataType);
-        if (typeName == null)
-            throw new JsonException($"Type '{value.DataType.FullName}' is not registered in TypeStringMapping.");
 
         writer.WriteString("type", typeName);
 

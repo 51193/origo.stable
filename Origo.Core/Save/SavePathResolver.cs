@@ -22,7 +22,11 @@ internal static class SavePathResolver
         var basePrefix = baseDir.Length == 0 ? "/" : $"{baseDir}/";
 
         if (fullPath.StartsWith(basePrefix, StringComparison.Ordinal))
-            return fullPath.Substring(basePrefix.Length);
+        {
+            var relative = fullPath.Substring(basePrefix.Length);
+            RejectPathTraversal(relative);
+            return relative;
+        }
 
         if (string.Equals(fullPath, baseDir, StringComparison.Ordinal))
             return string.Empty;
@@ -40,5 +44,23 @@ internal static class SavePathResolver
         var backslashIndex = trimmed.LastIndexOf('\\');
         var lastSeparator = Math.Max(slashIndex, backslashIndex);
         return lastSeparator < 0 ? trimmed : trimmed.Substring(lastSeparator + 1);
+    }
+
+    /// <summary>
+    ///     拒绝包含 ".." 路径遍历序列的路径片段。
+    /// </summary>
+    internal static void RejectPathTraversal(string pathSegment)
+    {
+        if (string.IsNullOrEmpty(pathSegment))
+            return;
+
+        var normalized = pathSegment.Replace('\\', '/');
+        if (normalized.Contains("../", StringComparison.Ordinal)
+            || normalized.EndsWith("..", StringComparison.Ordinal)
+            || normalized.StartsWith("../", StringComparison.Ordinal)
+            || normalized == "..")
+            throw new ArgumentException(
+                $"Path must not contain path traversal sequences: '{pathSegment}'",
+                nameof(pathSegment));
     }
 }

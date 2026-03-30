@@ -3,18 +3,9 @@ using Origo.Core.Abstractions;
 namespace Origo.Core.Snd.Strategy;
 
 /// <summary>
-///     SND 策略的抽象基类。
-///     通过 SndContext 访问运行时、黑板与存档能力。
-///     <para>
-///         <b>
-///             重要：策略实例通过 SndStrategyPool 在多个实体之间共享复用。
-///             子类必须保持无状态——禁止声明实例字段或属性来存储运行时数据。
-///             所有可变状态必须存储在实体的 Data 中（通过 ISndEntity.SetData/GetData 访问）。
-///             自动发现阶段会校验策略类型，若存在实例字段将拒绝注册并记录错误日志。
-///         </b>
-///     </para>
+///     挂载在 SND 实体上的策略基类，提供实体生命周期钩子。
 /// </summary>
-public abstract class BaseSndStrategy
+public abstract class EntityStrategyBase : BaseStrategy
 {
     public virtual void Process(ISndEntity entity, double delta, SndContext ctx)
     {

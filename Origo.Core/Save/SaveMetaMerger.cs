@@ -33,14 +33,14 @@ public static class SaveMetaMerger
         Dictionary<string, string> merged,
         IReadOnlyDictionary<string, string>? overrides)
     {
-        if (overrides == null)
+        if (overrides is null)
             return;
 
         foreach (var kv in overrides)
         {
             if (string.IsNullOrEmpty(kv.Key))
                 continue;
-            if (kv.Value == null)
+            if (kv.Value is null)
                 continue;
             merged[kv.Key] = kv.Value;
         }

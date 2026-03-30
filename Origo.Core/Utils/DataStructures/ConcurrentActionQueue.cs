@@ -11,18 +11,22 @@ namespace Origo.Core.Utils.DataStructures;
 /// </summary>
 internal class ConcurrentActionQueue
 {
-    private const int MaxDepth = 100;
+    /// <summary>
+    ///     Guard against infinite synchronous re-queue (action enqueues another that runs in the same drain).
+    /// </summary>
+    private const int MaxReentrantDrainDepth = 100;
 
     private readonly List<Action> _actionQueue = [];
     private readonly object _lock = new();
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
 
     /// <summary>
     ///     创建一个新的并发动作队列。
     /// </summary>
-    /// <param name="logger">可选日志接口，用于记录异常情况。</param>
-    public ConcurrentActionQueue(ILogger? logger = null)
+    /// <param name="logger">日志接口，用于记录异常情况。</param>
+    public ConcurrentActionQueue(ILogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
@@ -43,7 +47,7 @@ internal class ConcurrentActionQueue
     /// <param name="action">要执行的动作。</param>
     public void Enqueue(Action action)
     {
-        if (action == null) return;
+        ArgumentNullException.ThrowIfNull(action);
 
         lock (_lock)
         {
@@ -63,11 +67,10 @@ internal class ConcurrentActionQueue
 
         while (true)
         {
-            if (executeBatchCount >= MaxDepth)
+            if (executeBatchCount >= MaxReentrantDrainDepth)
             {
-                _logger?.Log(LogLevel.Error, nameof(ConcurrentActionQueue),
-                    new LogMessageBuilder().Build("Execute depth too deep, queue execution stopped."));
-                break;
+                throw new InvalidOperationException(
+                    $"ConcurrentActionQueue exceeded max re-entrant drain depth ({MaxReentrantDrainDepth}).");
             }
 
             List<Action> currentBatch;
@@ -87,7 +90,7 @@ internal class ConcurrentActionQueue
                 }
                 catch (Exception ex)
                 {
-                    _logger?.Log(LogLevel.Error, nameof(ConcurrentActionQueue),
+                    _logger.Log(LogLevel.Error, nameof(ConcurrentActionQueue),
                         new LogMessageBuilder().Build($"Deferred action execution failed: {ex.Message}"));
                     throw;
                 }

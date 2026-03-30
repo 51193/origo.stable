@@ -3,13 +3,14 @@ using Origo.Core.Abstractions;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
-public class SndCountCommandHandler : IConsoleCommandHandler
+public sealed class SndCountCommandHandler : IConsoleCommandHandler
 {
     private readonly OrigoRuntime _runtime;
 
     public SndCountCommandHandler(OrigoRuntime runtime)
     {
-        _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        ArgumentNullException.ThrowIfNull(runtime);
+        _runtime = runtime;
     }
 
     public string Name => "snd_count";

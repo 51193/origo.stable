@@ -17,7 +17,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -46,10 +46,10 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "push:after:null->a",
-                    "push:after:a->b",
-                    "popquit:before:b->a",
-                    "popquit:before:a->null"
+                    "push:runtime:null->a",
+                    "push:runtime:a->b",
+                    "pop:beforeQuit:b->a",
+                    "pop:beforeQuit:a->null"
                 },
                 events);
         }
@@ -60,12 +60,11 @@ public partial class RandomAndStateMachineTests
     }
 
     [Fact]
-    public void StateMachineStrategyEntityAdapter_GetDataOnly_OtherMembersThrow()
+    public void StateMachineStrategyContext_HoldsMachineKeyAndStackSnapshot()
     {
-        var op = new StateMachineOperationContext("mk", StateMachineDataKeys.OperationPush, null, "top");
-        var adapter = new StateMachineStrategyEntityAdapter(op);
-        Assert.Equal("top", adapter.GetData<string>(StateMachineDataKeys.AfterTop));
-        Assert.Throws<InvalidOperationException>(() => adapter.GetData<int>(StateMachineDataKeys.BeforeTop));
-        Assert.Throws<NotSupportedException>(() => adapter.SetData("a", 1));
+        var ctx = new StateMachineStrategyContext("mk", null, "top");
+        Assert.Equal("mk", ctx.MachineKey);
+        Assert.Null(ctx.BeforeTop);
+        Assert.Equal("top", ctx.AfterTop);
     }
 }

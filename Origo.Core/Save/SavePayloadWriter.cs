@@ -15,10 +15,7 @@ internal static class SavePayloadWriter
         ArgumentNullException.ThrowIfNull(fileSystem);
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
-        if (string.IsNullOrWhiteSpace(progressJson))
-            throw new InvalidOperationException("Missing required ProgressJson (strict mode).");
-        if (string.IsNullOrWhiteSpace(progressStateMachinesJson))
-            throw new InvalidOperationException("Missing required ProgressStateMachinesJson (strict mode).");
+        ValidateStrictProgressPayload(progressJson, progressStateMachinesJson);
 
         var currentRel = SavePathLayout.GetCurrentDirectory();
         var currentAbs = fileSystem.CombinePath(saveRootPath, currentRel);
@@ -45,21 +42,25 @@ internal static class SavePayloadWriter
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
 
-        if (string.IsNullOrWhiteSpace(payload.ProgressJson))
-            throw new InvalidOperationException("Save payload missing required ProgressJson (strict mode).");
-        if (string.IsNullOrWhiteSpace(payload.ProgressStateMachinesJson))
-            throw new InvalidOperationException(
-                "Save payload missing required ProgressStateMachinesJson (strict mode).");
+        ValidateStrictProgressPayload(payload.ProgressJson, payload.ProgressStateMachinesJson);
+
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        var currentAbs = fileSystem.CombinePath(saveRootPath, currentRel);
+        fileSystem.CreateDirectory(currentAbs);
+
+        var markerRel = SavePathLayout.GetWriteInProgressMarker(currentRel);
+        var markerAbs = fileSystem.CombinePath(saveRootPath, markerRel);
+        fileSystem.WriteAllText(markerAbs, "", true);
+
         WriteProgressOnlyToCurrent(
             fileSystem,
             saveRootPath,
             payload.ProgressJson,
             payload.ProgressStateMachinesJson);
 
-        var currentRel = SavePathLayout.GetCurrentDirectory();
         var customMetaRel = SavePathLayout.GetCustomMetaFile(currentRel);
         var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
-        if (payload.CustomMeta != null && payload.CustomMeta.Count > 0)
+        if (payload.CustomMeta is not null && payload.CustomMeta.Count > 0)
         {
             var metaText = SaveMetaMapCodec.Serialize(payload.CustomMeta);
             SavePathResolver.EnsureParentDirectory(fileSystem, customMetaAbs);
@@ -75,6 +76,8 @@ internal static class SavePayloadWriter
                 $"Active level '{payload.ActiveLevelId}' not found in SaveGamePayload.");
 
         WriteLevelPayload(fileSystem, saveRootPath, currentRel, level, true);
+
+        fileSystem.Delete(markerAbs);
     }
 
     public static void WriteLevelPayloadOnly(
@@ -120,5 +123,13 @@ internal static class SavePayloadWriter
             throw new InvalidOperationException(
                 $"Level payload '{level.LevelId}' missing required SessionStateMachinesJson (strict mode).");
         fileSystem.WriteAllText(sessionSmAbs, level.SessionStateMachinesJson, overwrite);
+    }
+
+    private static void ValidateStrictProgressPayload(string progressJson, string progressStateMachinesJson)
+    {
+        if (string.IsNullOrWhiteSpace(progressJson))
+            throw new InvalidOperationException("Missing required ProgressJson (strict mode).");
+        if (string.IsNullOrWhiteSpace(progressStateMachinesJson))
+            throw new InvalidOperationException("Missing required ProgressStateMachinesJson (strict mode).");
     }
 }

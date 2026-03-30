@@ -12,7 +12,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -27,6 +27,7 @@ public class SndContextChangeLevelContractTests
         ctx.RequestChangeLevel("b");
         ctx.FlushDeferredActionsForCurrentFrame();
 
+        Assert.NotNull(ctx.ProgressBlackboard);
         var (found, activeLevel) = ctx.ProgressBlackboard.TryGet<string>("origo.active_level_id");
         Assert.True(found);
         Assert.Equal("b", activeLevel);
@@ -37,7 +38,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -47,13 +48,14 @@ public class SndContextChangeLevelContractTests
 
         // Add some scene state we can observe being cleared.
         runtime.Snd.SceneHost.Spawn(new SndMetaData { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
-        Assert.NotEmpty(runtime.Snd.ExportMetaList());
+        Assert.NotEmpty(runtime.Snd.SerializeMetaList());
 
         // level_c payload not seeded in current/ => should clear and enter empty session per README contract.
         ctx.RequestChangeLevel("c");
         ctx.FlushDeferredActionsForCurrentFrame();
 
-        Assert.Empty(runtime.Snd.ExportMetaList());
+        Assert.Empty(runtime.Snd.SerializeMetaList());
+        Assert.NotNull(ctx.ProgressBlackboard);
         var (found, activeLevel) = ctx.ProgressBlackboard.TryGet<string>("origo.active_level_id");
         Assert.True(found);
         Assert.Equal("c", activeLevel);
@@ -64,7 +66,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -85,7 +87,7 @@ public class SndContextChangeLevelContractTests
     public void RequestChangeLevel_WhenNewLevelIdIsWhitespace_Throws()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost());
+        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 

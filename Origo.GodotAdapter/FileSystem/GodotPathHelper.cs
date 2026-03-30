@@ -1,3 +1,5 @@
+using System;
+
 namespace Origo.GodotAdapter.FileSystem;
 
 internal static class GodotPathHelper
@@ -8,6 +10,17 @@ internal static class GodotPathHelper
             return relativePath;
         if (string.IsNullOrEmpty(relativePath))
             return basePath;
+
+        // Reject path traversal sequences to prevent directory escape.
+        if (relativePath.Contains("..", StringComparison.Ordinal))
+        {
+            var normalized = relativePath.Replace('\\', '/');
+            if (normalized.Contains("../", StringComparison.Ordinal)
+                || normalized.EndsWith("..", StringComparison.Ordinal))
+                throw new ArgumentException(
+                    $"Relative path must not contain path traversal sequences: '{relativePath}'",
+                    nameof(relativePath));
+        }
 
         return $"{basePath.TrimEnd('/')}/{relativePath.TrimStart('/')}";
     }

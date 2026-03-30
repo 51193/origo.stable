@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Origo.Core.Abstractions;
 using Origo.Core.Scheduling;
 using Origo.Core.Serialization;
 using Xunit;
@@ -11,7 +12,7 @@ public class SchedulingAndTypeMappingTests
     [Fact]
     public void ActionScheduler_Tick_ExecutesQueuedAndNestedActions()
     {
-        var scheduler = new ActionScheduler();
+        var scheduler = new ActionScheduler(NullLogger.Instance);
         var order = new List<int>();
 
         scheduler.Enqueue(() =>
@@ -30,7 +31,7 @@ public class SchedulingAndTypeMappingTests
     [Fact]
     public void ActionScheduler_Clear_RemovesPendingActions()
     {
-        var scheduler = new ActionScheduler();
+        var scheduler = new ActionScheduler(NullLogger.Instance);
         scheduler.Enqueue(() => throw new InvalidOperationException("should not execute"));
         scheduler.Clear();
 

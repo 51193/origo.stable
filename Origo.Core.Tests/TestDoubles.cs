@@ -61,11 +61,11 @@ internal sealed class TestNodeFactory : INodeFactory
     public readonly List<(string logicalName, string resourceId)> Requests = new();
     public readonly List<TestNodeHandle> CreatedHandles = new();
 
-    public INodeHandle? Create(string logicalName, string resourceId)
+    public INodeHandle Create(string logicalName, string resourceId)
     {
         Requests.Add((logicalName, resourceId));
         if (_resourceIdsThatFail.Contains(resourceId))
-            return null;
+            throw new InvalidOperationException($"Simulated node creation failure for resourceId='{resourceId}'.");
 
         var handle = new TestNodeHandle(logicalName, resourceId);
         CreatedHandles.Add(handle);
@@ -77,6 +77,8 @@ internal sealed class TestFileSystem : IFileSystem
 {
     private readonly Dictionary<string, string> _files = new(StringComparer.Ordinal);
     private readonly HashSet<string> _directories = new(StringComparer.Ordinal);
+
+    public int ReadAllTextCallCount { get; private set; }
 
     public void SeedFile(string path, string content)
     {
@@ -96,6 +98,7 @@ internal sealed class TestFileSystem : IFileSystem
 
     public string ReadAllText(string path)
     {
+        ReadAllTextCallCount++;
         var normalized = Normalize(path);
         return _files[normalized];
     }
@@ -204,6 +207,48 @@ internal sealed class TestFileSystem : IFileSystem
         return children;
     }
 
+    public void Rename(string sourcePath, string destinationPath)
+    {
+        var src = Normalize(sourcePath).TrimEnd('/');
+        var dst = Normalize(destinationPath).TrimEnd('/');
+
+        // Move all files under source to destination
+        var srcPrefix = src + "/";
+        var filesToMove = _files.Keys.Where(f => f.StartsWith(srcPrefix, StringComparison.Ordinal) || f == src).ToList();
+        foreach (var file in filesToMove)
+        {
+            var newPath = dst + file.Substring(src.Length);
+            _files[newPath] = _files[file];
+            _files.Remove(file);
+            EnsureParents(newPath);
+        }
+
+        // Move all directories under source to destination
+        var dirsToMove = _directories.Where(d => d.StartsWith(srcPrefix, StringComparison.Ordinal) || d == src).ToList();
+        foreach (var dir in dirsToMove)
+        {
+            var newDir = dst + dir.Substring(src.Length);
+            _directories.Remove(dir);
+            _directories.Add(newDir);
+        }
+
+        EnsureParents(dst + "/dummy");
+    }
+
+    public void DeleteDirectory(string directoryPath)
+    {
+        var normalized = Normalize(directoryPath).TrimEnd('/');
+        var prefix = normalized + "/";
+
+        var filesToRemove = _files.Keys.Where(f => f.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        foreach (var file in filesToRemove)
+            _files.Remove(file);
+
+        var dirsToRemove = _directories.Where(d => d == normalized || d.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        foreach (var dir in dirsToRemove)
+            _directories.Remove(dir);
+    }
+
     private static string Normalize(string path)
     {
         return path.Replace('\\', '/').Trim();
@@ -238,16 +283,10 @@ internal sealed class TestSndSceneHost : ISndSceneHost
 
     public IReadOnlyCollection<ISndEntity> GetEntities() => _entities;
 
-    public ISndEntity? FindByName(string name)
-    {
-        return _entities.FirstOrDefault(e =>
-        {
-            var (found, value) = e.TryGetData<string>("name");
-            return found && value == name;
-        });
-    }
+    public ISndEntity? FindByName(string name) =>
+        _entities.FirstOrDefault(e => e.Name == name);
 
-    public IReadOnlyList<SndMetaData> ExportMetaList() => _metaList.ToArray();
+    public IReadOnlyList<SndMetaData> SerializeMetaList() => _metaList.ToArray();
 
     public void LoadFromMetaList(IEnumerable<SndMetaData> metaList)
     {
@@ -278,11 +317,11 @@ internal sealed class DummySndEntity : ISndEntity
 
     public void SetData<T>(string name, T value) => _data[name] = value;
     public T GetData<T>(string name) => _data.TryGetValue(name, out var value) && value is T cast ? cast : default!;
-    public (bool found, T value) TryGetData<T>(string name)
+    public (bool found, T? value) TryGetData<T>(string name)
     {
         if (_data.TryGetValue(name, out var value) && value is T cast)
             return (true, cast);
-        return (false, default!);
+        return (false, default);
     }
 
     public void Subscribe(string name, Action<ISndEntity, object?, object?> callback, Func<ISndEntity, object?, object?, bool>? filter = null)
@@ -293,7 +332,8 @@ internal sealed class DummySndEntity : ISndEntity
     {
     }
 
-    public INodeHandle? GetNode(string name) => null;
+    public INodeHandle GetNode(string name) =>
+        throw new InvalidOperationException($"Node '{name}' not found.");
     public IReadOnlyCollection<string> GetNodeNames() => Array.Empty<string>();
     public void AddStrategy(string index) { }
     public void RemoveStrategy(string index) { }

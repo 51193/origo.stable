@@ -24,10 +24,18 @@ public sealed class QuaternionJsonConverter : JsonConverter<Quaternion>
 
             switch (prop)
             {
-                case "x": x = reader.GetSingle(); break;
-                case "y": y = reader.GetSingle(); break;
-                case "z": z = reader.GetSingle(); break;
-                case "w": w = reader.GetSingle(); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.X, nameof(Quaternion));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Y, nameof(Quaternion));
+                    break;
+                case GodotJsonPropertyNames.Z:
+                    z = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.Z, nameof(Quaternion));
+                    break;
+                case GodotJsonPropertyNames.W:
+                    w = GodotJsonReaderStrict.ReadSingle(ref reader, GodotJsonPropertyNames.W, nameof(Quaternion));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -38,10 +46,10 @@ public sealed class QuaternionJsonConverter : JsonConverter<Quaternion>
     public override void Write(Utf8JsonWriter writer, Quaternion value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
-        writer.WriteNumber("x", value.X);
-        writer.WriteNumber("y", value.Y);
-        writer.WriteNumber("z", value.Z);
-        writer.WriteNumber("w", value.W);
+        writer.WriteNumber(GodotJsonPropertyNames.X, value.X);
+        writer.WriteNumber(GodotJsonPropertyNames.Y, value.Y);
+        writer.WriteNumber(GodotJsonPropertyNames.Z, value.Z);
+        writer.WriteNumber(GodotJsonPropertyNames.W, value.W);
         writer.WriteEndObject();
     }
 }
@@ -67,9 +75,18 @@ public sealed class BasisJsonConverter : JsonConverter<Basis>
 
             switch (prop)
             {
-                case "x": x = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
-                case "y": y = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
-                case "z": z = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options, GodotJsonPropertyNames.X,
+                        nameof(Basis));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options, GodotJsonPropertyNames.Y,
+                        nameof(Basis));
+                    break;
+                case GodotJsonPropertyNames.Z:
+                    z = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options, GodotJsonPropertyNames.Z,
+                        nameof(Basis));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -81,13 +98,13 @@ public sealed class BasisJsonConverter : JsonConverter<Basis>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("x");
+        writer.WritePropertyName(GodotJsonPropertyNames.X);
         JsonSerializer.Serialize(writer, value.X, options);
 
-        writer.WritePropertyName("y");
+        writer.WritePropertyName(GodotJsonPropertyNames.Y);
         JsonSerializer.Serialize(writer, value.Y, options);
 
-        writer.WritePropertyName("z");
+        writer.WritePropertyName(GodotJsonPropertyNames.Z);
         JsonSerializer.Serialize(writer, value.Z, options);
 
         writer.WriteEndObject();
@@ -114,8 +131,14 @@ public sealed class Transform3DJsonConverter : JsonConverter<Transform3D>
 
             switch (prop)
             {
-                case "basis": basis = JsonSerializer.Deserialize<Basis>(ref reader, options); break;
-                case "origin": origin = JsonSerializer.Deserialize<Vector3>(ref reader, options); break;
+                case GodotJsonPropertyNames.BasisProperty:
+                    basis = GodotJsonReaderStrict.DeserializeChild<Basis>(ref reader, options,
+                        GodotJsonPropertyNames.BasisProperty, nameof(Transform3D));
+                    break;
+                case GodotJsonPropertyNames.OriginProperty:
+                    origin = GodotJsonReaderStrict.DeserializeChild<Vector3>(ref reader, options,
+                        GodotJsonPropertyNames.OriginProperty, nameof(Transform3D));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -127,10 +150,10 @@ public sealed class Transform3DJsonConverter : JsonConverter<Transform3D>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("basis");
+        writer.WritePropertyName(GodotJsonPropertyNames.BasisProperty);
         JsonSerializer.Serialize(writer, value.Basis, options);
 
-        writer.WritePropertyName("origin");
+        writer.WritePropertyName(GodotJsonPropertyNames.OriginProperty);
         JsonSerializer.Serialize(writer, value.Origin, options);
 
         writer.WriteEndObject();
@@ -158,9 +181,18 @@ public sealed class Transform2DJsonConverter : JsonConverter<Transform2D>
 
             switch (prop)
             {
-                case "x": x = JsonSerializer.Deserialize<Vector2>(ref reader, options); break;
-                case "y": y = JsonSerializer.Deserialize<Vector2>(ref reader, options); break;
-                case "origin": origin = JsonSerializer.Deserialize<Vector2>(ref reader, options); break;
+                case GodotJsonPropertyNames.X:
+                    x = GodotJsonReaderStrict.DeserializeChild<Vector2>(ref reader, options, GodotJsonPropertyNames.X,
+                        nameof(Transform2D));
+                    break;
+                case GodotJsonPropertyNames.Y:
+                    y = GodotJsonReaderStrict.DeserializeChild<Vector2>(ref reader, options, GodotJsonPropertyNames.Y,
+                        nameof(Transform2D));
+                    break;
+                case GodotJsonPropertyNames.OriginProperty:
+                    origin = GodotJsonReaderStrict.DeserializeChild<Vector2>(ref reader, options,
+                        GodotJsonPropertyNames.OriginProperty, nameof(Transform2D));
+                    break;
                 default: reader.Skip(); break;
             }
         }
@@ -172,13 +204,13 @@ public sealed class Transform2DJsonConverter : JsonConverter<Transform2D>
     {
         writer.WriteStartObject();
 
-        writer.WritePropertyName("x");
+        writer.WritePropertyName(GodotJsonPropertyNames.X);
         JsonSerializer.Serialize(writer, value.X, options);
 
-        writer.WritePropertyName("y");
+        writer.WritePropertyName(GodotJsonPropertyNames.Y);
         JsonSerializer.Serialize(writer, value.Y, options);
 
-        writer.WritePropertyName("origin");
+        writer.WritePropertyName(GodotJsonPropertyNames.OriginProperty);
         JsonSerializer.Serialize(writer, value.Origin, options);
 
         writer.WriteEndObject();

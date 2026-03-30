@@ -14,10 +14,10 @@ public class PersistentBlackboardTests
         var fs = new TestFileSystem();
         var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
         var path = "user://origo/system.json";
-        var board = new PersistentBlackboard(fs, path, options);
+        var board = new PersistentBlackboard(fs, path, options, new Origo.Core.Blackboard.Blackboard());
 
         board.Set("n", 7);
-        var loaded = new PersistentBlackboard(fs, path, options);
+        var loaded = new PersistentBlackboard(fs, path, options, new Origo.Core.Blackboard.Blackboard());
         loaded.LoadFromDisk();
         var (found, n) = loaded.TryGet<int>("n");
 
@@ -31,7 +31,7 @@ public class PersistentBlackboardTests
         var fs = new TestFileSystem();
         var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
         var path = "user://origo/system.json";
-        var board = new PersistentBlackboard(fs, path, options);
+        var board = new PersistentBlackboard(fs, path, options, new Origo.Core.Blackboard.Blackboard());
         board.Set("x", 1);
         board.Clear();
 

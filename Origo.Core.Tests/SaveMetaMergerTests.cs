@@ -80,7 +80,7 @@ public class SaveMetaMergerTests
 
     private sealed class NullSceneHost : ISndSceneHost
     {
-        public IReadOnlyList<SndMetaData> ExportMetaList() => Array.Empty<SndMetaData>();
+        public IReadOnlyList<SndMetaData> SerializeMetaList() => Array.Empty<SndMetaData>();
 
         public void LoadFromMetaList(IEnumerable<SndMetaData> metaList)
         {

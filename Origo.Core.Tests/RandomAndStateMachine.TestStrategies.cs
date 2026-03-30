@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
@@ -18,56 +17,47 @@ public partial class RandomAndStateMachineTests
     }
 
     [StrategyIndex("sm.push.test")]
-    private sealed class SmPushStrategy : BaseSndStrategy
+    private sealed class SmPushStrategy : StateMachineStrategyBase
     {
         public static List<string>? PushEvents { get; set; }
         public static List<string>? AfterLoadEvents { get; set; }
 
-        public override void AfterAdd(ISndEntity entity, SndContext ctx)
+        public override void OnPushRuntime(StateMachineStrategyContext context, SndContext ctx)
         {
-            var before = entity.GetData<string>(StateMachineDataKeys.BeforeTop);
-            var after = entity.GetData<string>(StateMachineDataKeys.AfterTop);
-            PushEvents?.Add($"push:after:{before ?? "null"}->{after ?? "null"}");
+            PushEvents?.Add($"push:runtime:{context.BeforeTop ?? "null"}->{context.AfterTop ?? "null"}");
         }
 
-        public override void AfterLoad(ISndEntity entity, SndContext ctx)
+        public override void OnPushAfterLoad(StateMachineStrategyContext context, SndContext ctx)
         {
-            var before = entity.GetData<string>(StateMachineDataKeys.BeforeTop);
-            var after = entity.GetData<string>(StateMachineDataKeys.AfterTop);
-            AfterLoadEvents?.Add($"afterload:{before ?? "null"}->{after ?? "null"}");
+            AfterLoadEvents?.Add($"push:afterload:{context.BeforeTop ?? "null"}->{context.AfterTop ?? "null"}");
         }
     }
 
     [StrategyIndex("sm.pop.test")]
-    private sealed class SmPopStrategy : BaseSndStrategy
+    private sealed class SmPopStrategy : StateMachineStrategyBase
     {
         public static List<string>? PopRemoveEvents { get; set; }
         public static List<string>? PopQuitEvents { get; set; }
 
-        public override void BeforeRemove(ISndEntity entity, SndContext ctx)
+        public override void OnPopRuntime(StateMachineStrategyContext context, SndContext ctx)
         {
-            var before = entity.GetData<string>(StateMachineDataKeys.BeforeTop);
-            var after = entity.GetData<string>(StateMachineDataKeys.AfterTop);
-            PopRemoveEvents?.Add($"popremove:before:{before ?? "null"}->{after ?? "null"}");
+            PopRemoveEvents?.Add($"pop:runtime:{context.BeforeTop ?? "null"}->{context.AfterTop ?? "null"}");
         }
 
-        public override void BeforeQuit(ISndEntity entity, SndContext ctx)
+        public override void OnPopBeforeQuit(StateMachineStrategyContext context, SndContext ctx)
         {
-            var before = entity.GetData<string>(StateMachineDataKeys.BeforeTop);
-            var after = entity.GetData<string>(StateMachineDataKeys.AfterTop);
-            PopQuitEvents?.Add($"popquit:before:{before ?? "null"}->{after ?? "null"}");
+            PopQuitEvents?.Add($"pop:beforeQuit:{context.BeforeTop ?? "null"}->{context.AfterTop ?? "null"}");
         }
     }
 
     [StrategyIndex("sm.pop.orderprobe")]
-    private sealed class SmPopOrderProbeStrategy : BaseSndStrategy
+    private sealed class SmPopOrderProbeStrategy : StateMachineStrategyBase
     {
         public static List<string>? Events { get; set; }
 
-        public override void BeforeQuit(ISndEntity entity, SndContext ctx)
+        public override void OnPopBeforeQuit(StateMachineStrategyContext context, SndContext ctx)
         {
-            var mk = entity.GetData<string>(StateMachineDataKeys.MachineKey);
-            Events?.Add(mk);
+            Events?.Add(context.MachineKey);
         }
     }
 }

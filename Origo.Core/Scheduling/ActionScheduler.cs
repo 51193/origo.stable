@@ -12,7 +12,7 @@ public sealed class ActionScheduler : IScheduler
 {
     private readonly ConcurrentActionQueue _queue;
 
-    public ActionScheduler(ILogger? logger = null)
+    public ActionScheduler(ILogger logger)
     {
         _queue = new ConcurrentActionQueue(logger);
     }

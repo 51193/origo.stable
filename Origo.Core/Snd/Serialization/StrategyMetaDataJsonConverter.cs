@@ -30,7 +30,8 @@ public sealed class StrategyMetaDataJsonConverter : JsonConverter<StrategyMetaDa
                 {
                     case "indices":
                         result.Indices =
-                            JsonSerializer.Deserialize<List<string>>(ref reader, options) ?? new List<string>();
+                            JsonSerializer.Deserialize<List<string>>(ref reader, options)
+                            ?? throw new JsonException("Failed to deserialize strategy indices.");
                         break;
                     default:
                         reader.Skip();

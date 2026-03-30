@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using Origo.Core.Runtime;
 
@@ -17,6 +18,13 @@ public partial class OrigoConsolePump : Node
 
     public override void _Process(double delta)
     {
-        Runtime?.Console?.ProcessPending();
+        try
+        {
+            Runtime?.Console?.ProcessPending();
+        }
+        catch (Exception ex)
+        {
+            GD.PushError($"[OrigoConsolePump] Console processing error: {ex.Message}");
+        }
     }
 }

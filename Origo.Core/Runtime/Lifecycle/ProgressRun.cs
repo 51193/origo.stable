@@ -20,10 +20,14 @@ public sealed partial class ProgressRun : IProgressRun
         string saveId,
         string activeLevelId)
     {
-        _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-        ProgressScope = progressScope ?? throw new ArgumentNullException(nameof(progressScope));
-        SaveId = saveId ?? throw new ArgumentNullException(nameof(saveId));
-        ActiveLevelId = activeLevelId ?? throw new ArgumentNullException(nameof(activeLevelId));
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(progressScope);
+        ArgumentNullException.ThrowIfNull(saveId);
+        ArgumentNullException.ThrowIfNull(activeLevelId);
+        _factory = factory;
+        ProgressScope = progressScope;
+        SaveId = saveId;
+        ActiveLevelId = activeLevelId;
         ProgressScope.Blackboard.Set(WellKnownKeys.ActiveLevelId, ActiveLevelId);
     }
 

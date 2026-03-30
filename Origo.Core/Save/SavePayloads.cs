@@ -7,10 +7,19 @@ namespace Origo.Core.Save;
 /// </summary>
 public sealed class LevelPayload
 {
+    /// <summary>
+    ///     关卡唯一标识符。
+    /// </summary>
     public string LevelId { get; set; } = string.Empty;
 
+    /// <summary>
+    ///     该关卡 SND 场景的序列化 JSON。
+    /// </summary>
     public string SndSceneJson { get; set; } = string.Empty;
 
+    /// <summary>
+    ///     该关卡 Session 黑板的序列化 JSON。
+    /// </summary>
     public string SessionJson { get; set; } = string.Empty;
 
     /// <summary>
@@ -25,10 +34,29 @@ public sealed class LevelPayload
 /// </summary>
 public sealed class SaveGamePayload
 {
+    /// <summary>
+    ///     当前存档格式版本号。变更时递增，用于启动时校验格式兼容性。
+    /// </summary>
+    public const int CurrentFormatVersion = 1;
+
+    /// <summary>
+    ///     存档格式版本号，用于加载时校验兼容性。
+    /// </summary>
+    public int FormatVersion { get; set; } = CurrentFormatVersion;
+
+    /// <summary>
+    ///     存档槽唯一标识符。
+    /// </summary>
     public string SaveId { get; set; } = string.Empty;
 
+    /// <summary>
+    ///     当前活跃关卡的标识符。
+    /// </summary>
     public string ActiveLevelId { get; set; } = string.Empty;
 
+    /// <summary>
+    ///     流程级黑板的序列化 JSON。
+    /// </summary>
     public string ProgressJson { get; set; } = string.Empty;
 
     /// <summary>
@@ -42,5 +70,8 @@ public sealed class SaveGamePayload
     /// </summary>
     public IReadOnlyDictionary<string, string>? CustomMeta { get; set; }
 
+    /// <summary>
+    ///     按关卡 ID 索引的所有关卡存档数据。
+    /// </summary>
     public Dictionary<string, LevelPayload> Levels { get; set; } = new();
 }

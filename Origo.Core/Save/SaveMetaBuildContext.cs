@@ -15,11 +15,16 @@ public readonly struct SaveMetaBuildContext
         IBlackboard session,
         ISndSceneAccess sceneAccess)
     {
-        SaveId = saveId ?? throw new ArgumentNullException(nameof(saveId));
-        CurrentLevelId = currentLevelId ?? throw new ArgumentNullException(nameof(currentLevelId));
-        Progress = progress ?? throw new ArgumentNullException(nameof(progress));
-        Session = session ?? throw new ArgumentNullException(nameof(session));
-        SceneAccess = sceneAccess ?? throw new ArgumentNullException(nameof(sceneAccess));
+        ArgumentNullException.ThrowIfNull(saveId);
+        ArgumentNullException.ThrowIfNull(currentLevelId);
+        ArgumentNullException.ThrowIfNull(progress);
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sceneAccess);
+        SaveId = saveId;
+        CurrentLevelId = currentLevelId;
+        Progress = progress;
+        Session = session;
+        SceneAccess = sceneAccess;
     }
 
     public string SaveId { get; }

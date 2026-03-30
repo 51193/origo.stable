@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
@@ -57,8 +58,9 @@ public class ConsoleTests
         var runtime = new OrigoRuntime(
             logger,
             sceneHost,
+            typeMapping,
             _ => { },
-            null,
+            new Origo.Core.Blackboard.Blackboard(),
             new ConsoleInputQueue(),
             new ConsoleOutputChannel());
 
@@ -72,8 +74,8 @@ public class ConsoleTests
         input.Enqueue("spawn Boss1 enemy_template");
         runtime.Console!.ProcessPending();
 
-        Assert.Single(sceneHost.ExportMetaList());
-        Assert.Equal("Boss1", sceneHost.ExportMetaList()[0].Name);
+        Assert.Single(sceneHost.SerializeMetaList());
+        Assert.Equal("Boss1", sceneHost.SerializeMetaList()[0].Name);
         Assert.Contains(messages, m => m.Contains("Spawned 'Boss1'", System.StringComparison.Ordinal));
     }
 
@@ -91,8 +93,9 @@ public class ConsoleTests
         var runtime = new OrigoRuntime(
             logger,
             sceneHost,
+            typeMapping,
             _ => { },
-            null,
+            new Origo.Core.Blackboard.Blackboard(),
             new ConsoleInputQueue(),
             new ConsoleOutputChannel());
 
@@ -106,8 +109,13 @@ public class ConsoleTests
         input.Enqueue("spawn X missing_tpl");
         runtime.Console!.ProcessPending();
 
-        Assert.Empty(sceneHost.ExportMetaList());
-        Assert.Contains(messages, l => l.Contains("not found", System.StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(sceneHost.SerializeMetaList());
+        Assert.Contains(messages,
+            l => l.StartsWith("Command failed:", StringComparison.Ordinal)
+                 && (l.Contains("empty", StringComparison.OrdinalIgnoreCase)
+                     || l.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                     || l.Contains("missing_tpl", StringComparison.OrdinalIgnoreCase)
+                     || l.Contains("No templates loaded", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -127,13 +135,15 @@ public class ConsoleTests
 
         var logger = new TestLogger();
         var sceneHost = new TestSndSceneHost();
-        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var typeMapping = new TypeStringMapping();
+        var options = OrigoJson.CreateDefaultOptions(typeMapping);
 
         var runtime = new OrigoRuntime(
             logger,
             sceneHost,
+            typeMapping,
             _ => { },
-            null,
+            new Origo.Core.Blackboard.Blackboard(),
             new ConsoleInputQueue(),
             new ConsoleOutputChannel());
 
@@ -147,7 +157,7 @@ public class ConsoleTests
         input.Enqueue("spawn Dup enemy_template");
         runtime.Console!.ProcessPending();
 
-        Assert.Single(sceneHost.ExportMetaList());
+        Assert.Single(sceneHost.SerializeMetaList());
         Assert.Contains(messages, l => l.Contains("already exists", System.StringComparison.OrdinalIgnoreCase));
     }
 }

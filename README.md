@@ -1,174 +1,804 @@
 # Origo
-A platform-agnostic pure C# game framework built around the **SND (Strategy-Node-Data)** entity model and the **Strategy Pattern**, decoupled from engines through interface abstractions.
-## Project Structure
-```
-Origo.Core/                Pure C# core framework (Microsoft.NET.Sdk, no engine dependency)
-Origo.GodotAdapter/        Godot adapter layer (Godot.NET.Sdk, thin implementation + DI)
-Origo.Core.Tests/          Core test project (xUnit v3)
-Origo.GodotAdapter.Tests/  Adapter test project (xUnit v3)
-```
+
+[简体中文](README.zh-CN.md)
+
+<!-- badges placeholder -->
+
+**Origo** is a platform-agnostic, pure C# game framework built around the **SND (Strategy–Node–Data)** entity model and the **strategy pattern**. All engine-specific code is isolated behind interfaces so the Core library remains completely engine-free. An official **Godot 4** adapter is included.
+
+> **Audience:** This README is for **game developers integrating Origo** into a project — API surface, setup instructions, naming conventions, on-disk layouts, and subsystem boundaries. Implementation internals live in code and tests.
+
 ---
-## Architectural Principles
-1. **Core contains only platform-agnostic logic**. All engine interactions must go through interfaces in `Abstractions/`.
-2. **Adapter has exactly two responsibilities**: provide engine-specific implementations of Core interfaces, and perform dependency injection at startup. No game business logic.
-3. The **game layer** only focuses on strategy implementations (inherit `BaseSndStrategy`) and data configuration (JSON).
+
+## ✨ Features
+
+- **SND entity model** — compose entities from Data, Nodes, and Strategies instead of deep class hierarchies
+- **Stateless strategy pool** — shared, reference-counted, pooled strategy instances with fail-fast type safety
+- **Three-layer lifecycle** — `SystemRun` → `ProgressRun` → `SessionRun` with matching blackboards
+- **Complete save system** — slot-based save/load, continue, auto-save, level switching, and `meta.map` for UI
+- **Stack state machines** — push/pop string-based state machines with strategy hooks, persisted per layer
+- **Typed blackboards** — `IBlackboard` with `TypedData` values that survive serialization round-trips
+- **Built-in developer console** — `spawn`, `snd_count`, and custom commands via pub/sub output
+- **Deterministic RNG** — XorShift128+ implementation behind `IRandom`
+- **Platform-agnostic Core** — depends only on .NET 8; no engine symbols leak into `Origo.Core`
+- **Godot 4 adapter** — thin implementations + DI wiring; swap with your own adapter for Unity, MonoGame, etc.
+
 ---
-## Internal Architecture (OOD + Business Flows)
-### Object-Oriented Layers and Responsibility Boundaries
-- **Composition over inheritance**: `SndEntity` is the aggregate root and composes `SndDataManager` (data), `SndNodeManager` (nodes), and `SndStrategyManager` (behaviors).
-- **Dependency Inversion (DIP)**: Core depends on abstractions such as `IFileSystem`, `ISndSceneHost`, `INodeFactory`, and `ILogger`; concrete Godot implementations live in the Adapter.
-- **Facade orchestration**: `OrigoRuntime` provides unified runtime capabilities, `SndRuntime` provides unified entity operations, and `SndContext` provides save/load/change-level APIs.
-- **Explicit lifecycle modeling**: `SystemRun -> ProgressRun -> SessionRun` represent system-level, flow-level, and session-level states to avoid a single overloaded context object.
-- **Strategy pool reuse**: `SndStrategyPool` handles strategy creation, sharing, and reference-counted recycling. Strategies hook into entity behavior via `BaseSndStrategy` lifecycle hooks.
-### Key Runtime Object Relations
+
+## 📂 Project Layout
+
 ```
-OrigoDefaultEntry (Godot startup entry)
-  -> OrigoAutoHost (creates Runtime + injects adapter implementations)
-    -> OrigoRuntime
-      -> SndWorld (StrategyPool / Json / Mappings)
-      -> SndRuntime (ISndSceneHost facade)
-      -> SystemBlackboard
-  -> SndContext (save/load/change-level orchestration)
-    -> RunFactory
-      -> SystemRun -> ProgressRun -> SessionRun
+Origo.Core/               Pure C# core (Microsoft.NET.Sdk, net8.0, no engine dependency)
+Origo.GodotAdapter/       Godot 4 adapter (Godot.NET.Sdk 4.6.1, thin implementations + DI)
+Origo.Core.Tests/         Core unit tests (xUnit v3, 283 tests)
+Origo.GodotAdapter.Tests/ Adapter unit tests (xUnit v3, 1 test)
+scripts/                  Build & utility scripts
+Directory.Build.props     Shared MSBuild properties
+Origo.sln                 Solution file
 ```
-### Business Flow 1: Startup to Main Menu
-1. `OrigoDefaultEntry._Ready()` calls `OrigoAutoHost._Ready()` and creates `OrigoRuntime`.
-2. The entry initializes `SndContext` and binds it to `GodotSndManager`.
-3. Scene aliases and template mappings are loaded (`SndMappings.LoadSceneAliases/LoadTemplates`).
-4. `SndContext.RequestLoadMainMenuEntrySave()` enqueues main-menu loading into `SystemDeferred`; at end-of-frame it clears old runs, spawns main-menu entities from entry JSON, and creates corresponding `ProgressRun + SessionRun`.
-5. `GodotSndManager._Process` drives entity `Process` every frame and strategies start running.
-### Business Flow 2: Save/Load
-1. Game logic calls `SndContext.RequestSaveGame(...)` or `RequestSaveGameAuto(...)`.
-2. `SndContext` validates runtime instances and merges `meta.map` (contributors + custom override).
-3. `SaveContext` converts `Progress/Session/SND Scene` into `SaveGamePayload`.
-4. `SaveStorageFacade` writes to `current/` first, then snapshots to `save_xxx/` via `SnapshotCurrentToSave`.
-5. During load, `RequestLoadGame(saveId)` is enqueued into `SystemDeferred`; at frame end it restores snapshot to `current/`, rebuilds `ProgressRun/SessionRun`, and restores blackboards/scenes.
-### Business Flow 3: Change Level
-1. `SndContext.RequestChangeLevel(newLevelId)` -> frame-end `ProgressRun.SwitchLevel(newLevelId)`.
-2. Current level state is persisted by `SessionRun.PersistLevelState()` to `current/level_xxx/`.
-3. `ActiveLevelId` is updated and `progress.json` is persisted.
-4. Old `SessionRun` is disposed (session blackboard + scene cleanup).
-5. New level is restored from `current/level_new/`; if no complete save exists, an empty session is created and scene is cleared.
+
 ---
-## Core Module Design
-### Abstractions
-All capabilities that require engine-specific implementation are defined here.
-| Interface | Responsibility |
-|------|------|
-| `IFileSystem` | File I/O, path composition, directory operations. Virtual path logic (`res://`, `user://`) is implemented by adapters |
-| `INodeFactory` | Creates nodes by logical name and resource ID, returns `INodeHandle` |
-| `INodeHandle` | Minimal node abstraction: `Name`, `Native`, `Free()`, `SetVisible()` |
-| `INodeHost` | Manages restored nodes: lookup, metadata export, release |
-| `ISndSceneHost` | Scene-level entity management: `Spawn`, `GetEntities`, `FindByName`; extends `ISndSceneAccess` |
-| `ISndEntity` | Minimal entity abstraction: data access, node access, strategy add/remove, data subscriptions |
-| `IBlackboard` | Type-safe key-value storage with `ExportAll`/`ImportAll` |
-| `ILogger` | Logging API: `Log(LogLevel level, string tag, string message)` |
-| `IOrigoRuntimeProvider` | Runtime provider entry |
-| `IScheduler` | Deferred action queue |
-| `IStateMachine` | String stack state machine API |
-| `IRandom` | Deterministic random API |
-| `IClock` | Time source |
-| `IConsoleInputSource` | Console input source (`TryDequeueCommand`) |
-| `IConsoleOutputChannel` | Console output publish channel (`Publish`) |
-### Snd Subsystem
-SND is the framework core. Game objects are modeled as aggregates of **Data + Nodes + Strategies**.
-Core types:
-- `SndMetaData`: serializable entity description
-- `SndEntity`: aggregate root with data/node/strategy managers
-- `SndWorld`: subsystem entry (strategy pool, mappings, JSON config)
-- `SndRuntime`: facade over `SndWorld + ISndSceneHost`
-- `SndContext`: runtime orchestration for blackboards, save/load, level switch
-Entity lifecycle:
+
+## 🚀 Quick Start (Godot 4)
+
+### 1. Add Origo to your Godot C# project
+
+Reference both projects in your game `.csproj`:
+
+```xml
+<!-- In your game .csproj -->
+<ProjectReference Include="../Origo.Core/Origo.Core.csproj" />
+<ProjectReference Include="../Origo.GodotAdapter/Origo.GodotAdapter.csproj" />
 ```
-Spawn/Load -> [AfterSpawn/AfterLoad] -> Process (per-frame) -> [BeforeSave] -> [BeforeQuit/BeforeDead] -> Dispose
+
+### 2. Create the directory structure
+
 ```
-Strategies (`BaseSndStrategy`) are shared and reused across entities by `SndStrategyPool`, so they **must be stateless**. All mutable state must be stored in entity Data.
-### Save Subsystem
-Uses a **save/level** two-layer snapshot structure plus a `current` workspace.
-- Main flow is strict fail-fast in early stage.
-- Missing required save files/fields are treated as corruption.
-- No silent fallback for missing strategy indexes, invalid state values, or missing templates.
-### Blackboard
-Three semantic layers:
-- `SystemBlackboard`: global state
-- `ProgressBlackboard`: save-slot progress
-- `SessionBlackboard`: current-level session state
-Three run instances aligned to blackboard semantics:
-- `SystemRun`
-- `ProgressRun`
-- `SessionRun`
-### Serialization
-- `TypeStringMapping`: bidirectional type-string mapping
-- `OrigoJson`: default `JsonSerializerOptions` and converters
-### Runtime
-- `OrigoRuntime`: unified runtime entry (`SndRuntime + Logger + SystemBlackboard`)
-- End-of-frame deferred channels: `BusinessDeferred` then `SystemDeferred`
-- `OrigoConsole`: string command routing (built-in: `spawn`, `snd_count`)
-- `Runtime/Lifecycle/*`: `SystemRun / ProgressRun / SessionRun / RunFactory`
----
-## GodotAdapter Module Design
-The adapter provides Godot implementations for Core interfaces and wires dependencies at startup.
-Key modules:
-- `Bootstrap/OrigoAutoHost`: creates `OrigoRuntime`, injects dependencies
-- `Bootstrap/OrigoConsolePump`: per-frame `Console.ProcessPending()`
-- `Bootstrap/OrigoDefaultEntry`: startup orchestration and facade forwarding
-- `FileSystem/GodotFileSystem`: thin `IFileSystem` implementation
-- `Logging/GodotLogger`: `ILogger` implementation
-- `Snd/GodotSndManager`: `ISndSceneHost` implementation and per-frame driving
-- `Serialization/GodotJsonConverterRegistry`: registers Godot type mappings/converters
----
-## Startup Flow
-1. `OrigoDefaultEntry._Ready()` -> `OrigoAutoHost._Ready()` creates runtime
-2. `GodotFileSystem` + `PersistentBlackboard(saveRoot/system.json)` are created and injected
-3. Godot type mappings are registered into `SndWorld.TypeMapping`
-4. Reflection discovers and registers all `BaseSndStrategy` subclasses
-5. `SndContext` is created and bound to `GodotSndManager`
-6. Scene aliases and template mappings are loaded
-7. `RequestLoadMainMenuEntrySave()` is deferred and flushed at end of `_Ready()`
-8. `GodotSndManager._Process` drives strategy `Process` each frame
----
-## JSON Conventions
-### Naming Conventions for External Strings
-- Strategy index (`StrategyIndexAttribute` / JSON `strategy.indices[]`): lowercase dot namespace, each segment `lower_snake_case`
-- Blackboard/TypedData keys: same lowercase dot namespace style
-- `.map` keys (scene/template/meta): `lower_snake_case`, unique per file
-- `SndMetaData.name`: `PascalCase`
-### `SndMetaData` Example
-```json
+res://origo/
+  entry/
+    entry.json            ← main-menu entity definitions
+  maps/
+    scene_aliases.map     ← short name → PackedScene path
+    snd_templates.map     ← template key → SndMetaData JSON path
+  initial/                ← read-only initial save (shipped with game)
+```
+
+### 3. Add the entry node to your main scene
+
+Attach `OrigoDefaultEntry` as the root (or a child) node. Its exported properties control paths:
+
+| Property | Default | Purpose |
+|----------|---------|---------|
+| `ConfigPath` | `res://origo/entry/entry.json` | Main-menu entity definitions |
+| `SceneAliasMapPath` | `res://origo/maps/scene_aliases.map` | Scene alias mapping |
+| `SndTemplateMapPath` | `res://origo/maps/snd_templates.map` | SND template mapping |
+| `SaveRootPath` | `user://origo_saves` | Runtime save directory |
+| `InitialSaveRootPath` | `res://origo/initial` | Read-only initial save |
+| `AutoDiscoverStrategies` | `true` | Auto-register strategy subclasses via reflection |
+
+You can override `ConfigureSaveMetadataContributors(SndContext context)` to register custom `meta.map` contributors.
+
+### 4. Write your first strategy
+
+```csharp
+using Origo.Core.Snd;
+using Origo.Core.Snd.Strategy;
+
+[StrategyIndex("game.player_move")]
+public sealed class PlayerMoveStrategy : EntityStrategyBase
 {
-  "name": "EntityName",
-  "node": { "pairs": { "logicalName": "resourceAlias" } },
-  "strategy": { "indices": ["game.some_strategy"] },
-  "data": { "pairs": { "key": { "type": "Int32", "data": 100 } } }
+    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    {
+        // Read state from entity Data — strategies must be stateless
+        var (found, speed) = entity.TryGetData<float>("speed");
+        if (!found) return;
+
+        // Game logic here...
+    }
+
+    public override void AfterSpawn(ISndEntity entity, SndContext ctx)
+    {
+        // Initialize entity data on spawn
+        entity.SetData("speed", 200f);
+    }
 }
 ```
-### `.map` Format
-`key: value` per line, with `#` comments supported.
-### Save metadata (`meta.map`) format
-Same as `.map`:
+
+### 5. Define an entity in JSON
+
+```json
+{
+  "name": "Player",
+  "node": { "pairs": { "sprite": "player_sprite" } },
+  "strategy": { "indices": ["game.player_move"] },
+  "data": { "pairs": { "speed": { "type": "Single", "data": 200.0 } } }
+}
+```
+
+### 6. Run
+
+Launch your Godot project. `OrigoDefaultEntry._Ready()` bootstraps the entire framework, loads the entry save, and begins calling `Process` on entities each frame.
+
+---
+
+## 🏗 Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph game ["Your Game"]
+        GS[Game Strategies]
+        GC[Game Config / JSON]
+    end
+
+    subgraph adapter ["Origo.GodotAdapter"]
+        Entry[OrigoDefaultEntry]
+        Host[OrigoAutoHost]
+        GFS[GodotFileSystem]
+        GSM[GodotSndManager]
+    end
+
+    subgraph core ["Origo.Core"]
+        RT[OrigoRuntime]
+        SW[SndWorld]
+        SR[SndRuntime]
+        SC[SndContext]
+        SP[SndStrategyPool]
+        BB["Blackboards<br/>(System / Progress / Session)"]
+        SM[StackStateMachine]
+        SV["Save<br/>(SaveStorageFacade)"]
+        LC["Lifecycle<br/>(SystemRun → ProgressRun → SessionRun)"]
+    end
+
+    subgraph abs ["Origo.Core/Abstractions"]
+        IF[IFileSystem]
+        ISH[ISndSceneHost]
+        INF[INodeFactory]
+        IB[IBlackboard]
+        IL[ILogger]
+    end
+
+    GS --> SP
+    GC --> SW
+    Entry --> Host --> RT
+    RT --> SW & SR & BB
+    SC --> LC & SV & SM
+    SR --> SW & ISH
+    GSM -.implements.-> ISH
+    GFS -.implements.-> IF
+```
+
+### Key Design Principles
+
+1. **Core is platform-agnostic** — all engine touchpoints go through `Abstractions/` interfaces
+2. **Adapter implements interfaces + wires DI** — no business rules in the adapter
+3. **Strategies are shared, pooled, stateless** — mutable state lives in entity Data or blackboards
+4. **Composition over inheritance** — `SndEntity` composes Data, Nodes, and Strategies
+5. **Explicit lifecycles** — `SystemRun` → `ProgressRun` → `SessionRun` mirror blackboard layers
+6. **Fail-fast, no silent fallback** — missing data, bad indices, and invalid state throw immediately
+
+### Object Relationship Graph
+
+```
+OrigoDefaultEntry (Godot entry node)
+  └─ OrigoAutoHost (creates Runtime + injects adapter)
+       └─ OrigoRuntime
+            ├─ SndWorld (StrategyPool / TypeMapping / Mappings)
+            ├─ SndRuntime (ISndSceneHost facade)
+            └─ SystemBlackboard
+       └─ SndContext (save / load / change-level orchestration)
+            └─ RunFactory
+                 └─ SystemRun → ProgressRun → SessionRun
+```
+
+---
+
+## 🧩 Core Concepts
+
+### SND Entity Model
+
+SND (**Strategy–Node–Data**) models game objects as a composition of three orthogonal concerns:
+
+| Component | What it holds | Example |
+|-----------|--------------|---------|
+| **Strategy** | Behavior (stateless, pooled) | `game.player_move`, `ui.main_menu` |
+| **Node** | Visual / scene representation | Sprites, meshes, UI panels |
+| **Data** | Mutable state (typed key-value) | `health: 100`, `speed: 200.0` |
+
+An `SndEntity` is the aggregate root composing `SndDataManager`, `SndNodeManager`, and `SndStrategyManager`. Entities are described by `SndMetaData` (JSON-serializable) and spawned through `SndRuntime`.
+
+#### Entity Lifecycle
+
+```
+Spawn / Load
+    │
+    ▼
+AfterSpawn / AfterLoad          ← one-time initialization
+    │
+    ▼
+Process(entity, delta, ctx)     ← called every frame
+    │
+    ▼
+BeforeSave                      ← before persisting
+    │
+    ▼
+BeforeQuit / BeforeDead         ← teardown
+    │
+    ▼
+Dispose
+```
+
+---
+
+### Strategy System
+
+Strategies are **shared, pooled, stateless objects** registered by a dot-namespace index. They must have **no instance fields** (enforced at registration).
+
+#### Strategy Hierarchy
+
+```
+BaseStrategy                       ← root type (index + pool identity)
+  ├── EntityStrategyBase           ← entity lifecycle hooks
+  ├── StateMachineStrategyBase     ← push/pop state machine hooks
+  └── (future domain bases)
+```
+
+#### EntityStrategyBase — Virtual Methods
+
+```csharp
+public virtual void Process(ISndEntity entity, double delta, SndContext ctx);
+public virtual void AfterSpawn(ISndEntity entity, SndContext ctx);
+public virtual void AfterLoad(ISndEntity entity, SndContext ctx);
+public virtual void AfterAdd(ISndEntity entity, SndContext ctx);
+public virtual void BeforeRemove(ISndEntity entity, SndContext ctx);
+public virtual void BeforeSave(ISndEntity entity, SndContext ctx);
+public virtual void BeforeQuit(ISndEntity entity, SndContext ctx);
+public virtual void BeforeDead(ISndEntity entity, SndContext ctx);
+```
+
+#### Registration
+
+Every concrete strategy **must** declare `[StrategyIndex("dot.namespace")]`. Discovery fails fast if the attribute is missing, empty, or the type has instance fields.
+
+```csharp
+[StrategyIndex("combat.attack")]
+public sealed class AttackStrategy : EntityStrategyBase
+{
+    // No instance fields allowed — state goes in entity Data or blackboards
+    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    {
+        var (found, cooldown) = entity.TryGetData<double>("attack_cooldown");
+        if (found && cooldown > 0)
+            entity.SetData("attack_cooldown", cooldown - delta);
+    }
+}
+```
+
+Resolve with `SndStrategyPool.GetStrategy<EntityStrategyBase>(index)` — wrong `TBase` for an index throws `InvalidOperationException`.
+
+---
+
+### Blackboard System
+
+Blackboards are typed key-value stores used for cross-cutting state.
+
+#### `IBlackboard` Contract
+
+```csharp
+void Set<T>(string key, T value);
+(bool found, T value) TryGet<T>(string key);
+void Clear();
+IReadOnlyCollection<string> GetKeys();
+IReadOnlyDictionary<string, TypedData> SerializeAll();
+void DeserializeAll(IReadOnlyDictionary<string, TypedData> data);
+```
+
+#### Three Semantic Layers
+
+| Layer | Blackboard | Lifetime | Persisted to |
+|-------|-----------|----------|-------------|
+| **System** | `SystemBlackboard` | Entire process | `saveRoot/system.json` (via `PersistentBlackboard`) |
+| **Progress** | `ProgressBlackboard` | Save slot / flow | `current/progress.json` and `save_*/progress.json` |
+| **Session** | `SessionBlackboard` | Current level | `current/level_*/session.json` |
+
+Each blackboard layer aligns 1:1 with its corresponding **Run** object:
+
+- `SystemRun` ↔ `SystemBlackboard` — lives for the whole process
+- `ProgressRun` ↔ `ProgressBlackboard` — created/replaced on save load or continue
+- `SessionRun` ↔ `SessionBlackboard` — recreated on level change
+
+#### PersistentBlackboard
+
+`PersistentBlackboard` wraps `IBlackboard` and auto-persists to disk on every `Set`, `Clear`, and `DeserializeAll` call. Used by the Godot adapter for `SystemBlackboard`.
+
+#### Well-Known Keys
+
+```csharp
+WellKnownKeys.ActiveSaveId  = "origo.active_save_id";
+WellKnownKeys.ActiveLevelId = "origo.active_level_id";
+```
+
+---
+
+### State Machine System
+
+`StackStateMachine` implements `IStateMachine` — a **stack of string values** with strategy-driven hooks.
+
+Each machine is constructed with a **machine key**, a **push strategy index**, and a **pop strategy index** (both must be `StateMachineStrategyBase` implementations).
+
+#### StateMachineStrategyBase — Virtual Methods
+
+```csharp
+public virtual void OnPushRuntime(StateMachineStrategyContext context, SndContext ctx);
+public virtual void OnPushAfterLoad(StateMachineStrategyContext context, SndContext ctx);
+public virtual void OnPopRuntime(StateMachineStrategyContext context, SndContext ctx);
+public virtual void OnPopBeforeQuit(StateMachineStrategyContext context, SndContext ctx);
+```
+
+#### StateMachineStrategyContext
+
+```csharp
+public readonly struct StateMachineStrategyContext
+{
+    public string MachineKey { get; }
+    public string? BeforeTop { get; }
+    public string? AfterTop { get; }
+}
+```
+
+#### Hook Semantics
+
+| Operation | Hook | When |
+|-----------|------|------|
+| Runtime push | `OnPushRuntime` | After the new value is on the stack |
+| Load rebuild | `OnPushAfterLoad` | Called bottom → top for each stack level |
+| Runtime pop | `OnPopRuntime` | Before the top value is removed |
+| Quit unwind | `OnPopBeforeQuit` | When unwinding the stack on quit |
+
+#### Persistence
+
+State machines are managed by `StateMachineContainer`, scoped to `ProgressRun` or `SessionRun`:
+
+- `progress_state_machines.json` — progress-scoped machines
+- `session_state_machines.json` — session-scoped machines
+
+Access via `SndContext.GetProgressStateMachines()` / `GetSessionStateMachines()`.
+
+---
+
+### Save / Load System
+
+The save system uses a **workspace + snapshot** model:
+
+1. `current/` is the live working copy (always writable)
+2. `save_*/` directories are immutable snapshots
+3. Saving writes to `current/` first, then snapshots to `save_xxx/`
+4. Loading restores a snapshot to `current/`, then rebuilds runs
+
+#### Save Directory Layout
+
+```
+saveRoot/
+  system.json                       ← SystemBlackboard
+  current/                          ← writable working copy
+    progress.json                   ← ProgressBlackboard
+    progress_state_machines.json    ← progress state machines
+    meta.map                        ← display metadata (key: value)
+    level_default/                  ← current level data
+      snd_scene.json                ← serialized SND entities
+      session.json                  ← SessionBlackboard
+      session_state_machines.json   ← session state machines
+  save_000/                         ← immutable snapshot
+    progress.json
+    progress_state_machines.json
+    meta.map
+    level_default/
+      ...
+  save_001/
+    ...
+```
+
+#### Strict Semantics
+
+- **Required files:** missing required files or fields is treated as corruption (throws exceptions)
+- **`progress.json`** must exist and deserialize successfully — no silent fallback
+- **Fail-fast:** unregistered strategy index, invalid state machine payload, or missing template → immediate error
+
+#### Save Path Conventions (Godot defaults)
+
+| Path | Purpose |
+|------|---------|
+| `res://origo/initial/` | Read-only initial save shipped with the project |
+| `user://origo_saves/` | Runtime read/write save root |
+| `res://origo/entry/` | Entry configuration (main menu entities) |
+| `res://origo/maps/` | Alias and template map files |
+
+---
+
+## 📘 API Reference
+
+### SndContext
+
+`SndContext` is the primary facade strategies interact with for blackboards, save/load, level switching, and console.
+
+#### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `SystemBlackboard` | `IBlackboard` | System-level blackboard (always available) |
+| `ProgressBlackboard` | `IBlackboard?` | Progress-level blackboard (available after load) |
+| `SessionBlackboard` | `IBlackboard?` | Session-level blackboard (available after load) |
+| `SndRuntime` | `SndRuntime` | SND entity runtime |
+| `SaveRootPath` | `string` | Root path for save files |
+| `InitialSaveRootPath` | `string` | Path to initial (read-only) save |
+| `EntryConfigPath` | `string` | Path to entry configuration JSON |
+
+#### Entity & Deferred Methods
+
+| Method | Description |
+|--------|-------------|
+| `EnqueueBusinessDeferred(Action)` | Enqueue action for end-of-frame business phase |
+| `FlushDeferredActionsForCurrentFrame()` | Flush all deferred actions immediately |
+| `GetPendingPersistenceRequestCount()` | Count of pending persistence requests |
+| `ClearAllSndEntities()` | Remove all entities from the scene |
+| `SpawnManySndEntities(IEnumerable<SndMetaData>)` | Batch-spawn entities |
+| `FindSndEntity(string name)` | Find an entity by name |
+| `CloneTemplate(string templateKey, string? overrideName)` | Clone an entity from a template |
+
+#### Save / Load Methods
+
+| Method | Description |
+|--------|-------------|
+| `RequestSaveGame(newSaveId, baseSaveId, customMeta?)` | Save to a named slot |
+| `RequestSaveGameAuto(newSaveId?, customMeta?)` | Auto-save (picks base from active save) |
+| `RequestLoadGame(string saveId)` | Load a save slot |
+| `RequestContinueGame()` | Continue from active save (returns `bool`) |
+| `HasContinueData()` | Check if continue data exists |
+| `SetContinueTarget(string saveId)` | Set the save ID for continue |
+| `ClearContinueTarget()` | Clear the continue target |
+| `RequestLoadInitialSave()` | Load the initial (shipped) save |
+| `RequestLoadMainMenuEntrySave()` | Load main-menu entry (no implicit save) |
+| `RequestChangeLevel(string newLevelId)` | Switch to a different level |
+| `ListSaves()` | List available save slot IDs |
+| `ListSavesWithMetaData()` | List saves with parsed `meta.map` |
+| `RegisterSaveMetaContributor(ISaveMetaContributor)` | Register a meta.map contributor |
+| `RegisterSaveMetaContributor(Action<...>)` | Register a meta.map contributor (lambda overload) |
+
+#### Console Methods
+
+| Method | Description |
+|--------|-------------|
+| `TrySubmitConsoleCommand(string commandLine)` | Submit a console command |
+| `ProcessConsolePending()` | Process pending console commands |
+| `SubscribeConsoleOutput(Action<string>)` | Subscribe to console output |
+| `UnsubscribeConsoleOutput(long subscriptionId)` | Unsubscribe from console output |
+
+#### State Machine Methods
+
+| Method | Description |
+|--------|-------------|
+| `GetProgressStateMachines()` | Access progress-scoped state machines |
+| `GetSessionStateMachines()` | Access session-scoped state machines |
+
+---
+
+### OrigoRuntime
+
+Top-level runtime object created by the adapter.
+
+| Member | Kind | Description |
+|--------|------|-------------|
+| `Logger` | property | `ILogger` logging interface |
+| `SndWorld` | property | Strategy pool, type mapping, JSON options |
+| `Snd` | property | `SndRuntime` entity runtime facade |
+| `SystemBlackboard` | property | System blackboard |
+| `ConsoleInput` | property | `IConsoleInputSource?` console input source |
+| `ConsoleOutputChannel` | property | `IConsoleOutputChannel?` console output channel |
+| `Console` | property | `OrigoConsole?` console instance |
+| `EnqueueBusinessDeferred(Action)` | method | Enqueue business-phase deferred action |
+| `EnqueueSystemDeferred(Action)` | method | Enqueue system-phase deferred action |
+| `FlushEndOfFrameDeferred()` | method | Flush Business then System deferred queues |
+| `ResetConsoleState()` | method | Reset console to initial state |
+
+---
+
+### SndRuntime
+
+Facade combining `SndWorld` and `ISndSceneHost`.
+
+| Member | Kind | Description |
+|--------|------|-------------|
+| `World` | property | Access to strategy pool and mappings |
+| `SceneHost` | property | Scene host for entity operations |
+| `Spawn(SndMetaData)` | method | Spawn a single entity |
+| `SpawnMany(IEnumerable<SndMetaData>)` | method | Batch-spawn entities |
+| `SerializeMetaList()` | method | Serialize all entity metadata |
+| `ClearAll()` | method | Remove all entities |
+| `GetEntities()` | method | Get all active entities |
+| `FindByName(string)` | method | Find entity by name |
+
+---
+
+## 📄 JSON & Config Formats
+
+### SndMetaData
+
+```json
+{
+  "name": "Player",
+  "node": {
+    "pairs": {
+      "sprite": "player_sprite"
+    }
+  },
+  "strategy": {
+    "indices": ["game.player_move", "game.player_combat"]
+  },
+  "data": {
+    "pairs": {
+      "health": { "type": "Int32", "data": 100 },
+      "speed":  { "type": "Single", "data": 200.0 }
+    }
+  }
+}
+```
+
+### Template Shorthand (JSON Arrays)
+
+Entity arrays support both inline definitions and template references:
+
+```json
+[
+  { "sndName": "MyEntity", "templateKey": "some_template" },
+  {
+    "name": "InlineEntity",
+    "strategy": { "indices": ["game.some_strategy"] },
+    "data": { "pairs": {} }
+  }
+]
+```
+
+### `.map` File Format
+
+Simple `key: value` per line. Lines starting with `#` are comments.
+
+```
+# Scene aliases — maps short names to PackedScene paths
+box: res://scenes/resource/box.tscn
+camera: res://scenes/resource/camera.tscn
+player_sprite: res://scenes/characters/player.tscn
+```
+
+### `meta.map` (Save Display Metadata)
+
+Same format, used for save-slot UI display:
+
 ```
 # Save display metadata
 title: Chapter 2 - Forest
 play_time: 03:12:55
 player_level: 18
 ```
+
+Contributors registered via `SndContext.RegisterSaveMetaContributor(...)` are merged in order (later key wins), then `customMeta` from the save call overrides per key.
+
 ---
-## Save Directory Conventions
-- `res://origo/initial/` - initial save (read-only, distributed with project)
-- `user://origo_saves/` - runtime saves (read/write)
-- `res://origo/entry/` - entry configuration
-- `res://origo/maps/` - alias/template mapping files
----
-## Runtime Constraints and Test Matrix
-- Strategy auto-discovery validates statelessness; strategies with instance fields are rejected.
-- Strategies must declare non-empty `StrategyIndexAttribute`; otherwise auto-discovery fails.
-- Save facade APIs in `OrigoDefaultEntry` fail-fast before `_Ready()` (`EnsureContextOrThrow()`).
-Current test projects:
-- `Origo.Core.Tests`: Core unit tests (SND, Save, Lifecycle, Console, Serialization)
-- `Origo.GodotAdapter.Tests`: minimal adapter behavior tests
-Run tests from repository root:
-```bash
-dotnet test addons/Origo/Origo.sln
+
+## 🔄 Startup Sequence (Godot)
+
+```mermaid
+sequenceDiagram
+    participant Entry as OrigoDefaultEntry
+    participant Host as OrigoAutoHost
+    participant RT as OrigoRuntime
+    participant SM as GodotSndManager
+    participant Ctx as SndContext
+
+    Entry->>Host: _Ready()
+    Host->>RT: Create OrigoRuntime
+    Host->>Host: GodotFileSystem + PersistentBlackboard<br/>load system.json
+    Host->>RT: Register Godot types on TypeMapping
+    Host->>RT: Reflection-register all BaseStrategy subclasses
+    Entry->>Ctx: Create SndContext (RunFactory + SystemRun)
+    Entry->>SM: Inject SndContext into GodotSndManager
+    Entry->>Entry: Load scene alias + template maps
+    Entry->>Ctx: RequestLoadMainMenuEntrySave()
+    Entry->>Ctx: FlushDeferredActionsForCurrentFrame()
+    Note over SM: _Process() drives entity Process every frame
 ```
-Note: `W3.csproj` does not reference xUnit. To avoid IDE analyzing Origo test sources as part of W3, test folders under `addons/Origo` are excluded from W3.
+
+**Step-by-step:**
+
+1. `OrigoDefaultEntry._Ready()` → `OrigoAutoHost._Ready()` creates `OrigoRuntime`
+2. `GodotFileSystem` + `PersistentBlackboard` load `saveRoot/system.json`
+3. Register Godot types on `SndWorld.TypeMapping`
+4. Reflection registers all concrete `BaseStrategy` subclasses
+5. Create `SndContext` (`RunFactory` + `SystemRun`), inject into `GodotSndManager`
+6. Load scene alias and template map files
+7. `RequestLoadMainMenuEntrySave()` + `FlushDeferredActionsForCurrentFrame()`
+8. `GodotSndManager._Process` runs entity `Process` every frame
+
+---
+
+## 🔀 Key Flows
+
+### Save Game
+
+```
+Game calls SndContext.RequestSaveGame(newSaveId, baseSaveId, customMeta?)
+  → Enqueues on SystemDeferred
+  → Validates active runs
+  → Merges meta.map (contributors + customMeta)
+  → SaveContext serializes blackboards + scene → SaveGamePayload
+  → SaveStorageFacade writes current/, then snapshots to save_xxx/
+  → Updates active_save_id in SystemBlackboard
+```
+
+### Load Game
+
+```
+Game calls SndContext.RequestLoadGame(saveId)
+  → Enqueues on SystemDeferred
+  → Restores snapshot to current/
+  → Reads progress.json for active_level_id
+  → Rebuilds ProgressRun + SessionRun
+  → Restores blackboards and spawns scene entities
+  → Sets active_save_id
+```
+
+### Change Level
+
+```
+Game calls SndContext.RequestChangeLevel(newLevelId)
+  → Enqueues on BusinessDeferred (runs before SystemDeferred)
+  → SessionRun persists current level to current/level_xxx/
+  → Updates ActiveLevelId, persists progress.json
+  → Disposes old SessionRun
+  → Restores current/level_{newLevelId}/ (or starts empty)
+```
+
+---
+
+## 📏 Naming Conventions
+
+All external strings share a consistent style to prevent silent mismatches.
+
+| Context | Convention | Example |
+|---------|-----------|---------|
+| Strategy index | Dot namespace, `lower_snake_case` segments | `ui.main_menu`, `combat.attack` |
+| Blackboard keys | Dot namespace, `lower_snake_case` | `origo.active_save_id` |
+| `.map` keys | `lower_snake_case`, unique per file | `player_sprite`, `box` |
+| `SndMetaData.name` | `PascalCase` | `Player`, `MainMenu` |
+
+Invalid or missing data **fails fast** — there are no compatibility shims or silent fallbacks.
+
+---
+
+## 🔌 GodotAdapter Modules
+
+| Module | Location | Responsibility |
+|--------|----------|----------------|
+| **OrigoAutoHost** | `Bootstrap/` | Creates `OrigoRuntime`; `PersistentBlackboard` for system; `ConsoleInputQueue` + `ConsoleOutputChannel` |
+| **GodotSndBootstrap** | `Bootstrap/` | One-call `BindRuntimeAndContext(GodotSndManager, SndWorld, ILogger, SndContext)` |
+| **OrigoConsolePump** | `Bootstrap/` | Each frame: `OrigoRuntime.Console.ProcessPending()` |
+| **OrigoDefaultEntry** | `Bootstrap/` | Subclasses `OrigoAutoHost`; startup partials; override `ConfigureSaveMetadataContributors(SndContext)` |
+| **GodotFileSystem** | `FileSystem/` | `IFileSystem` for `res://` and `user://` paths |
+| **GodotLogger** | `Logging/` | `ILogger` implementation using Godot output |
+| **GodotSndEntity** | `Snd/` | Binds `SndEntity` to Godot `Node` lifetime |
+| **GodotSndManager** | `Snd/` | `ISndSceneHost`; `_Process` drives entity strategies each frame |
+| **GodotPackedSceneNodeFactory** | `Snd/` | `INodeFactory` via Godot `PackedScene` |
+| **GodotNodeHandle** | `Snd/` | `INodeHandle` wrapping Godot `Node` |
+| **GodotJsonConverterRegistry** | `Serialization/` | Registers Godot types in `TypeStringMapping` + JSON converters |
+
+### OrigoAutoHost Exported Properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `HostPath` | `null` | Optional `NodePath` to an `IOrigoRuntimeProvider` |
+| `SndManagerPath` | `null` | Optional `NodePath` to the `GodotSndManager` |
+| `SystemBlackboardSaveRoot` | `user://origo_saves` | Save root for `PersistentBlackboard` |
+
+---
+
+## 🧱 Abstractions (Interfaces)
+
+All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
+
+| Interface | Responsibility |
+|-----------|----------------|
+| `IFileSystem` | File I/O, paths, directories (virtual paths like `res://` interpreted by adapter) |
+| `INodeFactory` | Create nodes by logical name + resource id → `INodeHandle` |
+| `INodeHandle` | Minimal node handle: `Name`, `Native`, `Free()`, `SetVisible()` |
+| `ISndSceneHost` | Scene entity operations: `Spawn`, `GetEntities`, `FindByName` |
+| `ISndEntity` | Composed of `ISndDataAccess` + `ISndNodeAccess` + `ISndStrategyAccess` |
+| `IBlackboard` | Typed key-value store with `SerializeAll` / `DeserializeAll` |
+| `ILogger` | `Log(LogLevel level, string tag, string message)` with `LogLevel` enum |
+| `IOrigoRuntimeProvider` | Access to `OrigoRuntime` instance |
+| `IScheduler` | Deferred action scheduling |
+| `IStateMachine` | String-stack state machine API |
+| `IRandom` | Deterministic random number generation |
+| `IConsoleInputSource` | Console command input (`TryDequeueCommand`) |
+| `IConsoleOutputChannel` | Console output pub/sub (`Publish` / `Subscribe`) |
+
+---
+
+## 🔧 How to Extend
+
+### Adding a New Entity Strategy
+
+1. Create a class extending `EntityStrategyBase`
+2. Annotate with `[StrategyIndex("your.namespace")]`
+3. Override the lifecycle methods you need
+4. Ensure **no instance fields** — the class must be stateless
+
+```csharp
+[StrategyIndex("game.enemy_ai")]
+public sealed class EnemyAiStrategy : EntityStrategyBase
+{
+    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    {
+        // AI logic — read/write entity Data for state
+    }
+
+    public override void AfterSpawn(ISndEntity entity, SndContext ctx)
+    {
+        entity.SetData("ai_state", "idle");
+    }
+}
+```
+
+### Adding a New State Machine Strategy
+
+1. Create a class extending `StateMachineStrategyBase`
+2. Annotate with `[StrategyIndex("sm.push.your_machine")]`
+3. Override push/pop hooks as needed
+
+```csharp
+[StrategyIndex("sm.push.camera")]
+public sealed class CameraPushStrategy : StateMachineStrategyBase
+{
+    public override void OnPushRuntime(StateMachineStrategyContext context, SndContext ctx)
+    {
+        // React to state being pushed (e.g., switch camera mode)
+    }
+}
+```
+
+### Adding a New Engine Adapter
+
+To port Origo to a different engine (Unity, MonoGame, etc.):
+
+1. **Implement the Abstractions** — provide concrete types for `IFileSystem`, `ISndSceneHost`, `INodeFactory`, `INodeHandle`, `ILogger`, and any other interfaces your game needs
+2. **Bootstrap the runtime** — create an `OrigoRuntime` with your implementations, similar to `OrigoAutoHost`
+3. **Drive the frame loop** — call `Process` on entities each frame and `FlushEndOfFrameDeferred()` at frame end
+4. **Register engine types** — add your engine's types to `SndWorld.TypeMapping` for serialization
+
+The Core library has **zero** engine dependencies — only your adapter project references the target engine SDK.
+
+---
+
+## 🧪 Testing
+
+Run all tests from the repository root:
+
+```bash
+dotnet test Origo.sln
+```
+
+| Project | Tests | Coverage |
+|---------|-------|----------|
+| `Origo.Core.Tests` | 283 | SND, Save, Lifecycle, Console, Serialization, Blackboard |
+| `Origo.GodotAdapter.Tests` | 1 | Minimal adapter behavior |
+
+Test projects use **xUnit v3** and are excluded from the main game build.
+
+---
+
+## 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+<p align="center">
+  <em>Built for game developers who want structure without the weight of a full engine framework.</em>
+</p>

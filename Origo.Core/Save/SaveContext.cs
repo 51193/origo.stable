@@ -20,19 +20,31 @@ public sealed class SaveContext
         IBlackboard session,
         SndWorld sndWorld)
     {
-        Progress = progress ?? throw new ArgumentNullException(nameof(progress));
-        Session = session ?? throw new ArgumentNullException(nameof(session));
-        SndWorld = sndWorld ?? throw new ArgumentNullException(nameof(sndWorld));
+        ArgumentNullException.ThrowIfNull(progress);
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(sndWorld);
+        Progress = progress;
+        Session = session;
+        SndWorld = sndWorld;
 
         _blackboardSerializer = new BlackboardJsonSerializer(SndWorld.JsonOptions);
         _sceneSerializer = new SndSceneJsonSerializer(SndWorld);
-        _payloadFactory = new SaveGamePayloadFactory(Progress, Session, SndWorld);
+        _payloadFactory = new SaveGamePayloadFactory(Progress, Session, _blackboardSerializer, _sceneSerializer);
     }
 
+    /// <summary>
+    ///     流程级黑板，保存跨关卡的全局进度数据。
+    /// </summary>
     public IBlackboard Progress { get; }
 
+    /// <summary>
+    ///     会话级黑板，保存当前关卡内的临时状态数据。
+    /// </summary>
     public IBlackboard Session { get; }
 
+    /// <summary>
+    ///     当前 SND 世界实例，提供场景数据的注册与序列化支持。
+    /// </summary>
     public SndWorld SndWorld { get; }
 
     /// <summary>
@@ -48,7 +60,7 @@ public sealed class SaveContext
     /// </summary>
     public void DeserializeProgress(string json)
     {
-        if (json == null) throw new ArgumentNullException(nameof(json));
+        ArgumentNullException.ThrowIfNull(json);
         _blackboardSerializer.DeserializeInto(Progress, json);
     }
 
@@ -65,10 +77,13 @@ public sealed class SaveContext
     /// </summary>
     public void DeserializeSession(string json)
     {
-        if (json == null) throw new ArgumentNullException(nameof(json));
+        ArgumentNullException.ThrowIfNull(json);
         _blackboardSerializer.DeserializeInto(Session, json);
     }
 
+    /// <summary>
+    ///     将指定 SND 场景序列化为 JSON 字符串。
+    /// </summary>
     public string SerializeSndScene(ISndSceneAccess sceneAccess)
     {
         return _sceneSerializer.Serialize(sceneAccess);
@@ -84,6 +99,9 @@ public sealed class SaveContext
         _sceneSerializer.DeserializeInto(sceneAccess, json, clearBeforeLoad);
     }
 
+    /// <summary>
+    ///     收集当前存档所需的全部数据，生成完整的 <see cref="SaveGamePayload"/>。
+    /// </summary>
     public SaveGamePayload SaveGame(
         ISndSceneAccess sceneAccess,
         string saveId,

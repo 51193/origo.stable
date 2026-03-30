@@ -11,48 +11,74 @@ public sealed partial class ProgressRun
     {
         if (string.IsNullOrWhiteSpace(newLevelId))
             throw new ArgumentException("New level id cannot be null or whitespace.", nameof(newLevelId));
-        // 1) SessionRun.PersistLevelState()
-        _currentSession?.PersistLevelState();
 
-        // (preflight) strict parsing: if target payload exists, it must be valid and loadable.
+        // Phase 1: Persist current session (non-destructive).
+        PersistCurrentSession();
+
+        // Phase 2: Pre-flight validation – all checks run before any state mutation.
+        var (shouldLoadFromPayload, targetLevelPayload) = ValidateTargetLevel(newLevelId);
+
+        // Phase 3: Commit – unload old session and load new one.
+        //   UpdateActiveLevel + PersistProgress may fail; if they do, the old session
+        //   is still intact. The destructive Dispose only runs after persistence succeeds.
+        var previousLevelId = ActiveLevelId;
+        try
+        {
+            UpdateActiveLevel(newLevelId);
+            PersistProgress();
+        }
+        catch
+        {
+            // Rollback: restore the previous level id so ProgressBlackboard stays consistent.
+            ActiveLevelId = previousLevelId;
+            ProgressBlackboard.Set(WellKnownKeys.ActiveLevelId, previousLevelId);
+            throw;
+        }
+
+        _currentSession?.Dispose();
+        _currentSession = null;
+
+        LoadOrCreateNewSession(newLevelId, shouldLoadFromPayload, targetLevelPayload);
+    }
+
+    private void PersistCurrentSession()
+    {
+        _currentSession?.PersistLevelState();
+    }
+
+    private (bool shouldLoad, LevelPayload? payload) ValidateTargetLevel(string newLevelId)
+    {
         var targetLevelPayload = SavePayloadReader.TryReadLevelPayloadFromCurrent(
             _factory.FileSystem,
             _factory.SaveRootPath,
             newLevelId);
 
-        var shouldLoadFromPayload = false;
-        if (targetLevelPayload != null)
-        {
-            if (string.IsNullOrWhiteSpace(targetLevelPayload.SndSceneJson))
-                throw new InvalidOperationException(
-                    $"Target level '{newLevelId}' has invalid snd_scene.json (empty).");
-            if (string.IsNullOrWhiteSpace(targetLevelPayload.SessionJson))
-                throw new InvalidOperationException(
-                    $"Target level '{newLevelId}' has invalid session.json (empty).");
-            if (string.IsNullOrWhiteSpace(targetLevelPayload.SessionStateMachinesJson))
-                throw new InvalidOperationException(
-                    $"Target level '{newLevelId}' has invalid session_state_machines.json (empty).");
+        if (targetLevelPayload is null)
+            return (false, null);
 
-            // Validate state machine JSON parses before committing switch.
-            _ = JsonSerializer.Deserialize<StateMachineContainerPayload>(
-                    targetLevelPayload.SessionStateMachinesJson,
-                    _factory.Runtime.SndWorld.JsonOptions)
-                ?? throw new InvalidOperationException(
-                    $"Target level '{newLevelId}' has invalid session state machines json (null payload).");
-            shouldLoadFromPayload = true;
-        }
+        if (string.IsNullOrWhiteSpace(targetLevelPayload.SndSceneJson))
+            throw new InvalidOperationException(
+                $"Target level '{newLevelId}' has invalid snd_scene.json (empty).");
+        if (string.IsNullOrWhiteSpace(targetLevelPayload.SessionJson))
+            throw new InvalidOperationException(
+                $"Target level '{newLevelId}' has invalid session.json (empty).");
+        if (string.IsNullOrWhiteSpace(targetLevelPayload.SessionStateMachinesJson))
+            throw new InvalidOperationException(
+                $"Target level '{newLevelId}' has invalid session_state_machines.json (empty).");
 
-        // 2) ProgressRun.UpdateActiveLevel(newLevelId) + PersistProgress()
-        UpdateActiveLevel(newLevelId);
-        PersistProgress();
+        _ = JsonSerializer.Deserialize<StateMachineContainerPayload>(
+                targetLevelPayload.SessionStateMachinesJson,
+                _factory.Runtime.SndWorld.JsonOptions)
+            ?? throw new InvalidOperationException(
+                $"Target level '{newLevelId}' has invalid session state machines json (null payload).");
 
-        // 3) SessionRun.Dispose()
-        _currentSession?.Dispose();
-        _currentSession = null;
+        return (true, targetLevelPayload);
+    }
 
-        // 4) 尝试从 current/level_{id} 恢复；若无完整数据则创建空会话并清场（README 约定）。
+    private void LoadOrCreateNewSession(string newLevelId, bool shouldLoadFromPayload, LevelPayload? payload)
+    {
         if (shouldLoadFromPayload)
-            CreateSessionRunFromPayload(targetLevelPayload!);
+            CreateSessionRunFromPayload(payload!);
         else
             CreateEmptySessionRun(true);
     }

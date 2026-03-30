@@ -9,38 +9,41 @@ namespace Origo.Core.Snd.Strategy;
 /// <summary>
 ///     负责按索引管理与复用策略实例的池。
 ///     不使用反射自动收集，而是通过显式注册提升可控性与可测试性。
+///     仅允许通过泛型 <see cref="GetStrategy{TBase}" /> 获取实例；若索引对应的实例类型与泛型参数不匹配则抛异常，不做兜底。
 /// </summary>
 internal sealed class SndStrategyPool
 {
-    private readonly Dictionary<string, Func<BaseSndStrategy>> _factories = new();
-    private readonly ILogger? _logger;
-    private readonly Dictionary<string, BaseSndStrategy> _pool = new();
+    private readonly Dictionary<string, Func<BaseStrategy>> _factories = new();
+    private readonly ILogger _logger;
+    private readonly Dictionary<string, BaseStrategy> _pool = new();
     private readonly Dictionary<string, int> _refCounts = new();
 
-    public SndStrategyPool(ILogger? logger = null)
+    public SndStrategyPool(ILogger logger)
     {
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
-    public void Register(Type strategyType, Func<BaseSndStrategy> factory)
+    public void Register(Type strategyType, Func<BaseStrategy> factory)
     {
         ArgumentNullException.ThrowIfNull(strategyType);
         var index = ResolveRequiredIndex(strategyType);
-        _factories[index] = factory ?? throw new ArgumentNullException(nameof(factory));
+        ArgumentNullException.ThrowIfNull(factory);
+        _factories[index] = factory;
     }
 
-    public void Register<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseSndStrategy
+    public void Register<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseStrategy
     {
         ArgumentNullException.ThrowIfNull(factory);
         Register(typeof(TStrategy), () => factory());
     }
 
-    public BaseSndStrategy? GetStrategy(string index)
+    public TBase GetStrategy<TBase>(string index) where TBase : BaseStrategy
     {
         if (_pool.TryGetValue(index, out var strategy))
         {
             _refCounts[index]++;
-            return strategy;
+            return CastOrThrow<TBase>(strategy, index);
         }
 
         if (_factories.TryGetValue(index, out var factory))
@@ -48,47 +51,50 @@ internal sealed class SndStrategyPool
             strategy = factory();
             _pool[index] = strategy;
             _refCounts[index] = 1;
-            _logger?.Log(LogLevel.Info, nameof(SndStrategyPool),
+            _logger.Log(LogLevel.Info, nameof(SndStrategyPool),
                 new LogMessageBuilder().AddSuffix("strategyIndex", index).Build("Created new strategy instance."));
-            return strategy;
+            return CastOrThrow<TBase>(strategy, index);
         }
 
         throw new InvalidOperationException($"Strategy factory for '{index}' not found.");
     }
 
+    private static TBase CastOrThrow<TBase>(BaseStrategy strategy, string index) where TBase : BaseStrategy
+    {
+        if (strategy is TBase typed) return typed;
+
+        throw new InvalidOperationException(
+            $"Strategy '{index}' instance type '{strategy.GetType().FullName}' is not assignable to '{typeof(TBase).FullName}'.");
+    }
+
     public void ReleaseStrategy(string index)
     {
-        if (_refCounts.TryGetValue(index, out var count))
-        {
-            count--;
-            if (count <= 0)
-            {
-                if (count < 0)
-                    _logger?.Log(LogLevel.Warning, nameof(SndStrategyPool),
-                        new LogMessageBuilder().AddSuffix("strategyIndex", index)
-                            .Build("Reference count went below zero."));
+        if (!_refCounts.TryGetValue(index, out var count))
+            throw new InvalidOperationException(
+                $"Cannot release strategy '{index}': not acquired or already fully released.");
 
-                _pool.Remove(index);
-                _refCounts.Remove(index);
-                _logger?.Log(LogLevel.Info, nameof(SndStrategyPool),
-                    new LogMessageBuilder().AddSuffix("strategyIndex", index).Build("Released strategy instance."));
-            }
-            else
-            {
-                _refCounts[index] = count;
-            }
+        count--;
+        if (count < 0)
+            throw new InvalidOperationException(
+                $"Reference count for strategy '{index}' went below zero (double release).");
+
+        if (count == 0)
+        {
+            _pool.Remove(index);
+            _refCounts.Remove(index);
+            _logger.Log(LogLevel.Info, nameof(SndStrategyPool),
+                new LogMessageBuilder().AddSuffix("strategyIndex", index).Build("Released strategy instance."));
         }
         else
         {
-            _logger?.Log(LogLevel.Warning, nameof(SndStrategyPool),
-                new LogMessageBuilder().AddSuffix("strategyIndex", index).Build("Attempted to release unknown strategy."));
+            _refCounts[index] = count;
         }
     }
 
     private static string ResolveRequiredIndex(Type strategyType)
     {
         var attr = strategyType.GetCustomAttribute<StrategyIndexAttribute>();
-        if (attr == null)
+        if (attr is null)
             throw new InvalidOperationException(
                 $"Strategy type '{strategyType.FullName}' must declare [StrategyIndex(\"...\")].");
         if (string.IsNullOrWhiteSpace(attr.Index))

@@ -16,7 +16,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -41,10 +41,10 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "push:after:null->a",
-                    "push:after:a->b",
-                    "popremove:before:b->a",
-                    "popremove:before:a->null"
+                    "push:runtime:null->a",
+                    "push:runtime:a->b",
+                    "pop:runtime:b->a",
+                    "pop:runtime:a->null"
                 },
                 events);
         }
@@ -59,7 +59,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -84,10 +84,10 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "push:after:null->a",
-                    "push:after:a->b",
-                    "popquit:before:b->a",
-                    "popquit:before:a->null"
+                    "push:runtime:null->a",
+                    "push:runtime:a->b",
+                    "pop:beforeQuit:b->a",
+                    "pop:beforeQuit:a->null"
                 },
                 events);
         }
@@ -102,7 +102,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -134,11 +134,11 @@ public partial class RandomAndStateMachineTests
     }
 
     [Fact]
-    public void StateMachineContainer_ImportWithoutHooks_ThrowsOnEmptyJson()
+    public void StateMachineContainer_DeserializeWithoutHooks_ThrowsOnEmptyJson()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -146,15 +146,15 @@ public partial class RandomAndStateMachineTests
         var options = OrigoJson.CreateDefaultOptions(runtime.SndWorld.TypeMapping, _ => { });
         var container = new StateMachineContainer(pool, ctx);
 
-        Assert.Throws<InvalidOperationException>(() => container.ImportWithoutHooks(" ", options));
+        Assert.Throws<InvalidOperationException>(() => container.DeserializeWithoutHooks(" ", options));
     }
 
     [Fact]
-    public void StateMachineContainer_ExportImport_RoundTrip()
+    public void StateMachineContainer_SerializeDeserialize_RoundTrip()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -167,9 +167,9 @@ public partial class RandomAndStateMachineTests
         sm.Push("p");
         sm.Push("q");
 
-        var json = c1.ExportToJson(options);
+        var json = c1.SerializeToJson(options);
         var c2 = new StateMachineContainer(pool, ctx);
-        c2.ImportWithoutHooks(json, options);
+        c2.DeserializeWithoutHooks(json, options);
         c2.TryGet("ui", out var restored);
         Assert.NotNull(restored);
         Assert.Equal(new[] { "p", "q" }, restored!.Snapshot());

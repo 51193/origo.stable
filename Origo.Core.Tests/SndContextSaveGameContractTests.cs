@@ -14,7 +14,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -32,6 +32,8 @@ public class SndContextSaveGameContractTests
         var c0 = captured!.Value;
         Assert.Equal("001", c0.SaveId);
         Assert.Equal("main_menu", c0.CurrentLevelId);
+        Assert.NotNull(ctx.ProgressBlackboard);
+        Assert.NotNull(ctx.SessionBlackboard);
         Assert.Same(ctx.ProgressBlackboard, c0.Progress);
         Assert.Same(ctx.SessionBlackboard, c0.Session);
         Assert.Same(runtime.Snd.SceneHost, c0.SceneAccess);
@@ -42,7 +44,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -77,7 +79,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -102,7 +104,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 

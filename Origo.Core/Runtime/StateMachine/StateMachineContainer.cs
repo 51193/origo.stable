@@ -20,8 +20,10 @@ public sealed class StateMachineContainer
 
     internal StateMachineContainer(SndStrategyPool pool, SndContext ctx)
     {
-        _pool = pool ?? throw new ArgumentNullException(nameof(pool));
-        _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
+        ArgumentNullException.ThrowIfNull(pool);
+        ArgumentNullException.ThrowIfNull(ctx);
+        _pool = pool;
+        _ctx = ctx;
     }
 
     public StackStateMachine CreateOrGet(string machineKey, string pushStrategyIndex, string popStrategyIndex)
@@ -95,7 +97,7 @@ public sealed class StateMachineContainer
             }
     }
 
-    public string ExportToJson(JsonSerializerOptions options)
+    public string SerializeToJson(JsonSerializerOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 
@@ -116,7 +118,7 @@ public sealed class StateMachineContainer
         return JsonSerializer.Serialize(payload, options);
     }
 
-    public void ImportWithoutHooks(string json, JsonSerializerOptions options)
+    public void DeserializeWithoutHooks(string json, JsonSerializerOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
 
@@ -124,7 +126,7 @@ public sealed class StateMachineContainer
             throw new InvalidOperationException("StateMachineContainer json cannot be null/empty.");
 
         var payload = JsonSerializer.Deserialize<StateMachineContainerPayload>(json, options);
-        if (payload?.Machines == null)
+        if (payload?.Machines is null)
             throw new InvalidOperationException("StateMachineContainer payload.machines is required.");
 
         // Build new state first; only replace after full validation succeeds.
@@ -144,7 +146,7 @@ public sealed class StateMachineContainer
                     throw new InvalidOperationException($"StateMachineEntry '{entry.Key}' missing push index.");
                 if (string.IsNullOrWhiteSpace(entry.PopIndex))
                     throw new InvalidOperationException($"StateMachineEntry '{entry.Key}' missing pop index.");
-                if (entry.Stack == null)
+                if (entry.Stack is null)
                     throw new InvalidOperationException($"StateMachineEntry '{entry.Key}' stack is required.");
 
                 // Constructing StackStateMachine acquires strategies from the pool; dispose on any failure.
@@ -161,12 +163,19 @@ public sealed class StateMachineContainer
             throw;
         }
 
-        Clear();
+        // Atomically swap: save old state, replace with new, then dispose old.
+        var oldMachines = new Dictionary<string, StackStateMachine>(_machines, StringComparer.Ordinal);
+        _machines.Clear();
+        _machineOrder.Clear();
+
         foreach (var key in newOrder)
         {
             _machineOrder.Add(key);
             _machines[key] = newMachines[key];
         }
+
+        foreach (var sm in oldMachines.Values)
+            sm.Dispose();
     }
 
     private IEnumerable<StackStateMachine> EnumerateMachinesInInsertionOrder()

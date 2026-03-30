@@ -7,15 +7,17 @@ using Origo.Core.Snd.Strategy;
 namespace Origo.Core.StateMachine;
 
 /// <summary>
-///     字符串栈状态机：Push 调用 Push 策略的 <see cref="BaseSndStrategy.AfterAdd" />，
-///     Pop 在出栈前调用 Pop 策略的 <see cref="BaseSndStrategy.BeforeQuit" />。
+///     字符串栈状态机：运行时 <see cref="Push" /> 调用 Push 策略的 <see cref="StateMachineStrategyBase.OnPushRuntime" />；
+///     读档刷新调用 <see cref="StateMachineStrategyBase.OnPushAfterLoad" />；
+///     运行时出栈调用 Pop 策略的 <see cref="StateMachineStrategyBase.OnPopRuntime" />；
+///     退出逐级出栈调用 <see cref="StateMachineStrategyBase.OnPopBeforeQuit" />。
 /// </summary>
 public sealed class StackStateMachine : IStateMachine, IDisposable
 {
     private readonly SndContext _ctx;
     private readonly SndStrategyPool _pool;
-    private readonly BaseSndStrategy _popStrategy;
-    private readonly BaseSndStrategy _pushStrategy;
+    private readonly StateMachineStrategyBase _popStrategy;
+    private readonly StateMachineStrategyBase _pushStrategy;
     private readonly List<string> _stack = new();
     private bool _disposed;
 
@@ -26,16 +28,19 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         SndStrategyPool pool,
         SndContext ctx)
     {
-        MachineKey = machineKey ?? throw new ArgumentNullException(nameof(machineKey));
-        PushStrategyIndex = pushStrategyIndex ?? throw new ArgumentNullException(nameof(pushStrategyIndex));
-        PopStrategyIndex = popStrategyIndex ?? throw new ArgumentNullException(nameof(popStrategyIndex));
-        _pool = pool ?? throw new ArgumentNullException(nameof(pool));
-        _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
+        ArgumentNullException.ThrowIfNull(machineKey);
+        ArgumentNullException.ThrowIfNull(pushStrategyIndex);
+        ArgumentNullException.ThrowIfNull(popStrategyIndex);
+        ArgumentNullException.ThrowIfNull(pool);
+        ArgumentNullException.ThrowIfNull(ctx);
+        MachineKey = machineKey;
+        PushStrategyIndex = pushStrategyIndex;
+        PopStrategyIndex = popStrategyIndex;
+        _pool = pool;
+        _ctx = ctx;
 
-        _pushStrategy = _pool.GetStrategy(PushStrategyIndex)
-                        ?? throw new InvalidOperationException($"Push strategy '{PushStrategyIndex}' not found.");
-        _popStrategy = _pool.GetStrategy(PopStrategyIndex)
-                       ?? throw new InvalidOperationException($"Pop strategy '{PopStrategyIndex}' not found.");
+        _pushStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PushStrategyIndex);
+        _popStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PopStrategyIndex);
     }
 
     public void Dispose()
@@ -63,8 +68,8 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         _stack.Add(value);
         var afterTop = PeekTopOrNull();
 
-        var op = new StateMachineOperationContext(MachineKey, StateMachineDataKeys.OperationPush, beforeTop, afterTop);
-        _pushStrategy.AfterAdd(new StateMachineStrategyEntityAdapter(op), _ctx);
+        var context = new StateMachineStrategyContext(MachineKey, beforeTop, afterTop);
+        _pushStrategy.OnPushRuntime(context, _ctx);
     }
 
     public bool TryPopRuntime(out string? popped)
@@ -78,8 +83,8 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         var willPop = _stack[^1];
         var afterTop = _stack.Count > 1 ? _stack[^2] : null;
 
-        var op = new StateMachineOperationContext(MachineKey, StateMachineDataKeys.OperationPop, beforeTop, afterTop);
-        _popStrategy.BeforeRemove(new StateMachineStrategyEntityAdapter(op), _ctx);
+        var context = new StateMachineStrategyContext(MachineKey, beforeTop, afterTop);
+        _popStrategy.OnPopRuntime(context, _ctx);
 
         _stack.RemoveAt(_stack.Count - 1);
         popped = willPop;
@@ -97,8 +102,8 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         var willPop = _stack[^1];
         var afterTop = _stack.Count > 1 ? _stack[^2] : null;
 
-        var op = new StateMachineOperationContext(MachineKey, StateMachineDataKeys.OperationPop, beforeTop, afterTop);
-        _popStrategy.BeforeQuit(new StateMachineStrategyEntityAdapter(op), _ctx);
+        var context = new StateMachineStrategyContext(MachineKey, beforeTop, afterTop);
+        _popStrategy.OnPopBeforeQuit(context, _ctx);
 
         _stack.RemoveAt(_stack.Count - 1);
         popped = willPop;
@@ -141,9 +146,8 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         {
             var beforeTop = i == 0 ? null : _stack[i - 1];
             var afterTop = _stack[i];
-            var op = new StateMachineOperationContext(MachineKey, StateMachineDataKeys.OperationAfterLoad, beforeTop,
-                afterTop);
-            _pushStrategy.AfterLoad(new StateMachineStrategyEntityAdapter(op), _ctx);
+            var context = new StateMachineStrategyContext(MachineKey, beforeTop, afterTop);
+            _pushStrategy.OnPushAfterLoad(context, _ctx);
         }
     }
 

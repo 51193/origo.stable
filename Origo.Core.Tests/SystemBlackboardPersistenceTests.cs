@@ -15,15 +15,16 @@ public class SystemBlackboardPersistenceTests
         var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
         var path = "root/system.json";
 
-        var persistent = new PersistentBlackboard(fs, path, options);
-        var runtime = new OrigoRuntime(new TestLogger(), new TestSndSceneHost(), systemBlackboard: persistent);
+        var persistent = new PersistentBlackboard(fs, path, options, new Origo.Core.Blackboard.Blackboard());
+        var runtime = new OrigoRuntime(new TestLogger(), new TestSndSceneHost(), new TypeStringMapping(),
+            systemBlackboard: persistent);
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
 
         ctx.SetContinueTarget("777");
 
         Assert.True(fs.Exists(path));
 
-        var loadedBoard = new PersistentBlackboard(fs, path, options);
+        var loadedBoard = new PersistentBlackboard(fs, path, options, new Origo.Core.Blackboard.Blackboard());
         loadedBoard.LoadFromDisk();
         var (found, id) = loadedBoard.TryGet<string>("origo.active_save_id");
         Assert.True(found);

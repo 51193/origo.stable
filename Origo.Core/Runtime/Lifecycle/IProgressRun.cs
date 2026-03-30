@@ -1,3 +1,4 @@
+using System;
 using Origo.Core.Abstractions;
 using Origo.Core.Save;
 
@@ -6,7 +7,7 @@ namespace Origo.Core.Runtime.Lifecycle;
 /// <summary>
 ///     流程级运行时，持有流程黑板与当前关卡会话运行实例。
 /// </summary>
-public interface IProgressRun
+public interface IProgressRun : IDisposable
 {
     RunStateScope ProgressScope { get; }
 
@@ -58,8 +59,4 @@ public interface IProgressRun
     /// </summary>
     void SetSaveId(string saveId);
 
-    /// <summary>
-    ///     终止流程生命周期并清理资源（Keep-it-clean：先结束会话，再清理流程容器与黑板）。
-    /// </summary>
-    void Dispose();
 }

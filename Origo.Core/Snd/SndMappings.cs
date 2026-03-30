@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using Origo.Core.Abstractions;
 using Origo.Core.Logging;
-using Origo.Core.Serialization;
+using Origo.Core.Utils;
 
 namespace Origo.Core.Snd;
 
@@ -16,16 +16,16 @@ internal sealed class SndMappings
 {
     private readonly Dictionary<string, string> _sceneAliases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _templatePaths = new(StringComparer.Ordinal);
-    private IFileSystem? _fileSystem;
-    private JsonSerializerOptions? _jsonOptions;
+    private SndTemplateResolver? _templateResolver;
 
     /// <summary>
     ///     从指定文本文件加载场景资源别名映射。
     ///     文件格式为按行的 <c>key: value</c>，忽略空行与以 # 开头的注释行。
     /// </summary>
-    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger? logger = null)
+    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(logger);
         _sceneAliases.Clear();
 
         if (string.IsNullOrWhiteSpace(mapFilePath))
@@ -33,8 +33,10 @@ internal sealed class SndMappings
         if (!fileSystem.Exists(mapFilePath))
             throw new InvalidOperationException($"Scene resource alias map file '{mapFilePath}' not found.");
 
-        ParseKeyValueFile(fileSystem.ReadAllText(mapFilePath), _sceneAliases, mapFilePath, logger);
-        logger?.Log(LogLevel.Info, nameof(SndMappings),
+        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, strict: true,
+                     logger))
+            _sceneAliases[kv.Key] = kv.Value;
+        logger.Log(LogLevel.Info, nameof(SndMappings),
             new LogMessageBuilder().AddSuffix("filePath", mapFilePath)
                 .Build($"Loaded {_sceneAliases.Count} scene resource aliases."));
     }
@@ -64,14 +66,14 @@ internal sealed class SndMappings
         IFileSystem fileSystem,
         string mapFilePath,
         JsonSerializerOptions jsonOptions,
-        ILogger? logger = null)
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(jsonOptions);
+        ArgumentNullException.ThrowIfNull(logger);
 
         _templatePaths.Clear();
-        _fileSystem = fileSystem;
-        _jsonOptions = jsonOptions;
+        _templateResolver = null;
 
         if (string.IsNullOrWhiteSpace(mapFilePath))
             throw new ArgumentException("Snd template alias map file path cannot be null or whitespace.",
@@ -79,8 +81,12 @@ internal sealed class SndMappings
         if (!fileSystem.Exists(mapFilePath))
             throw new InvalidOperationException($"Snd template alias map file '{mapFilePath}' not found.");
 
-        ParseKeyValueFile(fileSystem.ReadAllText(mapFilePath), _templatePaths, mapFilePath, logger);
-        logger?.Log(LogLevel.Info, nameof(SndMappings),
+        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, strict: true,
+                     logger))
+            _templatePaths[kv.Key] = kv.Value;
+
+        _templateResolver = new SndTemplateResolver(fileSystem, jsonOptions, _templatePaths);
+        logger.Log(LogLevel.Info, nameof(SndMappings),
             new LogMessageBuilder().AddSuffix("filePath", mapFilePath)
                 .Build($"Loaded {_templatePaths.Count} Snd templates."));
     }
@@ -93,18 +99,15 @@ internal sealed class SndMappings
         if (string.IsNullOrWhiteSpace(alias))
             throw new ArgumentException("Template alias cannot be null or whitespace.", nameof(alias));
 
-        if (_fileSystem == null || _jsonOptions == null)
+        if (_templateResolver is null)
             throw new InvalidOperationException(
                 "Template resolution called before LoadTemplates; template paths are not initialized.");
 
-        if (!_templatePaths.TryGetValue(alias, out var path))
-            throw new KeyNotFoundException($"Template alias '{alias}' not found in template map.");
+        if (_templatePaths.Count == 0)
+            throw new InvalidOperationException(
+                "No templates loaded: the template map is empty. Call LoadTemplates with a map that contains at least one template entry before resolving template references.");
 
-        var json = _fileSystem.ReadAllText(path);
-        var meta = OrigoJson.DeserializeSndMetaData(json, _jsonOptions);
-        if (meta == null)
-            throw new InvalidOperationException($"Template '{alias}' at '{path}' deserialized to null.");
-        return meta;
+        return _templateResolver.Resolve(alias);
     }
 
     /// <summary>
@@ -113,8 +116,7 @@ internal sealed class SndMappings
     /// </summary>
     public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(
         JsonElement root,
-        JsonSerializerOptions jsonOptions,
-        ILogger? logger = null)
+        JsonSerializerOptions jsonOptions)
     {
         var list = new List<SndMetaData>();
 
@@ -136,17 +138,14 @@ internal sealed class SndMappings
 
                 var template = ResolveTemplate(templateKey);
 
-                var clonedJson = OrigoJson.SerializeSndMetaData(template, jsonOptions);
-                var cloned = OrigoJson.DeserializeSndMetaData(clonedJson, jsonOptions);
-                if (cloned == null)
-                    throw new InvalidOperationException($"Failed to clone template '{templateKey}'.");
+                var cloned = template.DeepClone();
                 cloned.Name = sndName;
                 list.Add(cloned);
             }
             else
             {
                 var meta = item.Deserialize<SndMetaData>(jsonOptions);
-                if (meta == null)
+                if (meta is null)
                     throw new InvalidOperationException("Failed to deserialize SndMetaData from config entry.");
                 if (string.IsNullOrWhiteSpace(meta.Name))
                     throw new InvalidOperationException("SndMetaData 'name' cannot be empty.");
@@ -156,40 +155,12 @@ internal sealed class SndMappings
         return list;
     }
 
+    /// <summary>Detects Godot-style schemes (<c>res://</c>, <c>user://</c>) and other URI-like resource ids.</summary>
+    private const string UriLikeSchemeSeparator = "://";
+
     private static bool IsExplicitResourcePath(string id)
     {
-        // Godot-like virtual FS (res://, user://) and any URI-ish scheme.
-        return id.Contains("://", StringComparison.Ordinal);
+        return id.Contains(UriLikeSchemeSeparator, StringComparison.Ordinal);
     }
 
-    private static void ParseKeyValueFile(
-        string content,
-        Dictionary<string, string> target,
-        string filePath,
-        ILogger? logger)
-    {
-        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var rawLine in lines)
-        {
-            var line = rawLine.Trim();
-            if (line.Length == 0 || line.StartsWith('#'))
-                continue;
-
-            var parts = line.Split(':', 2, StringSplitOptions.TrimEntries);
-            if (parts.Length != 2)
-                throw new FormatException(
-                    $"Invalid line '{line}' in '{filePath}'. Expected 'key: value'.");
-
-            var key = parts[0];
-            var value = parts[1];
-            if (key.Length == 0 || value.Length == 0)
-                throw new FormatException(
-                    $"Invalid line '{line}' in '{filePath}'. Empty key or value.");
-
-            if (!target.TryAdd(key, value))
-                throw new InvalidOperationException(
-                    $"Duplicate key '{key}' in '{filePath}'.");
-        }
-    }
 }

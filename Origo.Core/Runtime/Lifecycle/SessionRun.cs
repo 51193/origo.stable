@@ -17,6 +17,8 @@ public sealed class SessionRun : ISessionRun
     private readonly IFileSystem _fileSystem;
     private readonly SaveContext _saveContext;
     private readonly string _saveRootPath;
+    private readonly RunStateScope _sessionScope;
+    private readonly ISndSceneAccess _sceneAccess;
     private bool _disposed;
 
     public SessionRun(
@@ -28,33 +30,58 @@ public sealed class SessionRun : ISessionRun
         IFileSystem fileSystem,
         string saveRootPath)
     {
-        _saveContext = saveContext ?? throw new ArgumentNullException(nameof(saveContext));
-        LevelId = levelId ?? throw new ArgumentNullException(nameof(levelId));
-        SceneAccess = sceneAccess ?? throw new ArgumentNullException(nameof(sceneAccess));
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-        _saveRootPath = saveRootPath ?? throw new ArgumentNullException(nameof(saveRootPath));
-        SessionScope = new RunStateScope(sessionBlackboard, sessionStateMachines);
+        ArgumentNullException.ThrowIfNull(saveContext);
+        ArgumentNullException.ThrowIfNull(levelId);
+        ArgumentNullException.ThrowIfNull(sceneAccess);
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(saveRootPath);
+        _saveContext = saveContext;
+        LevelId = levelId;
+        _sceneAccess = sceneAccess;
+        _fileSystem = fileSystem;
+        _saveRootPath = saveRootPath;
+        _sessionScope = new RunStateScope(sessionBlackboard, sessionStateMachines);
     }
 
-    public RunStateScope SessionScope { get; }
+    public RunStateScope SessionScope
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _sessionScope;
+        }
+    }
 
-    public IBlackboard SessionBlackboard => SessionScope.Blackboard;
+    public IBlackboard SessionBlackboard
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _sessionScope.Blackboard;
+        }
+    }
 
-    public ISndSceneAccess SceneAccess { get; }
+    public ISndSceneAccess SceneAccess
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _sceneAccess;
+        }
+    }
 
     public string LevelId { get; }
 
     public void PersistLevelState()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(SessionRun));
+        ThrowIfDisposed();
 
         var levelPayload = new LevelPayload
         {
             LevelId = LevelId,
-            SndSceneJson = _saveContext.SerializeSndScene(SceneAccess),
+            SndSceneJson = _saveContext.SerializeSndScene(_sceneAccess),
             SessionJson = _saveContext.SerializeSession(),
-            SessionStateMachinesJson = SessionScope.StateMachines.ExportToJson(_saveContext.SndWorld.JsonOptions)
+            SessionStateMachinesJson = _sessionScope.StateMachines.SerializeToJson(_saveContext.SndWorld.JsonOptions)
         };
 
         var currentRel = SavePathLayout.GetCurrentDirectory();
@@ -68,11 +95,17 @@ public sealed class SessionRun : ISessionRun
     public void Dispose()
     {
         if (_disposed) return;
-
-        SessionScope.StateMachines.PopAllOnQuit();
-        SessionScope.StateMachines.Clear();
-        SceneAccess.ClearAll();
-        SessionBlackboard.Clear();
+        // Set flag first to prevent recursive Dispose calls (e.g. from cleanup callbacks).
         _disposed = true;
+
+        _sessionScope.StateMachines.PopAllOnQuit();
+        _sessionScope.StateMachines.Clear();
+        _sceneAccess.ClearAll();
+        _sessionScope.Blackboard.Clear();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 }

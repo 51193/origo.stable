@@ -13,13 +13,15 @@ namespace Origo.Core.Snd.Strategy;
 internal sealed class SndStrategyManager
 {
     private const string LogTag = nameof(SndStrategyManager);
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private readonly SndStrategyPool _pool;
+    private readonly List<StrategyEntry> _processBuffer = new();
     private readonly List<StrategyEntry> _strategies = new();
 
-    public SndStrategyManager(SndStrategyPool pool, ILogger? logger = null)
+    public SndStrategyManager(SndStrategyPool pool, ILogger logger)
     {
         _pool = pool;
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
@@ -49,20 +51,11 @@ internal sealed class SndStrategyManager
 
     public void Add(ISndEntity entity, string index, SndContext ctx)
     {
-        var strategy = _pool.GetStrategy(index);
-        if (strategy == null)
-        {
-            var ex = new InvalidOperationException($"Strategy '{index}' not found.");
-            _logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
-                .AddSuffix("entityName", entity.Name)
-                .AddSuffix("strategyIndex", index)
-                .Build($"Add strategy failed: {ex.Message}"));
-            throw ex;
-        }
+        var strategy = _pool.GetStrategy<EntityStrategyBase>(index);
 
         _strategies.Add(new StrategyEntry { Index = index, Strategy = strategy });
         strategy.AfterAdd(entity, ctx);
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
             .AddSuffix("entityName", entity.Name)
             .AddSuffix("strategyIndex", index)
             .Build("Strategy added."));
@@ -77,13 +70,13 @@ internal sealed class SndStrategyManager
         entry.Strategy.BeforeRemove(entity, ctx);
         _strategies.RemoveAt(i);
         _pool.ReleaseStrategy(index);
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
             .AddSuffix("entityName", entity.Name)
             .AddSuffix("strategyIndex", index)
             .Build("Strategy removed."));
     }
 
-    public IReadOnlyCollection<string> ExportIndices(ISndEntity entity, SndContext ctx)
+    public IReadOnlyCollection<string> SerializeIndices(ISndEntity entity, SndContext ctx)
     {
         TriggerBeforeSave(entity, ctx);
         return _strategies.Select(s => s.Index).ToArray();
@@ -91,8 +84,10 @@ internal sealed class SndStrategyManager
 
     public void Process(ISndEntity entity, double delta, SndContext ctx)
     {
-        // 允许策略在 Process 中通过实体接口增删策略，因此基于快照进行迭代。
-        foreach (var entry in _strategies.ToArray())
+        // 允许策略在 Process 中通过实体接口增删策略，因此基于快照进行迭代（复用缓冲以减少每帧数组分配）。
+        _processBuffer.Clear();
+        _processBuffer.AddRange(_strategies);
+        foreach (var entry in _processBuffer)
             entry.Strategy.Process(entity, delta, ctx);
     }
 
@@ -100,13 +95,10 @@ internal sealed class SndStrategyManager
     {
         Release();
         foreach (var index in indices)
-        {
-            var strategy = _pool.GetStrategy(index)
-                           ?? throw new InvalidOperationException($"Strategy '{index}' not found.");
-            _strategies.Add(new StrategyEntry { Index = index, Strategy = strategy });
-        }
+            _strategies.Add(new StrategyEntry
+                { Index = index, Strategy = _pool.GetStrategy<EntityStrategyBase>(index) });
 
-        _logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));
+        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));
     }
 
     private void Release()
@@ -149,6 +141,6 @@ internal sealed class SndStrategyManager
     private sealed class StrategyEntry
     {
         public required string Index { get; init; }
-        public required BaseSndStrategy Strategy { get; init; }
+        public required EntityStrategyBase Strategy { get; init; }
     }
 }

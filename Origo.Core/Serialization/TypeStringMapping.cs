@@ -15,15 +15,15 @@ public sealed class TypeStringMapping
 
     public TypeStringMapping()
     {
-        RegisterType<byte>("Byte");
-        RegisterType<short>("Int16");
-        RegisterType<int>("Int32");
-        RegisterType<long>("Int64");
-        RegisterType<bool>("Boolean");
-        RegisterType<float>("Single");
-        RegisterType<double>("Double");
-        RegisterType<string>("String");
-        RegisterType<string[]>("ArrayString");
+        RegisterType<byte>(BclTypeNames.Byte);
+        RegisterType<short>(BclTypeNames.Int16);
+        RegisterType<int>(BclTypeNames.Int32);
+        RegisterType<long>(BclTypeNames.Int64);
+        RegisterType<bool>(BclTypeNames.Boolean);
+        RegisterType<float>(BclTypeNames.Single);
+        RegisterType<double>(BclTypeNames.Double);
+        RegisterType<string>(BclTypeNames.String);
+        RegisterType<string[]>(BclTypeNames.ArrayString);
     }
 
     public void RegisterType<T>(string typeName)
@@ -46,13 +46,17 @@ public sealed class TypeStringMapping
         _reverseTypeMap[type] = typeName;
     }
 
-    public Type? GetTypeByName(string typeName)
+    public Type GetTypeByName(string typeName)
     {
-        return _typeMap.TryGetValue(typeName, out var type) ? type : null;
+        return _typeMap.TryGetValue(typeName, out var type)
+            ? type
+            : throw new InvalidOperationException($"Type name '{typeName}' is not registered.");
     }
 
-    public string? GetNameByType(Type type)
+    public string GetNameByType(Type type)
     {
-        return _reverseTypeMap.TryGetValue(type, out var typeName) ? typeName : null;
+        return _reverseTypeMap.TryGetValue(type, out var typeName)
+            ? typeName
+            : throw new InvalidOperationException($"Type '{type.FullName}' is not registered.");
     }
 }

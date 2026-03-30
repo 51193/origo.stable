@@ -13,28 +13,34 @@ namespace Origo.Core.Runtime;
 
 /// <summary>
 ///     提供运行时自动初始化能力：
-///     反射扫描 BaseSndStrategy 子类并注册到策略池，
+///     反射扫描 <see cref="BaseStrategy" /> 子类并注册到策略池，
 ///     从 JSON 配置文件加载 SndMetaData 数组并自动 Spawn 实体。
 /// </summary>
 public static class OrigoAutoInitializer
 {
     private const string LogTag = nameof(OrigoAutoInitializer);
+
+    /// <summary>Assembly simple name prefixes skipped when scanning for <see cref="BaseStrategy" /> types.</summary>
     private static readonly string[] DefaultSkipPrefixes =
         ["System", "Microsoft", "netstandard"];
 
+    /// <summary>Legacy assembly name that should always be skipped during strategy scanning.</summary>
+    private const string LegacyCorLibAssemblyName = "mscorlib";
+
     public static int DiscoverAndRegisterStrategies(
         SndWorld world,
-        ILogger? logger = null,
+        ILogger logger,
         IEnumerable<string>? additionalSkipPrefixes = null)
     {
         ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(logger);
         var watch = Stopwatch.StartNew();
 
-        var baseType = typeof(BaseSndStrategy);
+        var baseType = typeof(BaseStrategy);
         var pool = world.StrategyPool;
         var registered = 0;
 
-        var skipPrefixes = additionalSkipPrefixes != null
+        var skipPrefixes = additionalSkipPrefixes is not null
             ? DefaultSkipPrefixes.Concat(additionalSkipPrefixes).ToArray()
             : DefaultSkipPrefixes;
 
@@ -52,7 +58,7 @@ public static class OrigoAutoInitializer
             {
                 var wrapped = new InvalidOperationException(
                     $"Failed to enumerate types from assembly '{assembly.FullName}'.", ex);
-                logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                     .AddSuffix("filePath", assembly.FullName)
                     .Build($"Discover strategy types failed: {wrapped.Message}"));
                 throw wrapped;
@@ -62,11 +68,11 @@ public static class OrigoAutoInitializer
             {
                 if (type.IsAbstract || !baseType.IsAssignableFrom(type))
                     continue;
-                if (type.GetConstructor(Type.EmptyTypes) == null)
+                if (type.GetConstructor(Type.EmptyTypes) is null)
                 {
                     var ex = new InvalidOperationException(
                         $"Strategy type '{type.FullName}' must declare a public parameterless constructor.");
-                    logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                    logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                         .Build($"Invalid strategy constructor: {ex.Message}"));
                     throw ex;
                 }
@@ -75,7 +81,7 @@ public static class OrigoAutoInitializer
                     var ex = new InvalidOperationException(
                         $"Strategy type '{type.FullName}' declares instance fields ({mutableFieldNames}); " +
                         "shared pooled strategies must be stateless.");
-                    logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                    logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                         .Build($"Strategy state validation failed: {ex.Message}"));
                     throw ex;
                 }
@@ -83,10 +89,10 @@ public static class OrigoAutoInitializer
                 var index = ResolveStrategyIndex(type);
                 var capturedType = type;
 
-                pool.Register(capturedType, () => (BaseSndStrategy)Activator.CreateInstance(capturedType)!);
+                pool.Register(capturedType, () => (BaseStrategy)Activator.CreateInstance(capturedType)!);
                 registered++;
 
-                logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+                logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
                     .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
                     .AddSuffix("strategyIndex", index)
                     .Build("Strategy auto-registered."));
@@ -94,7 +100,7 @@ public static class OrigoAutoInitializer
         }
 
         watch.Stop();
-        logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+        logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
             .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
             .Build("Strategy auto-discovery complete."));
 
@@ -109,16 +115,17 @@ public static class OrigoAutoInitializer
         string filePath,
         SndRuntime snd,
         IFileSystem fileSystem,
-        ILogger? logger = null)
+        ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(snd);
+        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(fileSystem);
         var watch = Stopwatch.StartNew();
 
         if (string.IsNullOrWhiteSpace(filePath))
         {
             var ex = new ArgumentException("Config file path cannot be null or whitespace.", nameof(filePath));
-            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                 .AddSuffix("filePath", filePath)
                 .Build($"Invalid config path: {ex.Message}"));
             throw ex;
@@ -127,7 +134,7 @@ public static class OrigoAutoInitializer
         if (!fileSystem.Exists(filePath))
         {
             var ex = new InvalidOperationException($"Config file '{filePath}' not found.");
-            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                 .AddSuffix("filePath", filePath)
                 .Build($"Config file not found: {ex.Message}"));
             throw ex;
@@ -137,7 +144,7 @@ public static class OrigoAutoInitializer
         if (string.IsNullOrWhiteSpace(json))
         {
             var ex = new InvalidOperationException($"Config file '{filePath}' is empty.");
-            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                 .AddSuffix("filePath", filePath)
                 .Build($"Config file is empty: {ex.Message}"));
             throw ex;
@@ -148,17 +155,17 @@ public static class OrigoAutoInitializer
         if (doc.RootElement.ValueKind != JsonValueKind.Array)
         {
             var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");
-            logger?.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                 .AddSuffix("filePath", filePath)
                 .Build($"Config json root is not array: {ex.Message}"));
             throw ex;
         }
 
-        var metaList = snd.World.ResolveMetaListFromJsonArray(doc.RootElement, logger);
+        var metaList = snd.World.ResolveMetaListFromJsonArray(doc.RootElement);
         snd.SpawnMany(metaList);
 
         watch.Stop();
-        logger?.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+        logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
             .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
             .AddSuffix("filePath", filePath)
             .Build($"Spawned entities from config: {metaList.Count}."));
@@ -168,8 +175,8 @@ public static class OrigoAutoInitializer
     private static bool ShouldSkipAssembly(Assembly assembly, string[] skipPrefixes)
     {
         var name = assembly.GetName().Name;
-        if (name == null) return true;
-        if (name == "mscorlib") return true;
+        if (name is null) return true;
+        if (name == LegacyCorLibAssemblyName) return true;
 
         foreach (var prefix in skipPrefixes)
             if (name.StartsWith(prefix, StringComparison.Ordinal))
@@ -180,20 +187,27 @@ public static class OrigoAutoInitializer
 
     internal static bool IsStatelessStrategyType(Type strategyType, out string mutableFieldNames)
     {
-        var instanceFields = strategyType
-            .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-            .Where(f => !f.IsStatic)
-            .Select(f => f.Name)
-            .ToArray();
+        var baseType = typeof(BaseStrategy);
+        var names = new List<string>();
+        var t = strategyType;
+        while (t is not null && t != baseType && t != typeof(object))
+        {
+            var fields = t.GetFields(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(f => !f.IsStatic)
+                .Select(f => $"{t.Name}.{f.Name}");
+            names.AddRange(fields);
+            t = t.BaseType;
+        }
 
-        mutableFieldNames = string.Join(", ", instanceFields);
-        return instanceFields.Length == 0;
+        mutableFieldNames = string.Join(", ", names);
+        return names.Count == 0;
     }
 
     private static string ResolveStrategyIndex(Type strategyType)
     {
         var attr = strategyType.GetCustomAttribute<StrategyIndexAttribute>();
-        if (attr == null)
+        if (attr is null)
             throw new InvalidOperationException(
                 $"Strategy '{strategyType.FullName}' missing required StrategyIndexAttribute.");
         if (string.IsNullOrWhiteSpace(attr.Index))

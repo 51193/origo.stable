@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Origo.Core.Abstractions;
 using Origo.Core.Serialization;
 using Origo.Core.Snd;
 using Xunit;
@@ -45,6 +46,19 @@ public class JsonAndMappingsTests
     }
 
     [Fact]
+    public void SndMappings_LoadSceneAliases_DuplicateKey_LogsWarningAndLastWins()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("maps/dup_scenes.map", "hero: res://first.tscn\nhero: res://second.tscn\n");
+        var mappings = new SndMappings();
+        var logger = new TestLogger();
+        mappings.LoadSceneAliases(fs, "maps/dup_scenes.map", logger);
+
+        Assert.Equal("res://second.tscn", mappings.ResolveSceneAlias("hero"));
+        Assert.Contains(logger.Warnings, w => w.Contains("Duplicate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void SndMappings_LoadSceneAliasesAndTemplates_ResolveExpectedValues()
     {
         var fs = new TestFileSystem();
@@ -73,6 +87,10 @@ public class JsonAndMappingsTests
         var template = mappings.ResolveTemplate("hero_template");
         Assert.Equal("TemplateHero", template.Name);
         Assert.Equal(150, Assert.IsType<int>(template.DataMetaData!.Pairs["hp"].Data));
+
+        var readsAfterFirstResolve = fs.ReadAllTextCallCount;
+        _ = mappings.ResolveTemplate("hero_template");
+        Assert.Equal(readsAfterFirstResolve, fs.ReadAllTextCallCount);
     }
 
     [Fact]
@@ -91,7 +109,7 @@ public class JsonAndMappingsTests
             """);
         var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
         var mappings = new SndMappings();
-        mappings.LoadTemplates(fs, "maps/templates.map", options);
+        mappings.LoadTemplates(fs, "maps/templates.map", options, NullLogger.Instance);
 
         using var doc = JsonDocument.Parse(
             """
@@ -129,18 +147,20 @@ public class JsonAndMappingsTests
     }
 
     [Fact]
-    public void Blackboard_ExportAll_ReturnsDetachedCopy()
+    public void Blackboard_SerializeAll_ReturnsDetachedCopy()
     {
         var bb = new Origo.Core.Blackboard.Blackboard();
         bb.Set("k", 1);
 
-        var exported = bb.ExportAll();
+        var exported = bb.SerializeAll();
         Assert.Single(exported);
         Assert.Equal(1, Assert.IsType<int>(exported["k"].Data));
 
         ((Dictionary<string, TypedData>)exported).Clear();
         Assert.Single(bb.GetKeys());
-        Assert.Equal(1, bb.GetOrDefault<int>("k"));
+        var (foundK, kVal) = bb.TryGet<int>("k");
+        Assert.True(foundK);
+        Assert.Equal(1, kVal);
     }
 
     [Fact]
@@ -148,6 +168,19 @@ public class JsonAndMappingsTests
     {
         var mappings = new SndMappings();
         Assert.Throws<InvalidOperationException>(() => mappings.ResolveTemplate("any"));
+    }
+
+    [Fact]
+    public void SndMappings_ResolveTemplate_AfterLoadTemplatesWithEmptyMap_Throws()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("maps/empty_templates.map", "# no entries\n");
+        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var mappings = new SndMappings();
+        mappings.LoadTemplates(fs, "maps/empty_templates.map", options, NullLogger.Instance);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => mappings.ResolveTemplate("any_alias"));
+        Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

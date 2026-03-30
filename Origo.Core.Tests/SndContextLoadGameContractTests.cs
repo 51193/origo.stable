@@ -13,7 +13,7 @@ public class SndContextLoadGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_777/progress.json",
@@ -37,6 +37,7 @@ public class SndContextLoadGameContractTests
         Assert.True(found);
         Assert.Equal("777", activeSaveId);
 
+        Assert.NotNull(ctx.ProgressBlackboard);
         var (foundLevel, activeLevelId) = ctx.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
         Assert.True(foundLevel);
         Assert.Equal("level_x", activeLevelId);
@@ -47,7 +48,7 @@ public class SndContextLoadGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_001/progress.json",
@@ -71,7 +72,7 @@ public class SndContextLoadGameContractTests
     public void RequestLoadGame_WhenProgressMissingActiveLevelId_Throws()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost());
+        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_001/progress.json", "{}");

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -16,9 +17,12 @@ namespace Origo.GodotAdapter.Snd;
 public partial class GodotSndManager : Node, ISndSceneHost
 {
     private readonly List<GodotSndEntity> _entities = new();
+    private readonly List<GodotSndEntity> _processBuffer = new();
+    private EntityView? _entityView;
     private bool _contextBound;
 
     private bool _runtimeDepsBound;
+    private bool _inProcess;
 
     public SndWorld SharedWorld { get; private set; } = null!;
     public ILogger SharedLogger { get; private set; } = null!;
@@ -26,21 +30,43 @@ public partial class GodotSndManager : Node, ISndSceneHost
     public int ProcessTickCount { get; private set; }
     public double ProcessDeltaSum { get; private set; }
 
-    public IReadOnlyList<SndMetaData> ExportMetaList()
+    public IReadOnlyList<SndMetaData> SerializeMetaList()
     {
-        return _entities.Select(s => s.ExportMetaData()).ToList();
+        var list = new List<SndMetaData>(_entities.Count);
+        for (var i = 0; i < _entities.Count; i++)
+            list.Add(_entities[i].SerializeMetaData());
+        return list;
     }
 
     public void LoadFromMetaList(IEnumerable<SndMetaData> metaList)
     {
+        ArgumentNullException.ThrowIfNull(metaList);
+        var staged = new List<GodotSndEntity>();
         foreach (var meta in metaList)
         {
-            var snd = CreateSndEntity();
-            AddChild(snd);
-            _entities.Add(snd);
-            snd.Load(meta);
-        }
+            GodotSndEntity? snd = null;
+            try
+            {
+                snd = CreateSndEntity();
+                AddChild(snd);
+                _entities.Add(snd);
+                staged.Add(snd);
+                snd.Load(meta);
+            }
+            catch
+            {
+                RollbackPartialLoad(staged);
+                if (snd is not null && GodotObject.IsInstanceValid(snd))
+                {
+                    _entities.Remove(snd);
+                    if (snd.GetParent() == this)
+                        RemoveChild(snd);
+                    snd.Free();
+                }
 
+                throw;
+            }
+        }
     }
 
     public void ClearAll()
@@ -53,10 +79,8 @@ public partial class GodotSndManager : Node, ISndSceneHost
         return SpawnFromMeta(metaData);
     }
 
-    public IReadOnlyCollection<ISndEntity> GetEntities()
-    {
-        return _entities.Cast<ISndEntity>().ToArray();
-    }
+    public IReadOnlyCollection<ISndEntity> GetEntities() =>
+        _entityView ??= new EntityView(_entities);
 
     public ISndEntity? FindByName(string name)
     {
@@ -66,11 +90,21 @@ public partial class GodotSndManager : Node, ISndSceneHost
 
     public GodotSndEntity SpawnFromMeta(SndMetaData metaData)
     {
-        var snd = CreateSndEntity();
-        AddChild(snd);
-        _entities.Add(snd);
-        snd.Spawn(metaData);
-        return snd;
+        var staged = new List<GodotSndEntity>();
+        try
+        {
+            var snd = CreateSndEntity();
+            AddChild(snd);
+            _entities.Add(snd);
+            staged.Add(snd);
+            snd.Spawn(metaData);
+            return snd;
+        }
+        catch
+        {
+            RollbackPartialLoad(staged);
+            throw;
+        }
     }
 
     /// <summary>
@@ -115,18 +149,19 @@ public partial class GodotSndManager : Node, ISndSceneHost
     public void QuitAll()
     {
         // 严格栈语义：如果栈 push 顺序与实体 load/spawn 顺序一致，则退出顺序应当反向以匹配 LIFO。
-        foreach (var snd in _entities.ToList().AsEnumerable().Reverse())
+        for (var i = _entities.Count - 1; i >= 0; i--)
         {
-            _entities.Remove(snd);
+            var snd = _entities[i];
+            _entities.RemoveAt(i);
             snd.QuitFromManager();
         }
-
     }
 
     public void DeadByName(string name)
     {
         var snd = _entities.FirstOrDefault(s => s.StableName == name);
-        if (snd == null) return;
+        if (snd is null)
+            throw new InvalidOperationException($"No entity with StableName '{name}'.");
 
         _entities.Remove(snd);
         snd.DeadFromManager();
@@ -139,25 +174,67 @@ public partial class GodotSndManager : Node, ISndSceneHost
 
     public override void _Process(double delta)
     {
-        ProcessTickCount++;
-        ProcessDeltaSum += delta;
-        foreach (var snd in _entities.ToArray())
-            snd.ProcessSnd(delta);
-        Context?.FlushDeferredActionsForCurrentFrame();
+        if (_inProcess)
+            throw new InvalidOperationException("GodotSndManager._Process re-entrancy is not allowed.");
+
+        _inProcess = true;
+        try
+        {
+            ProcessTickCount++;
+            ProcessDeltaSum += delta;
+            _processBuffer.Clear();
+            _processBuffer.AddRange(_entities);
+            for (var i = 0; i < _processBuffer.Count; i++)
+                _processBuffer[i].ProcessSnd(delta);
+            Context?.FlushDeferredActionsForCurrentFrame();
+        }
+        finally
+        {
+            _inProcess = false;
+        }
+    }
+
+    private void RollbackPartialLoad(List<GodotSndEntity> staged)
+    {
+        for (var i = staged.Count - 1; i >= 0; i--)
+        {
+            var s = staged[i];
+            _entities.Remove(s);
+            if (GodotObject.IsInstanceValid(s) && s.GetParent() == this)
+                RemoveChild(s);
+            if (GodotObject.IsInstanceValid(s))
+                s.Free();
+        }
     }
 
     private GodotSndEntity CreateSndEntity()
     {
         EnsureReadyForSpawn();
-        return new GodotSndEntity(SharedWorld, Context!, SharedLogger);
+        return new GodotSndEntity(SharedWorld, Context!, SharedLogger,
+            entity => new GodotPackedSceneNodeFactory(entity));
     }
 
     private void EnsureReadyForSpawn()
     {
-        if (!_runtimeDepsBound || !_contextBound || Context == null)
+        if (!_runtimeDepsBound || !_contextBound || Context is null)
         {
             throw new InvalidOperationException(
                 "GodotSndManager is not ready: call BindRuntimeDependencies and BindContext before spawning entities.");
         }
+    }
+
+    private sealed class EntityView(List<GodotSndEntity> inner) : IReadOnlyList<ISndEntity>
+    {
+        public int Count => inner.Count;
+
+        public ISndEntity this[int index] => inner[index];
+
+        public IEnumerator<ISndEntity> GetEnumerator()
+        {
+            for (var i = 0; i < inner.Count; i++)
+                yield return inner[i];
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

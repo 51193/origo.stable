@@ -3,6 +3,7 @@ using System.Text.Json;
 using Origo.Core.Abstractions;
 using Origo.Core.Runtime.Console;
 using Origo.Core.Scheduling;
+using Origo.Core.Serialization;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime;
@@ -10,6 +11,10 @@ namespace Origo.Core.Runtime;
 /// <summary>
 ///     Origo 在宿主游戏中的统一运行时入口。
 ///     聚合 SND 子系统与系统级黑板。
+///     <para>
+///         线程模型：未做跨线程同步；<see cref="EnqueueBusinessDeferred" /> 与 <see cref="EnqueueSystemDeferred" />
+///         应在宿主主线程（或单线程游戏主循环）上调用，与 <see cref="FlushEndOfFrameDeferred" /> 成对使用。
+///     </para>
 /// </summary>
 public sealed class OrigoRuntime
 {
@@ -19,22 +24,27 @@ public sealed class OrigoRuntime
     public OrigoRuntime(
         ILogger logger,
         ISndSceneHost sndSceneHost,
+        TypeStringMapping typeStringMapping,
         Action<JsonSerializerOptions>? configureJson = null,
         IBlackboard? systemBlackboard = null,
         ConsoleInputQueue? consoleInput = null,
         IConsoleOutputChannel? consoleOutputChannel = null)
     {
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        SndWorld = new SndWorld(Logger, configureJson);
+        ArgumentNullException.ThrowIfNull(logger);
+        Logger = logger;
+        ArgumentNullException.ThrowIfNull(sndSceneHost);
+        ArgumentNullException.ThrowIfNull(typeStringMapping);
+        SndWorld = new SndWorld(typeStringMapping, Logger, configureJson);
         Snd = new SndRuntime(SndWorld, sndSceneHost);
         _businessDeferredScheduler = new ActionScheduler(Logger);
         _systemDeferredScheduler = new ActionScheduler(Logger);
 
-        SystemBlackboard = systemBlackboard ?? new Blackboard.Blackboard();
+        ArgumentNullException.ThrowIfNull(systemBlackboard);
+        SystemBlackboard = systemBlackboard;
 
         ConsoleInput = consoleInput;
         ConsoleOutputChannel = consoleOutputChannel;
-        if (consoleInput != null && consoleOutputChannel != null)
+        if (consoleInput is not null && consoleOutputChannel is not null)
             Console = new OrigoConsole(consoleInput, consoleOutputChannel, this);
     }
 

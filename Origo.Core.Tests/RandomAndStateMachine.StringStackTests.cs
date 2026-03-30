@@ -15,7 +15,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -43,7 +43,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -71,10 +71,10 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "push:after:null->a",
-                    "push:after:a->b",
-                    "popremove:before:b->a",
-                    "popremove:before:a->null"
+                    "push:runtime:null->a",
+                    "push:runtime:a->b",
+                    "pop:runtime:b->a",
+                    "pop:runtime:a->null"
                 },
                 events);
         }
@@ -89,7 +89,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
 
@@ -102,7 +102,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -132,10 +132,10 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "push:after:null->a",
-                    "push:after:a->b",
-                    "popremove:before:b->a",
-                    "popquit:before:a->null"
+                    "push:runtime:null->a",
+                    "push:runtime:a->b",
+                    "pop:runtime:b->a",
+                    "pop:beforeQuit:a->null"
                 },
                 events);
         }
@@ -150,7 +150,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -170,9 +170,9 @@ public partial class RandomAndStateMachineTests
             Assert.Equal(
                 new[]
                 {
-                    "afterload:null->x",
-                    "afterload:x->y",
-                    "afterload:y->z"
+                    "push:afterload:null->x",
+                    "push:afterload:x->y",
+                    "push:afterload:y->z"
                 },
                 events);
         }

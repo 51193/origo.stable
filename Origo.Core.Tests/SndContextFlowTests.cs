@@ -8,11 +8,24 @@ namespace Origo.Core.Tests;
 public class SndContextFlowTests
 {
     [Fact]
+    public void SndContext_Blackboards_NullBeforeProgressRun()
+    {
+        var logger = new TestLogger();
+        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var fs = new TestFileSystem();
+        fs.SeedFile("res://entry/entry.json", "[]");
+        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+
+        Assert.Null(ctx.ProgressBlackboard);
+        Assert.Null(ctx.SessionBlackboard);
+    }
+
+    [Fact]
     public void SndContext_LoadInitialSave_LoadsFromInitialSnapshotAndClearsContinue()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://initial/save_000/progress.json", """{"origo.active_level_id":{"type":"String","data":"default"}}""");
         fs.SeedFile("res://initial/save_000/progress_state_machines.json", """{"machines":[]}""");
@@ -32,7 +45,7 @@ public class SndContextFlowTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
@@ -59,7 +72,7 @@ public class SndContextFlowTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
 
         fs.SeedFile("res://initial/save_000/progress.json", """{"origo.active_level_id":{"type":"String","data":"default"}}""");

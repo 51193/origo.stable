@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using Origo.Core.Abstractions;
@@ -7,6 +8,7 @@ namespace Origo.Core.Save;
 
 /// <summary>
 ///     装饰器黑板：包装内部 <see cref="IBlackboard" />，每次 mutation 自动序列化到指定文件路径。
+///     所有 mutation 操作通过锁保证线程安全。
 /// </summary>
 public sealed class PersistentBlackboard : IBlackboard
 {
@@ -14,55 +16,91 @@ public sealed class PersistentBlackboard : IBlackboard
     private readonly IFileSystem _fileSystem;
     private readonly IBlackboard _inner;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly object _lock = new();
 
+    /// <summary>
+    ///     创建持久化黑板实例，包装指定的内部黑板并绑定到磁盘文件路径。
+    /// </summary>
     public PersistentBlackboard(
         IFileSystem fileSystem,
         string filePath,
         JsonSerializerOptions jsonOptions,
-        IBlackboard? inner = null)
+        IBlackboard inner)
     {
         _fileSystem = fileSystem;
         _filePath = filePath;
         _jsonOptions = jsonOptions;
-        _inner = inner ?? new Blackboard.Blackboard();
+        ArgumentNullException.ThrowIfNull(inner);
+        _inner = inner;
     }
 
+    /// <summary>
+    ///     设置键值并自动持久化到磁盘。
+    /// </summary>
     public void Set<T>(string key, T value)
     {
-        _inner.Set(key, value);
-        Persist();
+        lock (_lock)
+        {
+            _inner.Set(key, value);
+            Persist();
+        }
     }
 
+    /// <summary>
+    ///     尝试获取指定键的值；未找到时 found 为 false。
+    /// </summary>
     public (bool found, T value) TryGet<T>(string key)
     {
-        return _inner.TryGet<T>(key);
+        lock (_lock)
+        {
+            return _inner.TryGet<T>(key);
+        }
     }
 
-    public T GetOrDefault<T>(string key, T defaultValue = default!)
-    {
-        return _inner.GetOrDefault(key, defaultValue);
-    }
-
+    /// <summary>
+    ///     清空黑板中所有键值并持久化空状态到磁盘。
+    /// </summary>
     public void Clear()
     {
-        _inner.Clear();
-        Persist();
+        lock (_lock)
+        {
+            _inner.Clear();
+            Persist();
+        }
     }
 
+    /// <summary>
+    ///     获取黑板中所有已注册的键集合。
+    /// </summary>
     public IReadOnlyCollection<string> GetKeys()
     {
-        return _inner.GetKeys();
+        lock (_lock)
+        {
+            return _inner.GetKeys();
+        }
     }
 
-    public IReadOnlyDictionary<string, TypedData> ExportAll()
+    /// <summary>
+    ///     将黑板中所有键值序列化为带类型信息的字典。
+    /// </summary>
+    public IReadOnlyDictionary<string, TypedData> SerializeAll()
     {
-        return _inner.ExportAll();
+        lock (_lock)
+        {
+            return _inner.SerializeAll();
+        }
     }
 
-    public void ImportAll(IReadOnlyDictionary<string, TypedData> data)
+    /// <summary>
+    ///     从带类型信息的字典恢复黑板全部键值并持久化到磁盘。
+    /// </summary>
+    public void DeserializeAll(IReadOnlyDictionary<string, TypedData> data)
     {
-        _inner.ImportAll(data);
-        Persist();
+        lock (_lock)
+        {
+            _inner.DeserializeAll(data);
+            Persist();
+        }
     }
 
     /// <summary>
@@ -70,22 +108,23 @@ public sealed class PersistentBlackboard : IBlackboard
     /// </summary>
     public void LoadFromDisk()
     {
-        if (!_fileSystem.Exists(_filePath))
-            return;
+        lock (_lock)
+        {
+            if (!_fileSystem.Exists(_filePath))
+                return;
 
-        var json = _fileSystem.ReadAllText(_filePath);
-        var dict = JsonSerializer.Deserialize<Dictionary<string, TypedData>>(json, _jsonOptions);
-        if (dict != null)
-            _inner.ImportAll(dict);
+            var json = _fileSystem.ReadAllText(_filePath);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, TypedData>>(json, _jsonOptions);
+            if (dict is not null)
+                _inner.DeserializeAll(dict);
+        }
     }
 
     private void Persist()
     {
-        var parentDir = _fileSystem.GetParentDirectory(_filePath);
-        if (!string.IsNullOrEmpty(parentDir) && !_fileSystem.DirectoryExists(parentDir))
-            _fileSystem.CreateDirectory(parentDir);
+        SavePathResolver.EnsureParentDirectory(_fileSystem, _filePath);
 
-        var data = _inner.ExportAll();
+        var data = _inner.SerializeAll();
         var json = JsonSerializer.Serialize(data, _jsonOptions);
         _fileSystem.WriteAllText(_filePath, json, true);
     }

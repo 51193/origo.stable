@@ -8,7 +8,7 @@ namespace Origo.Core.Abstractions;
 /// </summary>
 public interface ISndSceneAccess
 {
-    IReadOnlyList<SndMetaData> ExportMetaList();
+    IReadOnlyList<SndMetaData> SerializeMetaList();
 
     void LoadFromMetaList(IEnumerable<SndMetaData> metaList);
 

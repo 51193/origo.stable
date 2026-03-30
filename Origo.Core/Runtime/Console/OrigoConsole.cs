@@ -15,8 +15,10 @@ public sealed class OrigoConsole
 
     public OrigoConsole(IConsoleInputSource input, IConsoleOutputChannel output, OrigoRuntime runtime)
     {
-        _input = input ?? throw new ArgumentNullException(nameof(input));
-        _output = output ?? throw new ArgumentNullException(nameof(output));
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(output);
+        _input = input;
+        _output = output;
         ArgumentNullException.ThrowIfNull(runtime);
 
         _router.Register(new SpawnTemplateCommandHandler(runtime));
@@ -39,8 +41,11 @@ public sealed class OrigoConsole
                 continue;
             }
 
-            if (invocation == null)
+            if (invocation is null)
+            {
+                _output.Publish("Internal error: command invocation was null after a successful parse.");
                 continue;
+            }
 
             try
             {
@@ -50,7 +55,7 @@ public sealed class OrigoConsole
             }
             catch (Exception ex)
             {
-                _output.Publish(ex.Message);
+                _output.Publish($"Command failed: {ex.Message}");
             }
         }
     }

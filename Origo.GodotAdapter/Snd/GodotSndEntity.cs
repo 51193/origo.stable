@@ -15,17 +15,25 @@ public partial class GodotSndEntity : Node, ISndEntity
 {
     private readonly SndContext _context;
     private readonly ILogger _logger;
+    private readonly Func<GodotSndEntity, INodeFactory> _nodeFactoryCreator;
     private readonly SndWorld _world;
     private SndEntity? _entity;
+    private bool _releasedFromManager;
 
     public GodotSndEntity(
         SndWorld world,
         SndContext context,
-        ILogger logger)
+        ILogger logger,
+        Func<GodotSndEntity, INodeFactory> nodeFactoryCreator)
     {
-        _world = world ?? throw new ArgumentNullException(nameof(world));
-        _context = context ?? throw new ArgumentNullException(nameof(context));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(nodeFactoryCreator);
+        _world = world;
+        _context = context;
+        _logger = logger;
+        _nodeFactoryCreator = nodeFactoryCreator;
     }
 
     /// <summary>
@@ -48,7 +56,7 @@ public partial class GodotSndEntity : Node, ISndEntity
         return _entity!.GetData<T>(name);
     }
 
-    public (bool found, T value) TryGetData<T>(string name)
+    public (bool found, T? value) TryGetData<T>(string name)
     {
         EnsureEntity();
         return _entity!.TryGetData<T>(name);
@@ -67,7 +75,7 @@ public partial class GodotSndEntity : Node, ISndEntity
         _entity!.Unsubscribe(name, callback);
     }
 
-    public INodeHandle? GetNode(string name)
+    public INodeHandle GetNode(string name)
     {
         EnsureEntity();
         return _entity!.GetNode(name);
@@ -99,7 +107,8 @@ public partial class GodotSndEntity : Node, ISndEntity
 
     public void Load(SndMetaData metaData)
     {
-        if (metaData == null) throw new ArgumentNullException(nameof(metaData));
+        ThrowIfReleasedFromManager();
+        ArgumentNullException.ThrowIfNull(metaData);
         // Name 是 FindByName 的 key；必须在触发 AfterLoad 之前可见（Let-it-crash 语义下更应 fail-fast）。
         StableName = metaData.Name;
         Name = metaData.Name;
@@ -111,7 +120,8 @@ public partial class GodotSndEntity : Node, ISndEntity
 
     public void Spawn(SndMetaData metaData)
     {
-        if (metaData == null) throw new ArgumentNullException(nameof(metaData));
+        ThrowIfReleasedFromManager();
+        ArgumentNullException.ThrowIfNull(metaData);
         // Name 是 FindByName 的 key；必须在触发 AfterSpawn 之前可见。
         StableName = metaData.Name;
         Name = metaData.Name;
@@ -126,9 +136,14 @@ public partial class GodotSndEntity : Node, ISndEntity
     /// </summary>
     internal void QuitFromManager()
     {
-        if (_entity == null) return;
-        _entity.Quit();
-        // Core 已有显式生命周期编排，直接使用 Free 避免节点释放时序歧义。
+        if (_releasedFromManager) return;
+        _releasedFromManager = true;
+        if (_entity is not null)
+        {
+            _entity.Quit();
+            _entity = null;
+        }
+        // Core 已有显式生命周期编排，直接使用 Free（即时释放）；详见 README 中 GodotSndEntity 生命周期说明。
         Free();
     }
 
@@ -137,16 +152,20 @@ public partial class GodotSndEntity : Node, ISndEntity
     /// </summary>
     internal void DeadFromManager()
     {
-        if (_entity == null) return;
-        _entity.Dead();
-        // Core 已有显式生命周期编排，直接使用 Free 避免节点释放时序歧义。
+        if (_releasedFromManager) return;
+        _releasedFromManager = true;
+        if (_entity is not null)
+        {
+            _entity.Dead();
+            _entity = null;
+        }
         Free();
     }
 
-    public SndMetaData ExportMetaData()
+    public SndMetaData SerializeMetaData()
     {
         EnsureEntity();
-        return _entity!.ExportMetaData();
+        return _entity!.SerializeMetaData();
     }
 
     public void ProcessSnd(double delta)
@@ -156,8 +175,16 @@ public partial class GodotSndEntity : Node, ISndEntity
 
     private void EnsureEntity()
     {
-        if (_entity != null) return;
-        var nodeFactory = new GodotPackedSceneNodeFactory(this, _logger);
+        ThrowIfReleasedFromManager();
+        if (_entity is not null) return;
+        var nodeFactory = _nodeFactoryCreator(this);
         _entity = _world.CreateEntity(nodeFactory, _context, _logger);
+    }
+
+    private void ThrowIfReleasedFromManager()
+    {
+        if (_releasedFromManager)
+            throw new InvalidOperationException(
+                "GodotSndEntity has been released from GodotSndManager and cannot be used.");
     }
 }

@@ -13,8 +13,10 @@ public sealed class SndRuntime
 {
     public SndRuntime(SndWorld world, ISndSceneHost sceneHost)
     {
-        World = world ?? throw new ArgumentNullException(nameof(world));
-        SceneHost = sceneHost ?? throw new ArgumentNullException(nameof(sceneHost));
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(sceneHost);
+        World = world;
+        SceneHost = sceneHost;
     }
 
     public SndWorld World { get; }
@@ -26,7 +28,7 @@ public sealed class SndRuntime
         ArgumentNullException.ThrowIfNull(metaData);
         if (string.IsNullOrWhiteSpace(metaData.Name))
             throw new ArgumentException("SndMetaData.Name cannot be null or whitespace.", nameof(metaData));
-        if (SceneHost.FindByName(metaData.Name) != null)
+        if (SceneHost.FindByName(metaData.Name) is not null)
             throw new InvalidOperationException($"Snd entity name '{metaData.Name}' already exists.");
 
         return SceneHost.Spawn(metaData);
@@ -34,13 +36,13 @@ public sealed class SndRuntime
 
     public void SpawnMany(IEnumerable<SndMetaData> metaList)
     {
-        if (metaList == null) return;
+        ArgumentNullException.ThrowIfNull(metaList);
         foreach (var meta in metaList) Spawn(meta);
     }
 
-    public IReadOnlyList<SndMetaData> ExportMetaList()
+    public IReadOnlyList<SndMetaData> SerializeMetaList()
     {
-        return SceneHost.ExportMetaList();
+        return SceneHost.SerializeMetaList();
     }
 
     public void ClearAll()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Logging;
@@ -10,25 +11,26 @@ namespace Origo.Core.Snd;
 internal sealed class SndNodeManager : INodeHost
 {
     private readonly INodeFactory _factory;
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private readonly SndMappings _mappings;
     private readonly Dictionary<string, INodeHandle> _nodes = new();
     private Dictionary<string, string> _resources = new();
 
-    public SndNodeManager(INodeFactory factory, SndMappings mappings, ILogger? logger = null)
+    public SndNodeManager(INodeFactory factory, SndMappings mappings, ILogger logger)
     {
         _factory = factory;
         _mappings = mappings;
+        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
-    public INodeHandle? GetNode(string name)
+    public INodeHandle GetNode(string name)
     {
         if (_nodes.TryGetValue(name, out var node)) return node;
 
-        _logger?.Log(LogLevel.Error, nameof(SndNodeManager),
-            new LogMessageBuilder().AddSuffix("entityName", name).Build("Node not found."));
-        return null;
+        _logger.Log(LogLevel.Error, nameof(SndNodeManager),
+            new LogMessageBuilder().AddSuffix("nodeName", name).Build("Node not found."));
+        throw new InvalidOperationException($"Node '{name}' not found.");
     }
 
     public IReadOnlyCollection<string> GetNodeNames()
@@ -44,18 +46,19 @@ internal sealed class SndNodeManager : INodeHost
         foreach (var pair in _resources)
         {
             var resourceId = _mappings.ResolveSceneAlias(pair.Value);
-            var node = _factory.Create(pair.Key, resourceId);
-            if (node == null)
+            try
             {
-                _logger?.Log(LogLevel.Error, nameof(SndNodeManager),
-                    new LogMessageBuilder().AddSuffix("entityName", pair.Key).Build("Failed to create node."));
-                continue;
+                _nodes[pair.Key] = _factory.Create(pair.Key, resourceId);
             }
-
-            _nodes[pair.Key] = node;
+            catch (Exception ex)
+            {
+                Release();
+                throw new InvalidOperationException(
+                    $"Failed to create node logicalName='{pair.Key}', resourceId='{resourceId}'.", ex);
+            }
         }
 
-        _logger?.Log(LogLevel.Info, nameof(SndNodeManager),
+        _logger.Log(LogLevel.Info, nameof(SndNodeManager),
             new LogMessageBuilder().Build($"Loaded {_nodes.Count} nodes."));
     }
 
@@ -67,7 +70,7 @@ internal sealed class SndNodeManager : INodeHost
         _resources.Clear();
     }
 
-    public NodeMetaData ExportMetaData()
+    public NodeMetaData SerializeMetaData()
     {
         return new NodeMetaData
         {

@@ -9,7 +9,8 @@ internal sealed class DelegateSaveMetaContributor : ISaveMetaContributor
 
     public DelegateSaveMetaContributor(Action<SaveMetaBuildContext, IDictionary<string, string>> contribute)
     {
-        _contribute = contribute ?? throw new ArgumentNullException(nameof(contribute));
+        ArgumentNullException.ThrowIfNull(contribute);
+        _contribute = contribute;
     }
 
     public void Contribute(in SaveMetaBuildContext context, IDictionary<string, string> target)

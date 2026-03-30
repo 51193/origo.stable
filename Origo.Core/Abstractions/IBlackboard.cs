@@ -9,11 +9,11 @@ namespace Origo.Core.Abstractions;
 /// </summary>
 public interface IBlackboard
 {
+#pragma warning disable CA1716 // Identifiers should not match keywords — Set is an intentional API name for this blackboard
     void Set<T>(string key, T value);
+#pragma warning restore CA1716
 
     (bool found, T value) TryGet<T>(string key);
-
-    T GetOrDefault<T>(string key, T defaultValue = default!);
 
     void Clear();
 
@@ -22,10 +22,10 @@ public interface IBlackboard
     /// <summary>
     ///     导出全部条目（带类型信息），用于序列化持久化。
     /// </summary>
-    IReadOnlyDictionary<string, TypedData> ExportAll();
+    IReadOnlyDictionary<string, TypedData> SerializeAll();
 
     /// <summary>
     ///     从带类型信息的字典恢复全部条目，替换当前内容。
     /// </summary>
-    void ImportAll(IReadOnlyDictionary<string, TypedData> data);
+    void DeserializeAll(IReadOnlyDictionary<string, TypedData> data);
 }

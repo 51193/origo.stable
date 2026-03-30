@@ -41,4 +41,15 @@ public interface IFileSystem
     ///     枚举指定目录下的直接子目录，返回完整路径列表。
     /// </summary>
     IEnumerable<string> EnumerateDirectories(string directoryPath);
+
+    /// <summary>
+    ///     原子地将目录或文件从 <paramref name="sourcePath" /> 重命名/移动到 <paramref name="destinationPath" />。
+    ///     若目标已存在，行为由实现决定（可覆盖或抛异常）。
+    /// </summary>
+    void Rename(string sourcePath, string destinationPath);
+
+    /// <summary>
+    ///     递归删除指定目录及其全部内容。若目录不存在则忽略。
+    /// </summary>
+    void DeleteDirectory(string directoryPath);
 }

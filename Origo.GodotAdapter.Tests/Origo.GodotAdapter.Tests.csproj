@@ -1,16 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
         <OutputType>Exe</OutputType>
-        <Nullable>enable</Nullable>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <UseAppHost>true</UseAppHost>
         <GodotProjectDir>$(MSBuildThisFileDirectory)../../..</GodotProjectDir>
+        <GodotDisabledSourceGenerators>GodotPluginsInitializer</GodotDisabledSourceGenerators>
+        <!-- Test methods use underscore naming convention by design. -->
+        <NoWarn>$(NoWarn);CA1707</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
+        <CompilerVisibleProperty Include="GodotDisabledSourceGenerators" />
         <CompilerVisibleProperty Include="GodotProjectDir" />
     </ItemGroup>
 

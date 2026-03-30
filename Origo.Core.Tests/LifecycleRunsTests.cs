@@ -11,11 +11,11 @@ namespace Origo.Core.Tests;
 public class LifecycleRunsTests
 {
     [Fact]
-    public void SessionRun_Dispose_ClearsSessionAndScene()
+    public void SessionRun_Dispose_ClearsSessionAndScene_ThenThrowsOnAccess()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -27,8 +27,14 @@ public class LifecycleRunsTests
 
         run.Dispose();
 
-        Assert.Empty(run.SessionBlackboard.GetKeys());
-        Assert.Empty(host.ExportMetaList());
+        // Scene should have been cleared during Dispose.
+        Assert.Empty(host.SerializeMetaList());
+
+        // After Dispose, all property access should throw ObjectDisposedException.
+        Assert.Throws<ObjectDisposedException>(() => run.SessionBlackboard);
+        Assert.Throws<ObjectDisposedException>(() => run.SessionScope);
+        Assert.Throws<ObjectDisposedException>(() => run.SceneAccess);
+        Assert.Throws<ObjectDisposedException>(() => run.PersistLevelState());
     }
 
     [Fact]
@@ -36,7 +42,7 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -72,7 +78,7 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -100,7 +106,7 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host);
+        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -110,11 +116,11 @@ public class LifecycleRunsTests
 
         // Missing target level payload in current/ → enter empty session and clear scene (README contract).
         runtime.Snd.SceneHost.Spawn(new SndMetaData { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
-        Assert.NotEmpty(runtime.Snd.ExportMetaList());
+        Assert.NotEmpty(runtime.Snd.SerializeMetaList());
 
         progressRun.SwitchLevel("b");
 
-        Assert.Empty(runtime.Snd.ExportMetaList());
+        Assert.Empty(runtime.Snd.SerializeMetaList());
         Assert.Equal("b", progressRun.ActiveLevelId);
         Assert.NotNull(progressRun.CurrentSession);
         Assert.Equal("b", progressRun.CurrentSession!.LevelId);

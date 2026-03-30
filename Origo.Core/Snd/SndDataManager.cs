@@ -11,7 +11,7 @@ namespace Origo.Core.Snd;
 /// </summary>
 internal sealed class SndDataManager
 {
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
 
     private readonly DataObserverManager _observerManager = new();
     private readonly Dictionary<string, List<SubscriptionPair>> _subscriptionMap = new();
@@ -19,20 +19,23 @@ internal sealed class SndDataManager
 
     private Dictionary<string, TypedData> _data = new();
 
-    public SndDataManager(ISndEntity target, ILogger? logger = null)
+    public SndDataManager(ISndEntity target, ILogger logger)
     {
-        _target = target ?? throw new ArgumentNullException(nameof(target));
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(logger);
+        _target = target;
         _logger = logger;
     }
 
     public void Subscribe(string name, Action<ISndEntity, object?, object?> callback,
         Func<ISndEntity, object?, object?, bool>? filter)
     {
-        if (callback == null) return;
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(callback);
 
         var wrappedCallback = new Action<object?, object?>((oldValue, newValue) =>
             callback(_target, oldValue, newValue));
-        var wrappedFilter = filter == null
+        var wrappedFilter = filter is null
             ? null
             : new Func<object?, object?, bool>((oldValue, newValue) => filter(_target, oldValue, newValue));
 
@@ -80,10 +83,10 @@ internal sealed class SndDataManager
         _observerManager.NotifyObservers(name, oldValue, value);
     }
 
-    public (bool, T) TryGetData<T>(string name)
+    public (bool, T?) TryGetData<T>(string name)
     {
         if (_data.TryGetValue(name, out var typedData) && typedData.Data is T value) return (true, value);
-        return (false, default!);
+        return (false, default);
     }
 
     public T GetData<T>(string name)
@@ -95,14 +98,14 @@ internal sealed class SndDataManager
     {
         if (_data.TryGetValue(name, out var typedData) && typedData.Data is T value) return value;
         var message = $"Data with name '{name}' not found or is not of type '{typeof(T).Name}'.";
-        _logger?.Log(LogLevel.Error, nameof(SndDataManager), new LogMessageBuilder().Build(message));
+        _logger.Log(LogLevel.Error, nameof(SndDataManager), new LogMessageBuilder().Build(message));
         throw new InvalidOperationException(message);
     }
 
     public void Recover(DataMetaData meta)
     {
         _data = new Dictionary<string, TypedData>(meta.Pairs);
-        _logger?.Log(LogLevel.Info, nameof(SndDataManager),
+        _logger.Log(LogLevel.Info, nameof(SndDataManager),
             new LogMessageBuilder().Build($"Loaded {_data.Count} data entries."));
     }
 
@@ -113,7 +116,7 @@ internal sealed class SndDataManager
         _data.Clear();
     }
 
-    public DataMetaData ExportMeta()
+    public DataMetaData SerializeMeta()
     {
         return new DataMetaData
         {
