@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
+using Origo.Core.Runtime;
+using Origo.Core.Runtime.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Tests;
 
 internal sealed class TestLogger : ILogger
 {
+    public readonly List<string> Errors = new();
     public readonly List<string> Infos = new();
     public readonly List<string> Warnings = new();
-    public readonly List<string> Errors = new();
 
     public void Log(LogLevel level, string tag, string message)
     {
@@ -38,10 +41,11 @@ internal sealed class TestNodeHandle : INodeHandle
         Native = native ?? new object();
     }
 
-    public string Name { get; }
-    public object Native { get; }
     public bool IsVisible { get; private set; } = true;
     public int FreeCount { get; private set; }
+
+    public string Name { get; }
+    public object Native { get; }
 
     public void Free() => FreeCount++;
     public void SetVisible(bool visible) => IsVisible = visible;
@@ -50,6 +54,9 @@ internal sealed class TestNodeHandle : INodeHandle
 internal sealed class TestNodeFactory : INodeFactory
 {
     private readonly HashSet<string> _resourceIdsThatFail;
+    public readonly List<TestNodeHandle> CreatedHandles = new();
+
+    public readonly List<(string logicalName, string resourceId)> Requests = new();
 
     public TestNodeFactory(IEnumerable<string>? resourceIdsThatFail = null)
     {
@@ -57,9 +64,6 @@ internal sealed class TestNodeFactory : INodeFactory
             ? new HashSet<string>(resourceIdsThatFail, StringComparer.Ordinal)
             : new HashSet<string>(StringComparer.Ordinal);
     }
-
-    public readonly List<(string logicalName, string resourceId)> Requests = new();
-    public readonly List<TestNodeHandle> CreatedHandles = new();
 
     public INodeHandle Create(string logicalName, string resourceId)
     {
@@ -75,17 +79,10 @@ internal sealed class TestNodeFactory : INodeFactory
 
 internal sealed class TestFileSystem : IFileSystem
 {
-    private readonly Dictionary<string, string> _files = new(StringComparer.Ordinal);
     private readonly HashSet<string> _directories = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _files = new(StringComparer.Ordinal);
 
     public int ReadAllTextCallCount { get; private set; }
-
-    public void SeedFile(string path, string content)
-    {
-        var normalized = Normalize(path);
-        _files[normalized] = content;
-        EnsureParents(normalized);
-    }
 
     public bool Exists(string path) => _files.ContainsKey(Normalize(path));
 
@@ -164,10 +161,8 @@ internal sealed class TestFileSystem : IFileSystem
         _files.Remove(normalized);
     }
 
-    public string CombinePath(string basePath, string relativePath)
-    {
-        return Normalize($"{Normalize(basePath).TrimEnd('/')}/{relativePath}");
-    }
+    public string CombinePath(string basePath, string relativePath) =>
+        Normalize($"{Normalize(basePath).TrimEnd('/')}/{relativePath}");
 
     public string GetParentDirectory(string path)
     {
@@ -214,7 +209,8 @@ internal sealed class TestFileSystem : IFileSystem
 
         // Move all files under source to destination
         var srcPrefix = src + "/";
-        var filesToMove = _files.Keys.Where(f => f.StartsWith(srcPrefix, StringComparison.Ordinal) || f == src).ToList();
+        var filesToMove = _files.Keys.Where(f => f.StartsWith(srcPrefix, StringComparison.Ordinal) || f == src)
+            .ToList();
         foreach (var file in filesToMove)
         {
             var newPath = dst + file.Substring(src.Length);
@@ -224,7 +220,8 @@ internal sealed class TestFileSystem : IFileSystem
         }
 
         // Move all directories under source to destination
-        var dirsToMove = _directories.Where(d => d.StartsWith(srcPrefix, StringComparison.Ordinal) || d == src).ToList();
+        var dirsToMove = _directories.Where(d => d.StartsWith(srcPrefix, StringComparison.Ordinal) || d == src)
+            .ToList();
         foreach (var dir in dirsToMove)
         {
             var newDir = dst + dir.Substring(src.Length);
@@ -244,15 +241,20 @@ internal sealed class TestFileSystem : IFileSystem
         foreach (var file in filesToRemove)
             _files.Remove(file);
 
-        var dirsToRemove = _directories.Where(d => d == normalized || d.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+        var dirsToRemove = _directories.Where(d => d == normalized || d.StartsWith(prefix, StringComparison.Ordinal))
+            .ToList();
         foreach (var dir in dirsToRemove)
             _directories.Remove(dir);
     }
 
-    private static string Normalize(string path)
+    public void SeedFile(string path, string content)
     {
-        return path.Replace('\\', '/').Trim();
+        var normalized = Normalize(path);
+        _files[normalized] = content;
+        EnsureParents(normalized);
     }
+
+    private static string Normalize(string path) => path.Replace('\\', '/').Trim();
 
     private void EnsureParents(string filePath)
     {
@@ -269,8 +271,8 @@ internal sealed class TestFileSystem : IFileSystem
 
 internal sealed class TestSndSceneHost : ISndSceneHost
 {
-    private readonly List<SndMetaData> _metaList = new();
     private readonly List<ISndEntity> _entities = new();
+    private readonly List<SndMetaData> _metaList = new();
     public int ClearAllCount { get; private set; }
 
     public ISndEntity Spawn(SndMetaData metaData)
@@ -317,6 +319,7 @@ internal sealed class DummySndEntity : ISndEntity
 
     public void SetData<T>(string name, T value) => _data[name] = value;
     public T GetData<T>(string name) => _data.TryGetValue(name, out var value) && value is T cast ? cast : default!;
+
     public (bool found, T? value) TryGetData<T>(string name)
     {
         if (_data.TryGetValue(name, out var value) && value is T cast)
@@ -324,7 +327,8 @@ internal sealed class DummySndEntity : ISndEntity
         return (false, default);
     }
 
-    public void Subscribe(string name, Action<ISndEntity, object?, object?> callback, Func<ISndEntity, object?, object?, bool>? filter = null)
+    public void Subscribe(string name, Action<ISndEntity, object?, object?> callback,
+        Func<ISndEntity, object?, object?, bool>? filter = null)
     {
     }
 
@@ -334,7 +338,73 @@ internal sealed class DummySndEntity : ISndEntity
 
     public INodeHandle GetNode(string name) =>
         throw new InvalidOperationException($"Node '{name}' not found.");
+
     public IReadOnlyCollection<string> GetNodeNames() => Array.Empty<string>();
-    public void AddStrategy(string index) { }
-    public void RemoveStrategy(string index) { }
+
+    public void AddStrategy(string index)
+    {
+    }
+
+    public void RemoveStrategy(string index)
+    {
+    }
+}
+
+/// <summary>
+///     Centralized factory for test infrastructure objects with the new DataSource-based constructors.
+/// </summary>
+internal static class TestFactory
+{
+    public static DataSourceConverterRegistry CreateRegistry()
+    {
+        var tm = new TypeStringMapping();
+        return DataSourceFactory.CreateDefaultRegistry(tm);
+    }
+
+    public static DataSourceConverterRegistry CreateRegistry(
+        TypeStringMapping tm) =>
+        DataSourceFactory.CreateDefaultRegistry(tm);
+
+    public static IDataSourceCodec CreateJsonCodec() => DataSourceFactory.CreateJsonCodec();
+
+    public static IDataSourceCodec CreateMapCodec() => DataSourceFactory.CreateMapCodec();
+
+    public static SndWorld CreateSndWorld(
+        TypeStringMapping? tm = null,
+        ILogger? logger = null)
+    {
+        tm ??= new TypeStringMapping();
+        logger ??= new TestLogger();
+        var reg = CreateRegistry(tm);
+        return new SndWorld(tm, logger, reg, CreateJsonCodec(), CreateMapCodec());
+    }
+
+    public static OrigoRuntime CreateRuntime(
+        ILogger? logger = null,
+        ISndSceneHost? sceneHost = null,
+        TypeStringMapping? tm = null,
+        IBlackboard? systemBb = null)
+    {
+        logger ??= new TestLogger();
+        sceneHost ??= new TestSndSceneHost();
+        tm ??= new TypeStringMapping();
+        systemBb ??= new Blackboard.Blackboard();
+        var reg = CreateRegistry(tm);
+        return new OrigoRuntime(
+            logger, sceneHost, tm, reg, CreateJsonCodec(), CreateMapCodec(), systemBb);
+    }
+
+    public static OrigoRuntime CreateRuntime(
+        ILogger logger,
+        ISndSceneHost sceneHost,
+        TypeStringMapping tm,
+        IBlackboard systemBb,
+        ConsoleInputQueue consoleInput,
+        ConsoleOutputChannel consoleOutput)
+    {
+        var reg = CreateRegistry(tm);
+        return new OrigoRuntime(
+            logger, sceneHost, tm, reg, CreateJsonCodec(), CreateMapCodec(),
+            systemBb, consoleInput, consoleOutput);
+    }
 }

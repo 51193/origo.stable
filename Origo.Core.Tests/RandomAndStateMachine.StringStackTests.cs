@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
-using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Snd;
 using Origo.Core.StateMachine;
 using Xunit;
@@ -15,7 +13,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -43,7 +41,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -89,7 +87,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
 
@@ -102,7 +100,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -150,7 +148,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;

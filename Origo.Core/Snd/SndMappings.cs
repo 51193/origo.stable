@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Utils;
 
@@ -14,6 +14,9 @@ namespace Origo.Core.Snd;
 /// </summary>
 internal sealed class SndMappings
 {
+    /// <summary>Detects Godot-style schemes (<c>res://</c>, <c>user://</c>) and other URI-like resource ids.</summary>
+    private const string UriLikeSchemeSeparator = "://";
+
     private readonly Dictionary<string, string> _sceneAliases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _templatePaths = new(StringComparer.Ordinal);
     private SndTemplateResolver? _templateResolver;
@@ -33,7 +36,7 @@ internal sealed class SndMappings
         if (!fileSystem.Exists(mapFilePath))
             throw new InvalidOperationException($"Scene resource alias map file '{mapFilePath}' not found.");
 
-        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, strict: true,
+        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, true,
                      logger))
             _sceneAliases[kv.Key] = kv.Value;
         logger.Log(LogLevel.Info, nameof(SndMappings),
@@ -60,16 +63,18 @@ internal sealed class SndMappings
     }
 
     /// <summary>
-    ///     从映射文件加载模板别名到 JSON 文件路径的映射，并配置内部使用的文件系统与 JSON 选项。
+    ///     从映射文件加载模板别名到 JSON 文件路径的映射，并配置内部使用的文件系统与编解码器。
     /// </summary>
     public void LoadTemplates(
         IFileSystem fileSystem,
         string mapFilePath,
-        JsonSerializerOptions jsonOptions,
+        IDataSourceCodec jsonCodec,
+        DataSourceConverterRegistry registry,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        ArgumentNullException.ThrowIfNull(jsonOptions);
+        ArgumentNullException.ThrowIfNull(jsonCodec);
+        ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(logger);
 
         _templatePaths.Clear();
@@ -81,11 +86,12 @@ internal sealed class SndMappings
         if (!fileSystem.Exists(mapFilePath))
             throw new InvalidOperationException($"Snd template alias map file '{mapFilePath}' not found.");
 
-        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, strict: true,
+        foreach (var kv in KeyValueFileParser.Parse(fileSystem.ReadAllText(mapFilePath), mapFilePath, true,
                      logger))
             _templatePaths[kv.Key] = kv.Value;
 
-        _templateResolver = new SndTemplateResolver(fileSystem, jsonOptions, _templatePaths);
+        var sndMetaConverter = registry.Get<SndMetaData>();
+        _templateResolver = new SndTemplateResolver(fileSystem, jsonCodec, sndMetaConverter, _templatePaths);
         logger.Log(LogLevel.Info, nameof(SndMappings),
             new LogMessageBuilder().AddSuffix("filePath", mapFilePath)
                 .Build($"Loaded {_templatePaths.Count} Snd templates."));
@@ -111,25 +117,25 @@ internal sealed class SndMappings
     }
 
     /// <summary>
-    ///     将 JSON 数组元素（可能包含模板引用简写）解析为 SndMetaData 列表。
-    ///     支持两种形式：完整的 SndMetaData JSON 对象，或 { "sndName": "...", "templateKey": "..." } 简写。
+    ///     将 DataSourceNode 数组（可能包含模板引用简写）解析为 SndMetaData 列表。
+    ///     支持两种形式：完整的 SndMetaData 对象，或 { "sndName": "...", "templateKey": "..." } 简写。
     /// </summary>
     public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(
-        JsonElement root,
-        JsonSerializerOptions jsonOptions)
+        DataSourceNode root,
+        DataSourceConverterRegistry registry)
     {
         var list = new List<SndMetaData>();
+        var sndMetaConverter = registry.Get<SndMetaData>();
 
-        foreach (var item in root.EnumerateArray())
-            if (item.ValueKind == JsonValueKind.Object &&
-                item.TryGetProperty("templateKey", out var templateKeyProp))
+        foreach (var item in root.Elements)
+            if (item.Kind == DataSourceNodeKind.Object && item.ContainsKey("templateKey"))
             {
-                var templateKey = templateKeyProp.GetString();
+                var templateKey = item["templateKey"].AsString();
                 if (string.IsNullOrWhiteSpace(templateKey))
                     throw new InvalidOperationException("Config entry has an empty 'templateKey'.");
 
-                var sndName = item.TryGetProperty("sndName", out var sndNameProp)
-                    ? sndNameProp.GetString() ?? string.Empty
+                var sndName = item.TryGetValue("sndName", out var sndNameNode) && sndNameNode is not null
+                    ? sndNameNode.AsString()
                     : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(sndName))
@@ -144,7 +150,7 @@ internal sealed class SndMappings
             }
             else
             {
-                var meta = item.Deserialize<SndMetaData>(jsonOptions);
+                var meta = sndMetaConverter.Read(item);
                 if (meta is null)
                     throw new InvalidOperationException("Failed to deserialize SndMetaData from config entry.");
                 if (string.IsNullOrWhiteSpace(meta.Name))
@@ -155,12 +161,6 @@ internal sealed class SndMappings
         return list;
     }
 
-    /// <summary>Detects Godot-style schemes (<c>res://</c>, <c>user://</c>) and other URI-like resource ids.</summary>
-    private const string UriLikeSchemeSeparator = "://";
-
-    private static bool IsExplicitResourcePath(string id)
-    {
-        return id.Contains(UriLikeSchemeSeparator, StringComparison.Ordinal);
-    }
-
+    private static bool IsExplicitResourcePath(string id) =>
+        id.Contains(UriLikeSchemeSeparator, StringComparison.Ordinal);
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text.Json;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 
@@ -21,15 +20,11 @@ internal sealed class SaveGameWorkflow
         _ctx = ctx;
     }
 
-    internal IReadOnlyList<string> ListSaves()
-    {
-        return SaveStorageFacade.EnumerateSaveIds(_ctx.FileSystem, _ctx.SaveRootPath);
-    }
+    internal IReadOnlyList<string> ListSaves() =>
+        SaveStorageFacade.EnumerateSaveIds(_ctx.FileSystem, _ctx.SaveRootPath);
 
-    internal IReadOnlyList<SaveMetaDataEntry> ListSavesWithMetaData()
-    {
-        return SaveStorageFacade.EnumerateSavesWithMetaData(_ctx.FileSystem, _ctx.SaveRootPath);
-    }
+    internal IReadOnlyList<SaveMetaDataEntry> ListSavesWithMetaData() =>
+        SaveStorageFacade.EnumerateSavesWithMetaData(_ctx.FileSystem, _ctx.SaveRootPath);
 
     internal void RequestSaveGame(
         string newSaveId,
@@ -103,15 +98,9 @@ internal sealed class SaveGameWorkflow
         return !string.IsNullOrWhiteSpace(saveId);
     }
 
-    internal void SetContinueTarget(string saveId)
-    {
-        _ctx.SetActiveSaveState(saveId);
-    }
+    internal void SetContinueTarget(string saveId) => _ctx.SetActiveSaveState(saveId);
 
-    internal void ClearContinueTarget()
-    {
-        _ctx.SystemBlackboard.Set(WellKnownKeys.ActiveSaveId, string.Empty);
-    }
+    internal void ClearContinueTarget() => _ctx.SystemBlackboard.Set(WellKnownKeys.ActiveSaveId, string.Empty);
 
     private void ExecuteSaveGameNow(
         string newSaveId,
@@ -140,9 +129,12 @@ internal sealed class SaveGameWorkflow
 
             var mergedMeta = SaveMetaMerger.Merge(_ctx.SaveMetaContributors, in metaContext, customMeta);
 
-            var jsonOptions = _ctx.Runtime.SndWorld.JsonOptions;
-            var progressSmJson = progressRun.ProgressScope.StateMachines.SerializeToJson(jsonOptions);
-            var sessionSmJson = sessionRun.SessionScope.StateMachines.SerializeToJson(jsonOptions);
+            var jsonCodec = _ctx.Runtime.SndWorld.JsonCodec;
+            var converterRegistry = _ctx.Runtime.SndWorld.ConverterRegistry;
+            var progressSmJson =
+                progressRun.ProgressScope.StateMachines.SerializeToDataSource(jsonCodec, converterRegistry);
+            var sessionSmJson =
+                sessionRun.SessionScope.StateMachines.SerializeToDataSource(jsonCodec, converterRegistry);
 
             var payload = saveContext.SaveGame(
                 _ctx.Runtime.Snd.SceneHost,

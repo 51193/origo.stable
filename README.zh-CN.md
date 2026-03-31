@@ -18,7 +18,7 @@
 - **完整存档系统** —— 基于插槽的存/读档、继续游戏、自动存档、关卡切换，以及用于 UI 的 `meta.map`
 - **栈式状态机** —— 基于字符串的 push/pop 状态机，具有策略钩子，按层持久化
 - **类型化黑板** —— `IBlackboard` 使用 `TypedData` 值，在序列化往返中保持类型
-- **内置开发者控制台** —— `spawn`、`snd_count` 及自定义命令，通过发布/订阅输出
+- **内置开发者控制台** —— 14 个内置命令（`help`、`spawn`、`snd_count`、`find_entity`、`clear_entities`、`bb_get`、`bb_set`、`bb_keys`、`list_saves`、`save`、`load`、`auto_save`、`continue`、`change_level`），支持发布/订阅输出及自定义命令扩展
 - **确定性随机数** —— 基于 `IRandom` 接口的 XorShift128+ 实现
 - **平台无关的 Core** —— 仅依赖 .NET 8；`Origo.Core` 中无任何引擎符号泄露
 - **Godot 4 适配器** —— 薄层实现 + DI 连线；可替换为 Unity、MonoGame 等自定义适配器
@@ -30,7 +30,7 @@
 ```
 Origo.Core/               纯 C# 核心（Microsoft.NET.Sdk，net8.0，无引擎依赖）
 Origo.GodotAdapter/       Godot 4 适配器（Godot.NET.Sdk 4.6.1，薄层实现 + DI）
-Origo.Core.Tests/         Core 单元测试（xUnit v3，283 个测试）
+Origo.Core.Tests/         Core 单元测试（xUnit v3，353 个测试）
 Origo.GodotAdapter.Tests/ Adapter 单元测试（xUnit v3，1 个测试）
 scripts/                  构建与实用脚本
 Directory.Build.props     共享 MSBuild 属性
@@ -147,6 +147,7 @@ flowchart TB
         SM[StackStateMachine]
         SV["存档<br/>(SaveStorageFacade)"]
         LC["生命周期<br/>(SystemRun → ProgressRun → SessionRun)"]
+        DS["DataSource<br/>(IDataSourceCodec / ConverterRegistry)"]
     end
 
     subgraph abs ["Origo.Core/Abstractions"]
@@ -161,6 +162,7 @@ flowchart TB
     GC --> SW
     Entry --> Host --> RT
     RT --> SW & SR & BB
+    SW --> DS
     SC --> LC & SV & SM
     SR --> SW & ISH
     GSM -.implements.-> ISH
@@ -182,7 +184,7 @@ flowchart TB
 OrigoDefaultEntry（Godot 入口节点）
   └─ OrigoAutoHost（创建 Runtime + 注入适配器）
        └─ OrigoRuntime
-            ├─ SndWorld（StrategyPool / TypeMapping / Mappings）
+            ├─ SndWorld（StrategyPool / TypeMapping / Mappings / JsonCodec / ConverterRegistry）
             ├─ SndRuntime（ISndSceneHost 门面）
             └─ SystemBlackboard
        └─ SndContext（存档 / 读档 / 切换关卡编排）
@@ -365,6 +367,49 @@ public readonly struct StateMachineStrategyContext
 
 ---
 
+### 序列化 / DataSource 抽象
+
+Origo 中的所有序列化均通过 **DataSource 抽象层**（`Origo.Core/DataSource/`）进行，使整个 Core 与任何具体 JSON 库（如 `System.Text.Json`）完全解耦。
+
+#### 关键组件
+
+| 类型 | 职责 |
+|------|------|
+| `DataSourceNode` | 不可变树节点：Object、Array、String、Number、Boolean、Null —— 惰性展开 |
+| `IDataSourceCodec` | 在 `DataSourceNode` 与原始文本（JSON、`.map` 等）之间编码 / 解码 |
+| `DataSourceConverterRegistry` | 类型安全的领域对象 ↔ `DataSourceNode` 读写 |
+| `DataSourceConverter<T>` | 每种类型转换逻辑的抽象基类 |
+| `DataSourceFactory` | 工厂方法，创建预配置的注册表和所有内置转换器 |
+
+#### 编解码器实现
+
+- **`JsonDataSourceCodec`** —— 内部包装 `System.Text.Json`；STJ 仅在此处出现
+- **`MapDataSourceCodec`** —— 简单的 `key: value` 行格式，用于 `.map` 文件
+
+#### 工作原理
+
+```
+领域对象  ←→  DataSourceNode  ←→  原始文本（JSON / .map）
+     ↑ registry.Write/Read ↑    ↑ codec.Encode/Decode ↑
+```
+
+`SndWorld` 暴露 `JsonCodec` 和 `ConverterRegistry`，使所有子系统（Save、StateMachine、Blackboard）无需依赖任何 JSON 库即可完成序列化。
+
+#### 扩展自定义类型
+
+要为引擎特定类型（如 Godot `Vector2`）添加序列化支持：
+
+1. 为你的类型实现 `DataSourceConverter<T>`
+2. 在引导阶段注册：
+
+```csharp
+sndWorld.ConverterRegistry.Register(new MyVector2Converter());
+```
+
+参见 `GodotJsonConverterRegistry.RegisterDataSourceConverters()` 获取注册引擎类型的完整示例。
+
+---
+
 ### 存档 / 读档系统
 
 存档系统采用 **工作区 + 快照** 模型：
@@ -488,7 +533,7 @@ saveRoot/
 | 成员 | 类别 | 说明 |
 |------|------|------|
 | `Logger` | 属性 | `ILogger` 日志接口 |
-| `SndWorld` | 属性 | 策略池、类型映射、JSON 选项 |
+| `SndWorld` | 属性 | 策略池、类型映射、JsonCodec、ConverterRegistry |
 | `Snd` | 属性 | `SndRuntime` 实体运行时门面 |
 | `SystemBlackboard` | 属性 | 系统黑板 |
 | `ConsoleInput` | 属性 | `IConsoleInputSource?` 控制台输入源 |
@@ -515,6 +560,99 @@ saveRoot/
 | `ClearAll()` | 方法 | 移除所有实体 |
 | `GetEntities()` | 方法 | 获取所有活跃实体 |
 | `FindByName(string)` | 方法 | 按名称查找实体 |
+
+---
+
+## 🖥 内置控制台命令
+
+开发者控制台提供 14 个内置命令，覆盖实体管理、黑板检查、存/读档和关卡切换。通过 `SndContext.TrySubmitConsoleCommand(string)` 提交命令，通过 `SubscribeConsoleOutput` 接收输出。
+
+### 实体命令
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `spawn` | `spawn <name> <template>` | 通过克隆已注册模板生成实体 |
+| | `spawn name=<n> template=<t>` | 命名参数形式（不可与位置参数混用） |
+| `snd_count` | `snd_count` | 输出当前已生成实体的数量 |
+| `find_entity` | `find_entity <name>` | 按名称查找实体并显示其节点信息 |
+| `clear_entities` | `clear_entities` | 销毁所有已生成的实体 |
+
+### 黑板命令
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `bb_get` | `bb_get <layer> <key>` | 从指定黑板层读取值 |
+| `bb_set` | `bb_set <layer> <key> <value>` | 写入值（自动推断 int / float / bool / string 类型） |
+| `bb_keys` | `bb_keys <layer>` | 列出指定黑板层的所有键 |
+
+> **layer** —— 目前支持 `system`。当存在具有活跃 Run 的 `SndContext` 时，Progress / Session 层亦可用。
+
+### 存档 / 读档命令
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `list_saves` | `list_saves` | 列出所有可用的存档槽 ID |
+| `save` | `save <newSaveId> <baseSaveId>` | 请求基于现有槽保存到新槽 |
+| `load` | `load <saveId>` | 请求加载存档槽 |
+| `auto_save` | `auto_save [saveId]` | 请求自动存档（可选显式 ID） |
+| `continue` | `continue` | 从上次活跃存档继续游戏 |
+
+### 关卡命令
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `change_level` | `change_level <newLevelId>` | 请求切换到另一个关卡 |
+
+### 实用命令
+
+| 命令 | 用法 | 说明 |
+|------|------|------|
+| `help` | `help` | 列出所有已注册的命令名称 |
+
+### 自定义命令
+
+通过 `OrigoConsole.RegisterHandler(IConsoleCommandHandler)` 注册自定义命令。
+
+每个处理器需声明：
+
+| 属性 | 说明 |
+|------|------|
+| `Name` | 命令关键字（不区分大小写） |
+| `HelpText` | 帮助信息，由 `help` 命令自动收集展示 |
+| `MinPositionalArgs` | 允许的位置参数最小数量（含） |
+| `MaxPositionalArgs` | 允许的位置参数最大数量（含），-1 表示无上限 |
+
+继承 `ConsoleCommandHandlerBase` 可获得**自动参数数量校验** — 只有参数数量合法时才会调用 `ExecuteCore`：
+
+```csharp
+public sealed class TeleportCommandHandler : ConsoleCommandHandlerBase
+{
+    public override string Name => "teleport";
+    public override string HelpText => "teleport <x> <y> — 将玩家传送到指定坐标。";
+    public override int MinPositionalArgs => 2;
+    public override int MaxPositionalArgs => 2;
+
+    protected override bool ExecuteCore(
+        CommandInvocation invocation,
+        IConsoleOutputChannel outputChannel,
+        out string? errorMessage)
+    {
+        var x = invocation.PositionalArgs[0];
+        var y = invocation.PositionalArgs[1];
+        outputChannel.Publish($"已传送到 ({x}, {y})。");
+        errorMessage = null;
+        return true;
+    }
+}
+```
+
+随时注册：
+
+```csharp
+runtime.Console?.RegisterHandler(new TeleportCommandHandler());
+```
+
+内置 `help` 命令会自动列出所有已注册处理器的 `HelpText`。
 
 ---
 
@@ -711,6 +849,7 @@ sequenceDiagram
 | `ISndSceneHost` | 场景实体操作：`Spawn`、`GetEntities`、`FindByName` |
 | `ISndEntity` | 由 `ISndDataAccess` + `ISndNodeAccess` + `ISndStrategyAccess` 组合 |
 | `IBlackboard` | 类型化键值存储，包含 `SerializeAll` / `DeserializeAll` |
+| `IDataSourceCodec` | 在 `DataSourceNode` 与原始文本（如 JSON）之间编码 / 解码 |
 | `ILogger` | `Log(LogLevel level, string tag, string message)`，含 `LogLevel` 枚举 |
 | `IOrigoRuntimeProvider` | 访问 `OrigoRuntime` 实例 |
 | `IScheduler` | 延迟操作调度 |
@@ -770,7 +909,7 @@ public sealed class CameraPushStrategy : StateMachineStrategyBase
 1. **实现抽象接口** —— 为 `IFileSystem`、`ISndSceneHost`、`INodeFactory`、`INodeHandle`、`ILogger` 以及游戏所需的其他接口提供具体类型
 2. **引导运行时** —— 使用你的实现创建 `OrigoRuntime`，类似于 `OrigoAutoHost`
 3. **驱动帧循环** —— 每帧调用实体的 `Process`，帧末调用 `FlushEndOfFrameDeferred()`
-4. **注册引擎类型** —— 将引擎类型添加到 `SndWorld.TypeMapping` 以支持序列化
+4. **注册引擎类型** —— 将引擎类型添加到 `SndWorld.TypeMapping`，并通过 `SndWorld.ConverterRegistry` 注册 `DataSourceConverter<T>` 实现
 
 Core 库 **零** 引擎依赖 —— 只有适配器项目引用目标引擎 SDK。
 
@@ -786,7 +925,7 @@ dotnet test Origo.sln
 
 | 项目 | 测试数 | 覆盖范围 |
 |------|--------|---------|
-| `Origo.Core.Tests` | 283 | SND、存档、生命周期、控制台、序列化、黑板 |
+| `Origo.Core.Tests` | 353 | SND、存档、生命周期、控制台、DataSource、序列化、黑板 |
 | `Origo.GodotAdapter.Tests` | 1 | 最小适配器行为 |
 
 测试项目使用 **xUnit v3**，不包含在主游戏构建中。

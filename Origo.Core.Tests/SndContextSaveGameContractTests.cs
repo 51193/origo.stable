@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
@@ -14,7 +13,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -44,7 +43,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -79,7 +78,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -104,7 +103,7 @@ public class SndContextSaveGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -115,4 +114,3 @@ public class SndContextSaveGameContractTests
         Assert.Throws<ArgumentException>(() => ctx.RequestSaveGame(" ", "000"));
     }
 }
-

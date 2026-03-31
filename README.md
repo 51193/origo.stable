@@ -18,7 +18,7 @@
 - **Complete save system** — slot-based save/load, continue, auto-save, level switching, and `meta.map` for UI
 - **Stack state machines** — push/pop string-based state machines with strategy hooks, persisted per layer
 - **Typed blackboards** — `IBlackboard` with `TypedData` values that survive serialization round-trips
-- **Built-in developer console** — `spawn`, `snd_count`, and custom commands via pub/sub output
+- **Built-in developer console** — 14 built-in commands (`help`, `spawn`, `snd_count`, `find_entity`, `clear_entities`, `bb_get`, `bb_set`, `bb_keys`, `list_saves`, `save`, `load`, `auto_save`, `continue`, `change_level`) with pub/sub output and custom command extensibility
 - **Deterministic RNG** — XorShift128+ implementation behind `IRandom`
 - **Platform-agnostic Core** — depends only on .NET 8; no engine symbols leak into `Origo.Core`
 - **Godot 4 adapter** — thin implementations + DI wiring; swap with your own adapter for Unity, MonoGame, etc.
@@ -30,7 +30,7 @@
 ```
 Origo.Core/               Pure C# core (Microsoft.NET.Sdk, net8.0, no engine dependency)
 Origo.GodotAdapter/       Godot 4 adapter (Godot.NET.Sdk 4.6.1, thin implementations + DI)
-Origo.Core.Tests/         Core unit tests (xUnit v3, 283 tests)
+Origo.Core.Tests/         Core unit tests (xUnit v3, 353 tests)
 Origo.GodotAdapter.Tests/ Adapter unit tests (xUnit v3, 1 test)
 scripts/                  Build & utility scripts
 Directory.Build.props     Shared MSBuild properties
@@ -147,6 +147,7 @@ flowchart TB
         SM[StackStateMachine]
         SV["Save<br/>(SaveStorageFacade)"]
         LC["Lifecycle<br/>(SystemRun → ProgressRun → SessionRun)"]
+        DS["DataSource<br/>(IDataSourceCodec / ConverterRegistry)"]
     end
 
     subgraph abs ["Origo.Core/Abstractions"]
@@ -161,6 +162,7 @@ flowchart TB
     GC --> SW
     Entry --> Host --> RT
     RT --> SW & SR & BB
+    SW --> DS
     SC --> LC & SV & SM
     SR --> SW & ISH
     GSM -.implements.-> ISH
@@ -182,7 +184,7 @@ flowchart TB
 OrigoDefaultEntry (Godot entry node)
   └─ OrigoAutoHost (creates Runtime + injects adapter)
        └─ OrigoRuntime
-            ├─ SndWorld (StrategyPool / TypeMapping / Mappings)
+            ├─ SndWorld (StrategyPool / TypeMapping / Mappings / JsonCodec / ConverterRegistry)
             ├─ SndRuntime (ISndSceneHost facade)
             └─ SystemBlackboard
        └─ SndContext (save / load / change-level orchestration)
@@ -365,6 +367,49 @@ Access via `SndContext.GetProgressStateMachines()` / `GetSessionStateMachines()`
 
 ---
 
+### Serialization / DataSource Abstraction
+
+All serialization in Origo goes through a **DataSource abstraction layer** (`Origo.Core/DataSource/`), decoupling the entire Core from any concrete JSON library (e.g. `System.Text.Json`).
+
+#### Key Components
+
+| Type | Responsibility |
+|------|----------------|
+| `DataSourceNode` | Immutable tree node: Object, Array, String, Number, Boolean, Null — with lazy expansion |
+| `IDataSourceCodec` | Encode / Decode between `DataSourceNode` and raw text (JSON, `.map`, etc.) |
+| `DataSourceConverterRegistry` | Type-safe read/write of domain objects ↔ `DataSourceNode` |
+| `DataSourceConverter<T>` | Abstract base for per-type conversion logic |
+| `DataSourceFactory` | Factory that creates a pre-configured registry with all built-in converters |
+
+#### Codec Implementations
+
+- **`JsonDataSourceCodec`** — wraps `System.Text.Json` internally; the only place STJ appears
+- **`MapDataSourceCodec`** — simple `key: value` line-based format for `.map` files
+
+#### How It Works
+
+```
+Domain Object  ←→  DataSourceNode  ←→  Raw Text (JSON / .map)
+     ↑ registry.Write/Read ↑    ↑ codec.Encode/Decode ↑
+```
+
+`SndWorld` exposes `JsonCodec` and `ConverterRegistry` so all subsystems (Save, StateMachine, Blackboard) serialize without depending on any JSON library.
+
+#### Extending with Custom Types
+
+To add serialization support for engine-specific types (e.g. Godot `Vector2`):
+
+1. Implement `DataSourceConverter<T>` for your type
+2. Register it during bootstrap:
+
+```csharp
+sndWorld.ConverterRegistry.Register(new MyVector2Converter());
+```
+
+See `GodotJsonConverterRegistry.RegisterDataSourceConverters()` for a complete example of registering engine types.
+
+---
+
 ### Save / Load System
 
 The save system uses a **workspace + snapshot** model:
@@ -488,7 +533,7 @@ Top-level runtime object created by the adapter.
 | Member | Kind | Description |
 |--------|------|-------------|
 | `Logger` | property | `ILogger` logging interface |
-| `SndWorld` | property | Strategy pool, type mapping, JSON options |
+| `SndWorld` | property | Strategy pool, type mapping, JsonCodec, ConverterRegistry |
 | `Snd` | property | `SndRuntime` entity runtime facade |
 | `SystemBlackboard` | property | System blackboard |
 | `ConsoleInput` | property | `IConsoleInputSource?` console input source |
@@ -515,6 +560,99 @@ Facade combining `SndWorld` and `ISndSceneHost`.
 | `ClearAll()` | method | Remove all entities |
 | `GetEntities()` | method | Get all active entities |
 | `FindByName(string)` | method | Find entity by name |
+
+---
+
+## 🖥 Built-in Console Commands
+
+The developer console provides 14 built-in commands covering entity management, blackboard inspection, save/load, and level switching. Submit commands via `SndContext.TrySubmitConsoleCommand(string)` and receive output through `SubscribeConsoleOutput`.
+
+### Entity Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `spawn` | `spawn <name> <template>` | Spawn an entity by cloning a registered template |
+| | `spawn name=<n> template=<t>` | Named-argument form (cannot mix with positional) |
+| `snd_count` | `snd_count` | Print the current number of spawned entities |
+| `find_entity` | `find_entity <name>` | Look up an entity by name and display its node info |
+| `clear_entities` | `clear_entities` | Destroy all spawned entities |
+
+### Blackboard Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `bb_get` | `bb_get <layer> <key>` | Read a value from the specified blackboard layer |
+| `bb_set` | `bb_set <layer> <key> <value>` | Write a value (auto-infers int / float / bool / string) |
+| `bb_keys` | `bb_keys <layer>` | List all keys in the specified blackboard layer |
+
+> **layer** — currently supports `system`. Progress / Session layers are available when a `SndContext` with an active run is present.
+
+### Save / Load Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `list_saves` | `list_saves` | List all available save slot IDs |
+| `save` | `save <newSaveId> <baseSaveId>` | Request a save to a new slot based on an existing slot |
+| `load` | `load <saveId>` | Request loading a save slot |
+| `auto_save` | `auto_save [saveId]` | Request an auto-save (optional explicit ID) |
+| `continue` | `continue` | Continue from the last active save |
+
+### Level Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `change_level` | `change_level <newLevelId>` | Request switching to a different level |
+
+### Utility Commands
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `help` | `help` | List all registered command names |
+
+### Custom Commands
+
+Register custom commands via `OrigoConsole.RegisterHandler(IConsoleCommandHandler)`.
+
+Each handler declares:
+
+| Property | Description |
+|----------|-------------|
+| `Name` | Command keyword (case-insensitive) |
+| `HelpText` | Usage string shown by the `help` command |
+| `MinPositionalArgs` | Minimum positional argument count (inclusive) |
+| `MaxPositionalArgs` | Maximum positional argument count (inclusive, -1 = unlimited) |
+
+Extend `ConsoleCommandHandlerBase` to get **automatic argument-count validation** — your `ExecuteCore` is only called when the count is in range:
+
+```csharp
+public sealed class TeleportCommandHandler : ConsoleCommandHandlerBase
+{
+    public override string Name => "teleport";
+    public override string HelpText => "teleport <x> <y> — Teleport the player to the given coordinates.";
+    public override int MinPositionalArgs => 2;
+    public override int MaxPositionalArgs => 2;
+
+    protected override bool ExecuteCore(
+        CommandInvocation invocation,
+        IConsoleOutputChannel outputChannel,
+        out string? errorMessage)
+    {
+        var x = invocation.PositionalArgs[0];
+        var y = invocation.PositionalArgs[1];
+        outputChannel.Publish($"Teleported to ({x}, {y}).");
+        errorMessage = null;
+        return true;
+    }
+}
+```
+
+Register at any time:
+
+```csharp
+runtime.Console?.RegisterHandler(new TeleportCommandHandler());
+```
+
+The built-in `help` command automatically lists every registered handler's `HelpText`.
 
 ---
 
@@ -711,6 +849,7 @@ All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
 | `ISndSceneHost` | Scene entity operations: `Spawn`, `GetEntities`, `FindByName` |
 | `ISndEntity` | Composed of `ISndDataAccess` + `ISndNodeAccess` + `ISndStrategyAccess` |
 | `IBlackboard` | Typed key-value store with `SerializeAll` / `DeserializeAll` |
+| `IDataSourceCodec` | Encode / Decode between `DataSourceNode` and raw text (e.g. JSON) |
 | `ILogger` | `Log(LogLevel level, string tag, string message)` with `LogLevel` enum |
 | `IOrigoRuntimeProvider` | Access to `OrigoRuntime` instance |
 | `IScheduler` | Deferred action scheduling |
@@ -770,7 +909,7 @@ To port Origo to a different engine (Unity, MonoGame, etc.):
 1. **Implement the Abstractions** — provide concrete types for `IFileSystem`, `ISndSceneHost`, `INodeFactory`, `INodeHandle`, `ILogger`, and any other interfaces your game needs
 2. **Bootstrap the runtime** — create an `OrigoRuntime` with your implementations, similar to `OrigoAutoHost`
 3. **Drive the frame loop** — call `Process` on entities each frame and `FlushEndOfFrameDeferred()` at frame end
-4. **Register engine types** — add your engine's types to `SndWorld.TypeMapping` for serialization
+4. **Register engine types** — add your engine's types to `SndWorld.TypeMapping` and register `DataSourceConverter<T>` implementations via `SndWorld.ConverterRegistry`
 
 The Core library has **zero** engine dependencies — only your adapter project references the target engine SDK.
 
@@ -786,7 +925,7 @@ dotnet test Origo.sln
 
 | Project | Tests | Coverage |
 |---------|-------|----------|
-| `Origo.Core.Tests` | 283 | SND, Save, Lifecycle, Console, Serialization, Blackboard |
+| `Origo.Core.Tests` | 353 | SND, Save, Lifecycle, Console, DataSource, Serialization, Blackboard |
 | `Origo.GodotAdapter.Tests` | 1 | Minimal adapter behavior |
 
 Test projects use **xUnit v3** and are excluded from the main game build.

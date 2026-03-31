@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Origo.Core.Abstractions;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
-using Origo.Core.Serialization;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
@@ -23,7 +21,7 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -64,12 +62,12 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         var saveContext = new SaveContext(progress, session, runtime.SndWorld);
         var run = factory.CreateSessionRun(saveContext, "default", session, host);
 
@@ -88,12 +86,12 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
-        var fs = new FailOnWriteFileSystem(failPath: "root/current/progress.json");
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new FailOnWriteFileSystem("root/current/progress.json");
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
 
-        var progressRun = factory.CreateProgressRun("001", "a", new Origo.Core.Blackboard.Blackboard());
+        var progressRun = factory.CreateProgressRun("001", "a", new Blackboard.Blackboard());
         progressRun.CreateFromAlreadyLoadedScene();
 
         // Seed a valid target level so validation passes.
@@ -141,7 +139,7 @@ public class TechnicalDebtFixTests
     [Fact]
     public void SaveStorageFacade_SnapshotCurrentToSave_CleansUpTempOnFailure()
     {
-        var fs = new FailOnCopyFileSystem(failTargetSubstring: "save_001.tmp");
+        var fs = new FailOnCopyFileSystem("save_001.tmp");
         fs.SeedFile("root/current/progress.json", "{}");
         fs.SeedFile("root/current/level_default/snd_scene.json", "[]");
 
@@ -159,7 +157,7 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -223,7 +221,7 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -251,7 +249,7 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
@@ -270,28 +268,27 @@ public class TechnicalDebtFixTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SwapTestPushStrategy());
         pool.Register(() => new SwapTestPopStrategy());
 
-        var options = OrigoJson.CreateDefaultOptions(runtime.SndWorld.TypeMapping, _ => { });
         var container = new StateMachineContainer(pool, ctx);
 
         // Serialize an empty container, then deserialize back – no-op swap.
-        var emptyJson = container.SerializeToJson(options);
-        container.DeserializeWithoutHooks(emptyJson, options);
+        var emptyJson = container.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        container.DeserializeWithoutHooks(emptyJson, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
         Assert.False(container.TryGet("anything", out _));
 
         // Populate with a machine, serialize, then deserialize into the same container.
         var sm = container.CreateOrGet("nav", "sm.swap.push", "sm.swap.pop");
         sm.RestoreStackWithoutHooks(new List<string> { "a", "b" });
-        var json = container.SerializeToJson(options);
+        var json = container.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
 
         // Deserialize replaces old state atomically.
-        container.DeserializeWithoutHooks(json, options);
+        container.DeserializeWithoutHooks(json, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
 
         Assert.True(container.TryGet("nav", out var restored));
         Assert.NotNull(restored);
@@ -306,24 +303,30 @@ public class TechnicalDebtFixTests
     // ── Test doubles for this file ─────────────────────────────────────
 
     [StrategyIndex("sm.swap.push")]
-    private sealed class SwapTestPushStrategy : StateMachineStrategyBase { }
+    private sealed class SwapTestPushStrategy : StateMachineStrategyBase
+    {
+    }
 
     [StrategyIndex("sm.swap.pop")]
-    private sealed class SwapTestPopStrategy : StateMachineStrategyBase { }
+    private sealed class SwapTestPopStrategy : StateMachineStrategyBase
+    {
+    }
 
     /// <summary>
-    /// A file system that delegates to <see cref="TestFileSystem"/> but throws on
-    /// <see cref="IFileSystem.WriteAllText"/> when the path contains the configured fail path.
-    /// Used to simulate persistence failures during SwitchLevel.
+    ///     A file system that delegates to <see cref="TestFileSystem" /> but throws on
+    ///     <see cref="IFileSystem.WriteAllText" /> when the path contains the configured fail path.
+    ///     Used to simulate persistence failures during SwitchLevel.
     /// </summary>
     private sealed class FailOnWriteFileSystem : IFileSystem
     {
-        private readonly TestFileSystem _inner = new();
         private readonly string _failPath;
+        private readonly TestFileSystem _inner = new();
 
-        public FailOnWriteFileSystem(string failPath) => _failPath = failPath;
+        public FailOnWriteFileSystem(string failPath)
+        {
+            _failPath = failPath;
+        }
 
-        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
         public bool Exists(string path) => _inner.Exists(path);
         public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
         public string ReadAllText(string path) => _inner.ReadAllText(path);
@@ -337,38 +340,49 @@ public class TechnicalDebtFixTests
 
         public void Copy(string sourcePath, string destinationPath, bool overwrite)
             => _inner.Copy(sourcePath, destinationPath, overwrite);
+
         public IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
             => _inner.EnumerateFiles(directoryPath, searchPattern, recursive);
+
         public void CreateDirectory(string directoryPath) => _inner.CreateDirectory(directoryPath);
         public void Delete(string path) => _inner.Delete(path);
+
         public string CombinePath(string basePath, string relativePath)
             => _inner.CombinePath(basePath, relativePath);
+
         public string GetParentDirectory(string path) => _inner.GetParentDirectory(path);
+
         public IEnumerable<string> EnumerateDirectories(string directoryPath)
             => _inner.EnumerateDirectories(directoryPath);
+
         public void Rename(string sourcePath, string destinationPath)
             => _inner.Rename(sourcePath, destinationPath);
+
         public void DeleteDirectory(string directoryPath)
             => _inner.DeleteDirectory(directoryPath);
+
+        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
     }
 
     /// <summary>
-    /// A file system that delegates to <see cref="TestFileSystem"/> but throws on
-    /// <see cref="IFileSystem.Copy"/> when the destination path contains the configured substring.
-    /// Used to simulate snapshot copy failures.
+    ///     A file system that delegates to <see cref="TestFileSystem" /> but throws on
+    ///     <see cref="IFileSystem.Copy" /> when the destination path contains the configured substring.
+    ///     Used to simulate snapshot copy failures.
     /// </summary>
     private sealed class FailOnCopyFileSystem : IFileSystem
     {
-        private readonly TestFileSystem _inner = new();
         private readonly string _failTargetSubstring;
+        private readonly TestFileSystem _inner = new();
 
         public FailOnCopyFileSystem(string failTargetSubstring)
-            => _failTargetSubstring = failTargetSubstring;
+        {
+            _failTargetSubstring = failTargetSubstring;
+        }
 
-        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
         public bool Exists(string path) => _inner.Exists(path);
         public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
         public string ReadAllText(string path) => _inner.ReadAllText(path);
+
         public void WriteAllText(string path, string content, bool overwrite)
             => _inner.WriteAllText(path, content, overwrite);
 
@@ -381,16 +395,24 @@ public class TechnicalDebtFixTests
 
         public IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
             => _inner.EnumerateFiles(directoryPath, searchPattern, recursive);
+
         public void CreateDirectory(string directoryPath) => _inner.CreateDirectory(directoryPath);
         public void Delete(string path) => _inner.Delete(path);
+
         public string CombinePath(string basePath, string relativePath)
             => _inner.CombinePath(basePath, relativePath);
+
         public string GetParentDirectory(string path) => _inner.GetParentDirectory(path);
+
         public IEnumerable<string> EnumerateDirectories(string directoryPath)
             => _inner.EnumerateDirectories(directoryPath);
+
         public void Rename(string sourcePath, string destinationPath)
             => _inner.Rename(sourcePath, destinationPath);
+
         public void DeleteDirectory(string directoryPath)
             => _inner.DeleteDirectory(directoryPath);
+
+        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
     }
 }

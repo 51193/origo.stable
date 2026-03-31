@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -11,7 +10,7 @@ public class SndContextDeferredExecutionTests
     public void FlushDeferredActionsForCurrentFrame_ExecutesBusinessBeforeSystem()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
         var order = new List<string>();
@@ -33,7 +32,7 @@ public class SndContextDeferredExecutionTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");

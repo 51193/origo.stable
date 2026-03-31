@@ -1,15 +1,15 @@
 using System;
-using System.Text.Json;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Save;
 
-internal sealed class SndSceneJsonSerializer
+internal sealed class SndSceneSerializer
 {
     private readonly SndWorld _world;
 
-    public SndSceneJsonSerializer(SndWorld world)
+    public SndSceneSerializer(SndWorld world)
     {
         ArgumentNullException.ThrowIfNull(world);
         _world = world;
@@ -22,18 +22,18 @@ internal sealed class SndSceneJsonSerializer
         return _world.SerializeMetaList(metaList);
     }
 
-    public void DeserializeInto(ISndSceneAccess sceneAccess, string json, bool clearBeforeLoad)
+    public void DeserializeInto(ISndSceneAccess sceneAccess, string serializedText, bool clearBeforeLoad)
     {
         ArgumentNullException.ThrowIfNull(sceneAccess);
-        ArgumentNullException.ThrowIfNull(json);
+        ArgumentNullException.ThrowIfNull(serializedText);
 
-        using var doc = JsonDocument.Parse(json);
-        if (doc.RootElement.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException("SND scene json must be a JSON array.");
+        var root = _world.JsonCodec.Decode(serializedText);
+        if (root.Kind != DataSourceNodeKind.Array)
+            throw new InvalidOperationException("SND 场景序列化数据必须为数组格式。");
 
         var metaList = _world.Mappings.ResolveMetaListFromJsonArray(
-            doc.RootElement,
-            _world.JsonOptions);
+            root,
+            _world.ConverterRegistry);
 
         if (clearBeforeLoad)
             sceneAccess.ClearAll();

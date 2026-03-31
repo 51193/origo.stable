@@ -19,10 +19,8 @@ internal static class SavePayloadReader
         var markerRel = SavePathLayout.GetWriteInProgressMarker(baseRel);
         var markerAbs = fileSystem.CombinePath(saveRootPath, markerRel);
         if (fileSystem.Exists(markerAbs))
-        {
             (logger ?? NullLogger.Instance).Log(LogLevel.Warning, nameof(SavePayloadReader),
                 "Detected .write_in_progress marker in current/; save data may be corrupt from an interrupted write.");
-        }
 
         var progressRel = SavePathLayout.GetProgressFile(baseRel);
         var progressSmRel = SavePathLayout.GetProgressStateMachinesFile(baseRel);
@@ -83,7 +81,8 @@ internal static class SavePayloadReader
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
     }
 
-    private static (string ProgressJson, string ProgressStateMachinesJson, IReadOnlyDictionary<string, string>? CustomMeta)
+    private static (string ProgressJson, string ProgressStateMachinesJson, IReadOnlyDictionary<string, string>?
+        CustomMeta)
         ReadProgressAndCustomMeta(
             IFileSystem fileSystem,
             string saveRootPath,

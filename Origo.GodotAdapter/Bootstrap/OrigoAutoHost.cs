@@ -1,7 +1,9 @@
 using System;
-using Godot;
 using System.Diagnostics;
+using Godot;
 using Origo.Core.Abstractions;
+using Origo.Core.Blackboard;
+using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
@@ -37,12 +39,12 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
     /// </summary>
     public IConsoleOutputChannel? ConsoleOutputChannel { get; private set; }
 
-    public OrigoRuntime Runtime { get; private set; } = null!;
-
     /// <summary>
     ///     与 <see cref="Runtime" /> 同一次引导创建的 <see cref="GodotFileSystem" />，供子类（如 <see cref="OrigoDefaultEntry" />）复用。
     /// </summary>
     protected IFileSystem SharedFileSystem { get; private set; } = null!;
+
+    public OrigoRuntime Runtime { get; private set; } = null!;
 
     public override void _Ready()
     {
@@ -59,7 +61,7 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
                     .AddSuffix("hostPath", HostPath?.ToString())
                     .Build("_Ready completed."));
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             readyWatch.Stop();
             bootstrapLogger.Log(LogLevel.Error, LogTag,
@@ -110,10 +112,14 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
         var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
         var sharedTypeMapping = new TypeStringMapping();
         GodotJsonConverterRegistry.RegisterTypeMappings(sharedTypeMapping);
-        var systemJsonOptions =
-            OrigoJson.CreateDefaultOptions(sharedTypeMapping, GodotJsonConverterRegistry.AddConverters);
-        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, systemJsonOptions,
-            new Origo.Core.Blackboard.Blackboard());
+
+        var converterRegistry = DataSourceFactory.CreateDefaultRegistry(sharedTypeMapping);
+        GodotJsonConverterRegistry.RegisterDataSourceConverters(converterRegistry);
+        var jsonCodec = DataSourceFactory.CreateJsonCodec();
+        var mapCodec = DataSourceFactory.CreateMapCodec();
+
+        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, jsonCodec, converterRegistry,
+            new Blackboard());
         persistentBb.LoadFromDisk();
 
         var consoleInput = new ConsoleInputQueue();
@@ -123,7 +129,9 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
             logger,
             sndManager,
             sharedTypeMapping,
-            GodotJsonConverterRegistry.AddConverters,
+            converterRegistry,
+            jsonCodec,
+            mapCodec,
             persistentBb,
             consoleInput,
             consoleOutputChannel

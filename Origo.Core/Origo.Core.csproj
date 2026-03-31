@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Origo.Core.Tests" />
+        <InternalsVisibleTo Include="Origo.Core.Tests"/>
     </ItemGroup>
 
 </Project>

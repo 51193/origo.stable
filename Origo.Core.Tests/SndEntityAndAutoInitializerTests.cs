@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Origo.Core.Abstractions;
 using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
@@ -23,7 +25,8 @@ public class SndEntityAndAutoInitializerTests
         var meta = new SndMetaData
         {
             Name = "Player",
-            NodeMetaData = new NodeMetaData { Pairs = new Dictionary<string, string> { ["root"] = "res://player.tscn" } },
+            NodeMetaData = new NodeMetaData
+                { Pairs = new Dictionary<string, string> { ["root"] = "res://player.tscn" } },
             StrategyMetaData = new StrategyMetaData { Indices = new List<string> { LifecycleStrategyIndex } },
             DataMetaData = new DataMetaData
             {
@@ -88,7 +91,8 @@ public class SndEntityAndAutoInitializerTests
         context.Runtime.SndWorld.RegisterStrategy(() => new LifecycleStrategy(new List<string>()));
 
         var entity = context.Runtime.SndWorld.CreateEntity(nodeFactory, context, logger);
-        entity.Spawn(new SndMetaData { Name = "E", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
+        entity.Spawn(new SndMetaData
+            { Name = "E", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
 
         entity.AddStrategy(LifecycleStrategyIndex);
         Assert.Contains(LifecycleStrategyIndex, entity.SerializeMetaData().StrategyMetaData!.Indices);
@@ -107,9 +111,10 @@ public class SndEntityAndAutoInitializerTests
         var context = CreateContext(logger);
         var nodeFactory = new TestNodeFactory();
         var entity = context.Runtime.SndWorld.CreateEntity(nodeFactory, context, logger);
-        entity.Spawn(new SndMetaData { Name = "E", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
+        entity.Spawn(new SndMetaData
+            { Name = "E", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
 
-        Assert.Throws<System.InvalidOperationException>(() => entity.GetData<int>("missing"));
+        Assert.Throws<InvalidOperationException>(() => entity.GetData<int>("missing"));
     }
 
     [Fact]
@@ -117,7 +122,7 @@ public class SndEntityAndAutoInitializerTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("config/entry.json",
             """
@@ -141,7 +146,7 @@ public class SndEntityAndAutoInitializerTests
     private static SndContext CreateContext(TestLogger logger)
     {
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         return new SndContext(runtime, fs, "user://saveRoot", "res://initial", "res://entry/entry.json");
     }
@@ -150,32 +155,36 @@ public class SndEntityAndAutoInitializerTests
     private sealed class LifecycleStrategy : EntityStrategyBase
     {
         private readonly ICollection<string> _events;
-        public LifecycleStrategy(ICollection<string> events) => _events = events;
-        public override void AfterSpawn(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx) => _events.Add("AfterSpawn");
-        public override void AfterAdd(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx) => _events.Add("AfterAdd");
-        public override void BeforeRemove(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx) => _events.Add("BeforeRemove");
-        public override void BeforeSave(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx) => _events.Add("BeforeSave");
-        public override void BeforeQuit(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx) => _events.Add("BeforeQuit");
+
+        public LifecycleStrategy(ICollection<string> events)
+        {
+            _events = events;
+        }
+
+        public override void AfterSpawn(ISndEntity entity, SndContext ctx) => _events.Add("AfterSpawn");
+        public override void AfterAdd(ISndEntity entity, SndContext ctx) => _events.Add("AfterAdd");
+        public override void BeforeRemove(ISndEntity entity, SndContext ctx) => _events.Add("BeforeRemove");
+        public override void BeforeSave(ISndEntity entity, SndContext ctx) => _events.Add("BeforeSave");
+        public override void BeforeQuit(ISndEntity entity, SndContext ctx) => _events.Add("BeforeQuit");
     }
 }
 
-[StrategyIndex(AutoInitStrategyA.IndexConst)]
+[StrategyIndex(IndexConst)]
 public sealed class AutoInitStrategyA : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.a";
 }
 
-[StrategyIndex(AutoInitStrategyB.IndexConst)]
+[StrategyIndex(IndexConst)]
 public sealed class AutoInitStrategyB : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.b";
 }
 
-[StrategyIndex(StatefulAutoInitStrategy.IndexConst)]
+[StrategyIndex(IndexConst)]
 public abstract class StatefulAutoInitStrategy : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.stateful";
     private int _counter;
-    public override void Process(Origo.Core.Abstractions.ISndEntity entity, double delta, SndContext ctx) => _counter++;
+    public override void Process(ISndEntity entity, double delta, SndContext ctx) => _counter++;
 }
-

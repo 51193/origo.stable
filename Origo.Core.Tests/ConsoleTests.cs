@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
-using Origo.Core.Serialization;
-using Origo.Core.Snd;
 using Xunit;
 
 namespace Origo.Core.Tests;
@@ -53,18 +50,12 @@ public class ConsoleTests
         var logger = new TestLogger();
         var sceneHost = new TestSndSceneHost();
         var typeMapping = new TypeStringMapping();
-        var options = OrigoJson.CreateDefaultOptions(typeMapping);
 
-        var runtime = new OrigoRuntime(
-            logger,
-            sceneHost,
-            typeMapping,
-            _ => { },
-            new Origo.Core.Blackboard.Blackboard(),
-            new ConsoleInputQueue(),
-            new ConsoleOutputChannel());
+        var runtime = TestFactory.CreateRuntime(logger, sceneHost, typeMapping,
+            new Blackboard.Blackboard(),
+            new ConsoleInputQueue(), new ConsoleOutputChannel());
 
-        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+        runtime.SndWorld.LoadTemplates(fs, "maps/templates.map", logger);
 
         var input = runtime.ConsoleInput!;
         var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
@@ -76,7 +67,7 @@ public class ConsoleTests
 
         Assert.Single(sceneHost.SerializeMetaList());
         Assert.Equal("Boss1", sceneHost.SerializeMetaList()[0].Name);
-        Assert.Contains(messages, m => m.Contains("Spawned 'Boss1'", System.StringComparison.Ordinal));
+        Assert.Contains(messages, m => m.Contains("Spawned 'Boss1'", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -85,21 +76,15 @@ public class ConsoleTests
         var logger = new TestLogger();
         var sceneHost = new TestSndSceneHost();
         var typeMapping = new TypeStringMapping();
-        var options = OrigoJson.CreateDefaultOptions(typeMapping);
 
         var fs = new TestFileSystem();
         fs.SeedFile("maps/empty.map", "");
 
-        var runtime = new OrigoRuntime(
-            logger,
-            sceneHost,
-            typeMapping,
-            _ => { },
-            new Origo.Core.Blackboard.Blackboard(),
-            new ConsoleInputQueue(),
-            new ConsoleOutputChannel());
+        var runtime = TestFactory.CreateRuntime(logger, sceneHost, typeMapping,
+            new Blackboard.Blackboard(),
+            new ConsoleInputQueue(), new ConsoleOutputChannel());
 
-        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/empty.map", options, logger);
+        runtime.SndWorld.LoadTemplates(fs, "maps/empty.map", logger);
 
         var input = runtime.ConsoleInput!;
         var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
@@ -136,18 +121,12 @@ public class ConsoleTests
         var logger = new TestLogger();
         var sceneHost = new TestSndSceneHost();
         var typeMapping = new TypeStringMapping();
-        var options = OrigoJson.CreateDefaultOptions(typeMapping);
 
-        var runtime = new OrigoRuntime(
-            logger,
-            sceneHost,
-            typeMapping,
-            _ => { },
-            new Origo.Core.Blackboard.Blackboard(),
-            new ConsoleInputQueue(),
-            new ConsoleOutputChannel());
+        var runtime = TestFactory.CreateRuntime(logger, sceneHost, typeMapping,
+            new Blackboard.Blackboard(),
+            new ConsoleInputQueue(), new ConsoleOutputChannel());
 
-        runtime.SndWorld.Mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+        runtime.SndWorld.LoadTemplates(fs, "maps/templates.map", logger);
         var input = runtime.ConsoleInput!;
         var output = (ConsoleOutputChannel)runtime.ConsoleOutputChannel!;
         var messages = new List<string>();
@@ -158,6 +137,6 @@ public class ConsoleTests
         runtime.Console!.ProcessPending();
 
         Assert.Single(sceneHost.SerializeMetaList());
-        Assert.Contains(messages, l => l.Contains("already exists", System.StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(messages, l => l.Contains("already exists", StringComparison.OrdinalIgnoreCase));
     }
 }

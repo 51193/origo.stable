@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
+using System.Linq;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
 using Origo.Core.Serialization;
 using Origo.Core.Snd.Strategy;
 
@@ -14,17 +15,30 @@ public sealed class SndWorld
 {
     private readonly ILogger _logger;
 
-    public SndWorld(TypeStringMapping typeMapping, ILogger logger, Action<JsonSerializerOptions>? configureJson = null)
+    public SndWorld(
+        TypeStringMapping typeMapping,
+        ILogger logger,
+        DataSourceConverterRegistry registry,
+        IDataSourceCodec jsonCodec,
+        IDataSourceCodec mapCodec)
     {
         ArgumentNullException.ThrowIfNull(typeMapping);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(jsonCodec);
+        ArgumentNullException.ThrowIfNull(mapCodec);
         _logger = logger;
         StrategyPool = new SndStrategyPool(logger);
         TypeMapping = typeMapping;
-        JsonOptions = OrigoJson.CreateDefaultOptions(TypeMapping, configureJson);
+        ConverterRegistry = registry;
+        JsonCodec = jsonCodec;
+        MapCodec = mapCodec;
         Mappings = new SndMappings();
     }
 
+    /// <summary>
+    ///     策略对象池，管理所有已注册策略的创建、共享与引用计数。
+    /// </summary>
     internal SndStrategyPool StrategyPool { get; }
 
     /// <summary>
@@ -33,14 +47,29 @@ public sealed class SndWorld
     /// </summary>
     internal TypeStringMapping TypeMapping { get; }
 
-    internal JsonSerializerOptions JsonOptions { get; }
+    /// <summary>
+    ///     数据源转换器注册表，负责 DataSourceNode 与强类型 C# 对象之间的双向转换。
+    /// </summary>
+    public DataSourceConverterRegistry ConverterRegistry { get; }
 
+    /// <summary>
+    ///     JSON 编解码器，用于 DataSourceNode 与 JSON 文本之间的双向转换。
+    ///     注意：尽管名称包含 'Json'，实际编解码通过 IDataSourceCodec 接口抽象，此属性在创建时注入。
+    /// </summary>
+    public IDataSourceCodec JsonCodec { get; }
+
+    /// <summary>
+    ///     Map 格式编解码器，用于 key: value 格式的简单文本文件（如 meta.map）。
+    /// </summary>
+    internal IDataSourceCodec MapCodec { get; }
+
+    /// <summary>
+    ///     SND 映射管理器，维护场景别名与模板别名的映射关系。
+    /// </summary>
     internal SndMappings Mappings { get; }
 
-    public void RegisterStrategy<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseStrategy
-    {
+    public void RegisterStrategy<TStrategy>(Func<TStrategy> factory) where TStrategy : BaseStrategy =>
         StrategyPool.Register(factory);
-    }
 
     public void RegisterTypeMappings(Action<TypeStringMapping> registerMappings)
     {
@@ -48,10 +77,7 @@ public sealed class SndWorld
         registerMappings(TypeMapping);
     }
 
-    public SndMetaData ResolveTemplate(string alias)
-    {
-        return Mappings.ResolveTemplate(alias);
-    }
+    public SndMetaData ResolveTemplate(string alias) => Mappings.ResolveTemplate(alias);
 
     /// <summary>
     ///     克隆 SND 元数据（与模板解析路径一致，便于将来统一替换实现）。
@@ -62,25 +88,20 @@ public sealed class SndWorld
         return meta.DeepClone();
     }
 
-    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger logger)
-    {
+    public void LoadSceneAliases(IFileSystem fileSystem, string mapFilePath, ILogger logger) =>
         Mappings.LoadSceneAliases(fileSystem, mapFilePath, logger);
-    }
 
-    public void LoadTemplates(IFileSystem fileSystem, string mapFilePath, ILogger logger)
-    {
-        Mappings.LoadTemplates(fileSystem, mapFilePath, JsonOptions, logger);
-    }
+    public void LoadTemplates(IFileSystem fileSystem, string mapFilePath, ILogger logger) =>
+        Mappings.LoadTemplates(fileSystem, mapFilePath, JsonCodec, ConverterRegistry, logger);
 
-    public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(JsonElement root)
-    {
-        return Mappings.ResolveMetaListFromJsonArray(root, JsonOptions);
-    }
+    public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(DataSourceNode root) =>
+        Mappings.ResolveMetaListFromJsonArray(root, ConverterRegistry);
 
-    public IReadOnlyDictionary<string, TypedData> DeserializeTypedDataMap(string json)
+    public IReadOnlyDictionary<string, TypedData> DeserializeTypedDataMap(string serializedText)
     {
-        return JsonSerializer.Deserialize<Dictionary<string, TypedData>>(json, JsonOptions)
-               ?? throw new InvalidOperationException("Failed to deserialize typed data map.");
+        ArgumentNullException.ThrowIfNull(serializedText);
+        var node = JsonCodec.Decode(serializedText);
+        return ConverterRegistry.Read<IReadOnlyDictionary<string, TypedData>>(node);
     }
 
     public SndEntity CreateEntity(
@@ -94,21 +115,28 @@ public sealed class SndWorld
 
     public string SerializeMeta(SndMetaData metaData)
     {
-        return OrigoJson.SerializeSndMetaData(metaData, JsonOptions);
+        var node = ConverterRegistry.Write(metaData);
+        return JsonCodec.Encode(node);
     }
 
-    public SndMetaData DeserializeMeta(string json)
+    public SndMetaData DeserializeMeta(string serializedText)
     {
-        return OrigoJson.DeserializeSndMetaData(json, JsonOptions);
+        ArgumentNullException.ThrowIfNull(serializedText);
+        var node = JsonCodec.Decode(serializedText);
+        return ConverterRegistry.Read<SndMetaData>(node);
     }
 
     public string SerializeMetaList(IEnumerable<SndMetaData> metaDataList)
     {
-        return OrigoJson.SerializeSndMetaDataList(metaDataList, JsonOptions);
+        var list = metaDataList as IReadOnlyList<SndMetaData> ?? metaDataList.ToList();
+        var node = ConverterRegistry.Write(list);
+        return JsonCodec.Encode(node);
     }
 
-    public IReadOnlyList<SndMetaData> DeserializeMetaList(string json)
+    public IReadOnlyList<SndMetaData> DeserializeMetaList(string serializedText)
     {
-        return OrigoJson.DeserializeSndMetaDataList(json, JsonOptions);
+        ArgumentNullException.ThrowIfNull(serializedText);
+        var node = JsonCodec.Decode(serializedText);
+        return ConverterRegistry.Read<IReadOnlyList<SndMetaData>>(node);
     }
 }

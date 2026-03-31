@@ -68,10 +68,8 @@ internal class ConcurrentActionQueue
         while (true)
         {
             if (executeBatchCount >= MaxReentrantDrainDepth)
-            {
                 throw new InvalidOperationException(
                     $"ConcurrentActionQueue exceeded max re-entrant drain depth ({MaxReentrantDrainDepth}).");
-            }
 
             List<Action> currentBatch;
             lock (_lock)
@@ -82,7 +80,6 @@ internal class ConcurrentActionQueue
             }
 
             foreach (var action in currentBatch)
-            {
                 try
                 {
                     action.Invoke();
@@ -94,7 +91,6 @@ internal class ConcurrentActionQueue
                         new LogMessageBuilder().Build($"Deferred action execution failed: {ex.Message}"));
                     throw;
                 }
-            }
 
             executeBatchCount++;
         }

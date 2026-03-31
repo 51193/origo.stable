@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
-using MemoryBlackboard = Origo.Core.Blackboard.Blackboard;
 using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
+using MemoryBlackboard = Origo.Core.Blackboard.Blackboard;
 
 namespace Origo.Core.Tests;
 
@@ -72,10 +72,8 @@ public class SaveMetaMergerTests
             _action = action;
         }
 
-        public void Contribute(in SaveMetaBuildContext context, IDictionary<string, string> target)
-        {
+        public void Contribute(in SaveMetaBuildContext context, IDictionary<string, string> target) =>
             _action(context, target);
-        }
     }
 
     private sealed class NullSceneHost : ISndSceneHost

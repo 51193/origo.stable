@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Origo.Core.Abstractions;
-using Origo.Core.Serialization;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -16,10 +14,11 @@ public class JsonAndMappingsTests
     private const string StrategyTalk = "test.talk";
 
     [Fact]
-    public void OrigoJson_SndMetaData_RoundTripPreservesTypedData()
+    public void SndMetaData_RoundTripPreservesTypedData()
     {
         var typeMapping = new TypeStringMapping();
-        var options = OrigoJson.CreateDefaultOptions(typeMapping);
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(typeMapping);
         var meta = new SndMetaData
         {
             Name = "Hero",
@@ -35,8 +34,10 @@ public class JsonAndMappingsTests
             }
         };
 
-        var json = OrigoJson.SerializeSndMetaData(meta, options);
-        var parsed = OrigoJson.DeserializeSndMetaData(json, options);
+        var node = registry.Write(meta);
+        var json = codec.Encode(node);
+        var parsedNode = codec.Decode(json);
+        var parsed = registry.Read<SndMetaData>(parsedNode);
 
         Assert.Equal("Hero", parsed.Name);
         Assert.Equal("hero_prefab", parsed.NodeMetaData!.Pairs["body"]);
@@ -76,10 +77,11 @@ public class JsonAndMappingsTests
 
         var mappings = new SndMappings();
         var logger = new TestLogger();
-        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(new TypeStringMapping());
 
         mappings.LoadSceneAliases(fs, "maps/scenes.map", logger);
-        mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, logger);
 
         Assert.Equal("res://hero.tscn", mappings.ResolveSceneAlias("hero"));
         Assert.Throws<KeyNotFoundException>(() => mappings.ResolveSceneAlias("missing_alias"));
@@ -107,24 +109,25 @@ public class JsonAndMappingsTests
               "data": { "pairs": { "damage": { "type": "Int32", "data": 8 } } }
             }
             """);
-        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
-        mappings.LoadTemplates(fs, "maps/templates.map", options, NullLogger.Instance);
+        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, NullLogger.Instance);
 
-        using var doc = JsonDocument.Parse(
-            """
-            [
-              { "sndName": "EnemyA", "templateKey": "enemy_template" },
-              {
-                "name": "Npc",
-                "node": { "pairs": { "root": "npc" } },
-                "strategy": { "indices": [ "test.talk" ] },
-                "data": { "pairs": { "mood": { "type": "String", "data": "Calm" } } }
-              }
-            ]
-            """);
+        var json = """
+                   [
+                     { "sndName": "EnemyA", "templateKey": "enemy_template" },
+                     {
+                       "name": "Npc",
+                       "node": { "pairs": { "root": "npc" } },
+                       "strategy": { "indices": [ "test.talk" ] },
+                       "data": { "pairs": { "mood": { "type": "String", "data": "Calm" } } }
+                     }
+                   ]
+                   """;
 
-        var metas = mappings.ResolveMetaListFromJsonArray(doc.RootElement, options);
+        var node = codec.Decode(json);
+        var metas = mappings.ResolveMetaListFromJsonArray(node, registry);
 
         Assert.Equal(2, metas.Count);
         Assert.Equal("EnemyA", metas[0].Name);
@@ -136,20 +139,20 @@ public class JsonAndMappingsTests
     [Fact]
     public void TypedDataJson_DataPropertyBeforeType_DeserializesCorrectly()
     {
-        var typeMapping = new TypeStringMapping();
-        var options = OrigoJson.CreateDefaultOptions(typeMapping);
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         const string json = """{"data":42,"type":"Int32"}""";
 
-        var td = JsonSerializer.Deserialize<TypedData>(json, options);
-        Assert.NotNull(td);
-        Assert.Equal(typeof(int), td!.DataType);
+        var node = codec.Decode(json);
+        var td = registry.Read<TypedData>(node);
+        Assert.Equal(typeof(int), td.DataType);
         Assert.Equal(42, Assert.IsType<int>(td.Data));
     }
 
     [Fact]
     public void Blackboard_SerializeAll_ReturnsDetachedCopy()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("k", 1);
 
         var exported = bb.SerializeAll();
@@ -175,9 +178,10 @@ public class JsonAndMappingsTests
     {
         var fs = new TestFileSystem();
         fs.SeedFile("maps/empty_templates.map", "# no entries\n");
-        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
-        mappings.LoadTemplates(fs, "maps/empty_templates.map", options, NullLogger.Instance);
+        mappings.LoadTemplates(fs, "maps/empty_templates.map", codec, registry, NullLogger.Instance);
 
         var ex = Assert.Throws<InvalidOperationException>(() => mappings.ResolveTemplate("any_alias"));
         Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -189,11 +193,12 @@ public class JsonAndMappingsTests
         var fs = new TestFileSystem();
         fs.SeedFile("maps/templates.map", "bad_template: templates/bad.json");
         fs.SeedFile("templates/bad.json", "{ invalid-json");
-        var options = OrigoJson.CreateDefaultOptions(new TypeStringMapping());
+        var codec = TestFactory.CreateJsonCodec();
+        var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
         var logger = new TestLogger();
-        mappings.LoadTemplates(fs, "maps/templates.map", options, logger);
+        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, logger);
 
-        Assert.Throws<JsonException>(() => mappings.ResolveTemplate("bad_template"));
+        Assert.ThrowsAny<Exception>(() => mappings.ResolveTemplate("bad_template"));
     }
 }

@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Threading;
 using Origo.Core.Abstractions;
-using Origo.Core.Logging;
 using Origo.Core.Runtime;
+using Origo.Core.Runtime.Console.CommandImpl;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
@@ -31,19 +30,20 @@ namespace Origo.Core.Snd;
 /// </summary>
 public sealed partial class SndContext
 {
+    private readonly EntryPointWorkflow _entryPointWorkflow;
+
+    private readonly SaveGameWorkflow _saveGameWorkflow;
     private readonly List<ISaveMetaContributor> _saveMetaContributors = new();
-    private int _pendingPersistenceRequests;
     private readonly SystemRun _systemRun;
+    private int _pendingPersistenceRequests;
     private IProgressRun? _progressRun;
+
     /// <summary>
     ///     Guard flag to prevent concurrent lifecycle workflows.
     ///     Only accessed from deferred queue callbacks which execute sequentially on the game loop thread,
     ///     so no synchronization is required.
     /// </summary>
     private bool _workflowInProgress;
-
-    private readonly SaveGameWorkflow _saveGameWorkflow;
-    private readonly EntryPointWorkflow _entryPointWorkflow;
 
     public SndContext(
         OrigoRuntime runtime,
@@ -74,35 +74,80 @@ public sealed partial class SndContext
 
         _saveGameWorkflow = new SaveGameWorkflow(this);
         _entryPointWorkflow = new EntryPointWorkflow(this);
+
+        RegisterConsoleCommands();
     }
 
+    /// <summary>
+    ///     底层运行时实例。SndContext 通过 Runtime 访问 SndRuntime、SndWorld、黑板、控制台等子系统。
+    ///     大部分公开 API 最终委托给 Runtime 中的对应方法。
+    /// </summary>
     internal OrigoRuntime Runtime { get; }
 
+    /// <summary>
+    ///     文件系统抽象，用于存档读写操作。
+    /// </summary>
     internal IFileSystem FileSystem { get; }
 
+    /// <summary>
+    ///     存档根路径，所有存档槽位和 current/ 目录均位于此路径下。
+    /// </summary>
     public string SaveRootPath { get; }
 
+    /// <summary>
+    ///     初始存档模板路径，用于首次启动时从初始存档模板加载游戏。
+    /// </summary>
     public string InitialSaveRootPath { get; }
+
+    /// <summary>
+    ///     入口配置文件路径，定义主菜单入口存档和启动流程配置。
+    /// </summary>
     public string EntryConfigPath { get; }
 
+    /// <summary>
+    ///     运行实例工厂，负责创建 SystemRun / ProgressRun / SessionRun 三层运行实例。
+    /// </summary>
     internal RunFactory RunFactory { get; }
 
+    /// <summary>
+    ///     已注册的存档元数据贡献者列表，存档时按顺序收集展示用 meta.map 条目。
+    /// </summary>
     internal IReadOnlyList<ISaveMetaContributor> SaveMetaContributors => _saveMetaContributors;
 
+    /// <summary>
+    ///     系统级黑板（来自 SystemRun）。与 Runtime.SystemBlackboard 指向同一实例，此处提供快捷访问。
+    /// </summary>
     public IBlackboard SystemBlackboard => _systemRun.SystemBlackboard;
 
     /// <summary>
-    ///     当前流程级黑板；无活动流程时为 null。
+    ///     当前流程级黑板（来自当前 ProgressRun）；无活动流程时为 null。
     /// </summary>
     public IBlackboard? ProgressBlackboard => _progressRun?.ProgressBlackboard;
 
     /// <summary>
-    ///     当前关卡会话黑板；无当前会话时为 null。
+    ///     当前关卡会话黑板（来自当前 SessionRun）；无活动会话时为 null。
     /// </summary>
     public IBlackboard? SessionBlackboard => _progressRun?.CurrentSession?.SessionBlackboard;
+
+    /// <summary>
+    ///     SND 运行时门面（来自 Runtime.Snd），提供 Spawn / 查询 / 序列化等操作。
+    ///     此属性与 Runtime.Snd 是同一实例，此处提供快捷访问。
+    /// </summary>
     public SndRuntime SndRuntime => Runtime.Snd;
 
-    private JsonSerializerOptions JsonOptions => Runtime.SndWorld.JsonOptions;
+    private void RegisterConsoleCommands()
+    {
+        var console = Runtime.Console;
+        if (console is null)
+            return;
+
+        console.RegisterHandler(new ListSavesCommandHandler(this));
+        console.RegisterHandler(new SaveGameCommandHandler(this));
+        console.RegisterHandler(new LoadGameCommandHandler(this));
+        console.RegisterHandler(new AutoSaveCommandHandler(this));
+        console.RegisterHandler(new ContinueGameCommandHandler(this));
+        console.RegisterHandler(new ChangeLevelCommandHandler(this));
+    }
 
     // ── Helpers shared with workflows ──────────────────────────────────
 
@@ -112,10 +157,7 @@ public sealed partial class SndContext
         return found && !string.IsNullOrWhiteSpace(value) ? value : null;
     }
 
-    internal void SetActiveSaveState(string saveId)
-    {
-        _systemRun.SetActiveSaveSlot(saveId);
-    }
+    internal void SetActiveSaveState(string saveId) => _systemRun.SetActiveSaveSlot(saveId);
 
     internal IProgressRun EnsureProgressRun()
     {
@@ -131,10 +173,7 @@ public sealed partial class SndContext
         return (progressRun, sessionRun);
     }
 
-    internal void SetProgressRun(IProgressRun? progressRun)
-    {
-        _progressRun = progressRun;
-    }
+    internal void SetProgressRun(IProgressRun? progressRun) => _progressRun = progressRun;
 
     /// <summary>
     ///     标记工作流开始。若已有工作流正在执行则抛出，防止并发工作流导致 <see cref="_progressRun" /> 竞态。
@@ -151,10 +190,7 @@ public sealed partial class SndContext
     /// <summary>
     ///     标记工作流完成。
     /// </summary>
-    internal void EndWorkflow()
-    {
-        _workflowInProgress = false;
-    }
+    internal void EndWorkflow() => _workflowInProgress = false;
 
     internal void IncrementPendingPersistence() => Interlocked.Increment(ref _pendingPersistenceRequests);
     internal void DecrementPendingPersistence() => Interlocked.Decrement(ref _pendingPersistenceRequests);
@@ -168,41 +204,45 @@ public sealed partial class SndContext
 
     // ── Public API ─────────────────────────────────────────────────────
 
-    public void EnqueueBusinessDeferred(Action action)
-    {
-        Runtime.EnqueueBusinessDeferred(action);
-    }
+    /// <summary>
+    ///     将一个业务逻辑延迟动作加入队列，委托给 Runtime.EnqueueBusinessDeferred。
+    /// </summary>
+    public void EnqueueBusinessDeferred(Action action) => Runtime.EnqueueBusinessDeferred(action);
 
-    internal void EnqueueSystemDeferred(Action action)
-    {
-        Runtime.EnqueueSystemDeferred(action);
-    }
+    /// <summary>
+    ///     将一个系统级延迟动作加入队列，委托给 Runtime.EnqueueSystemDeferred。
+    /// </summary>
+    internal void EnqueueSystemDeferred(Action action) => Runtime.EnqueueSystemDeferred(action);
 
-    public int GetPendingPersistenceRequestCount()
-    {
-        return Interlocked.CompareExchange(ref _pendingPersistenceRequests, 0, 0);
-    }
+    /// <summary>
+    ///     获取当前待执行的持久化请求计数。
+    /// </summary>
+    public int GetPendingPersistenceRequestCount() =>
+        Interlocked.CompareExchange(ref _pendingPersistenceRequests, 0, 0);
 
-    public void FlushDeferredActionsForCurrentFrame()
-    {
-        Runtime.FlushEndOfFrameDeferred();
-    }
+    /// <summary>
+    ///     执行当前帧的所有延迟动作，委托给 Runtime.FlushEndOfFrameDeferred。
+    /// </summary>
+    public void FlushDeferredActionsForCurrentFrame() => Runtime.FlushEndOfFrameDeferred();
 
-    public void ClearAllSndEntities()
-    {
-        Runtime.Snd.ClearAll();
-    }
+    /// <summary>
+    ///     清除所有 SND 实体，委托给 Runtime.Snd.ClearAll。
+    /// </summary>
+    public void ClearAllSndEntities() => Runtime.Snd.ClearAll();
 
-    public void SpawnManySndEntities(IEnumerable<SndMetaData> metaList)
-    {
-        Runtime.Snd.SpawnMany(metaList);
-    }
+    /// <summary>
+    ///     批量生成多个 SND 实体，委托给 Runtime.Snd.SpawnMany。
+    /// </summary>
+    public void SpawnManySndEntities(IEnumerable<SndMetaData> metaList) => Runtime.Snd.SpawnMany(metaList);
 
-    public ISndEntity? FindSndEntity(string name)
-    {
-        return Runtime.Snd.FindByName(name);
-    }
+    /// <summary>
+    ///     按名称查找 SND 实体，委托给 Runtime.Snd.FindByName。
+    /// </summary>
+    public ISndEntity? FindSndEntity(string name) => Runtime.Snd.FindByName(name);
 
+    /// <summary>
+    ///     克隆指定模板并可选地覆盖名称，便于按模板批量创建实体。
+    /// </summary>
     public SndMetaData CloneTemplate(string templateKey, string? overrideName = null)
     {
         var template = Runtime.SndWorld.ResolveTemplate(templateKey);
@@ -212,6 +252,9 @@ public sealed partial class SndContext
         return cloned;
     }
 
+    /// <summary>
+    ///     提交一条控制台命令到 Runtime.ConsoleInput 队列。若未注入输入队列则返回 false。
+    /// </summary>
     public bool TrySubmitConsoleCommand(string commandLine)
     {
         if (string.IsNullOrWhiteSpace(commandLine))
@@ -221,11 +264,14 @@ public sealed partial class SndContext
         return Runtime.ConsoleInput is not null;
     }
 
-    public void ProcessConsolePending()
-    {
-        Runtime.Console?.ProcessPending();
-    }
+    /// <summary>
+    ///     处理控制台待执行命令，委托给 Runtime.Console.ProcessPending。
+    /// </summary>
+    public void ProcessConsolePending() => Runtime.Console?.ProcessPending();
 
+    /// <summary>
+    ///     订阅控制台输出，委托给 Runtime.ConsoleOutputChannel。返回订阅 ID，用于后续取消。
+    /// </summary>
     public long SubscribeConsoleOutput(Action<string> onLine)
     {
         ArgumentNullException.ThrowIfNull(onLine);
@@ -234,6 +280,9 @@ public sealed partial class SndContext
         return channel.Subscribe(line => onLine(line ?? string.Empty));
     }
 
+    /// <summary>
+    ///     取消控制台输出订阅，委托给 Runtime.ConsoleOutputChannel。
+    /// </summary>
     public void UnsubscribeConsoleOutput(long subscriptionId)
     {
         if (subscriptionId <= 0)
@@ -244,33 +293,42 @@ public sealed partial class SndContext
     /// <summary>
     ///     流程级字符串栈状态机容器；无 <see cref="IProgressRun" /> 时为 null。
     /// </summary>
-    public StateMachineContainer? GetProgressStateMachines()
-    {
-        return _progressRun?.ProgressScope.StateMachines;
-    }
+    public StateMachineContainer? GetProgressStateMachines() => _progressRun?.ProgressScope.StateMachines;
 
     /// <summary>
     ///     当前关卡会话级字符串栈状态机容器。
     /// </summary>
-    public StateMachineContainer? GetSessionStateMachines()
-    {
-        return _progressRun?.CurrentSession?.SessionScope.StateMachines;
-    }
+    public StateMachineContainer? GetSessionStateMachines() => _progressRun?.CurrentSession?.SessionScope.StateMachines;
 
-    // ── Save flow delegation ───────────────────────────────────────────
+    // ── Save flow delegation（委托给 SaveGameWorkflow）─────────────────
 
+    /// <summary>
+    ///     列出所有存档槽位 ID，委托给 SaveGameWorkflow。
+    /// </summary>
     public IReadOnlyList<string> ListSaves() => _saveGameWorkflow.ListSaves();
 
+    /// <summary>
+    ///     列出所有存档槽位及其元数据，委托给 SaveGameWorkflow。
+    /// </summary>
     public IReadOnlyList<SaveMetaDataEntry> ListSavesWithMetaData() => _saveGameWorkflow.ListSavesWithMetaData();
 
+    /// <summary>
+    ///     请求保存游戏到新槽位，委托给 SaveGameWorkflow。
+    /// </summary>
     public void RequestSaveGame(
         string newSaveId,
         string baseSaveId,
         IReadOnlyDictionary<string, string>? customMeta = null)
         => _saveGameWorkflow.RequestSaveGame(newSaveId, baseSaveId, customMeta);
 
+    /// <summary>
+    ///     请求加载指定存档，委托给 SaveGameWorkflow。
+    /// </summary>
     public void RequestLoadGame(string saveId) => _saveGameWorkflow.RequestLoadGame(saveId);
 
+    /// <summary>
+    ///     请求继续游戏（加载 continue 槽位），委托给 SaveGameWorkflow。
+    /// </summary>
     public bool RequestContinueGame() => _saveGameWorkflow.RequestContinueGame();
 
     /// <summary>
@@ -283,14 +341,26 @@ public sealed partial class SndContext
         IReadOnlyDictionary<string, string>? customMeta = null)
         => _saveGameWorkflow.RequestSaveGameAuto(newSaveId, customMeta);
 
+    /// <summary>
+    ///     查询是否存在 continue 数据。
+    /// </summary>
     public bool HasContinueData() => _saveGameWorkflow.HasContinueData();
 
+    /// <summary>
+    ///     设置 continue 目标存档 ID。
+    /// </summary>
     public void SetContinueTarget(string saveId) => _saveGameWorkflow.SetContinueTarget(saveId);
 
+    /// <summary>
+    ///     清除 continue 目标。
+    /// </summary>
     public void ClearContinueTarget() => _saveGameWorkflow.ClearContinueTarget();
 
-    // ── Entry point delegation ─────────────────────────────────────────
+    // ── Entry point delegation（委托给 EntryPointWorkflow）─────────────
 
+    /// <summary>
+    ///     请求加载初始存档模板，委托给 EntryPointWorkflow。
+    /// </summary>
     public void RequestLoadInitialSave() => _entryPointWorkflow.RequestLoadInitialSave();
 
     /// <summary>
@@ -299,5 +369,8 @@ public sealed partial class SndContext
     /// </summary>
     public void RequestLoadMainMenuEntrySave() => _entryPointWorkflow.RequestLoadMainMenuEntrySave();
 
+    /// <summary>
+    ///     请求切换到新关卡，委托给 EntryPointWorkflow。
+    /// </summary>
     public void RequestChangeLevel(string newLevelId) => _entryPointWorkflow.RequestChangeLevel(newLevelId);
 }

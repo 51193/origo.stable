@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
-using Origo.Core.Runtime;
-using Origo.Core.Serialization;
+using Origo.Core.Runtime.Console;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
@@ -59,7 +58,7 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new SndRuntime(new SndWorld(new TypeStringMapping(), logger), host);
+        var runtime = new SndRuntime(TestFactory.CreateSndWorld(logger: logger), host);
         var metaA = new SndMetaData { Name = "A" };
         var metaB = new SndMetaData { Name = "B" };
 
@@ -79,7 +78,7 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new SndRuntime(new SndWorld(new TypeStringMapping(), logger), host);
+        var runtime = new SndRuntime(TestFactory.CreateSndWorld(logger: logger), host);
 
         runtime.Spawn(new SndMetaData { Name = "Dup" });
         Assert.Throws<InvalidOperationException>(() => runtime.Spawn(new SndMetaData { Name = "Dup" }));
@@ -90,8 +89,8 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var injectedSystemBoard = new Origo.Core.Blackboard.Blackboard();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, injectedSystemBoard);
+        var injectedSystemBoard = new Blackboard.Blackboard();
+        var runtime = TestFactory.CreateRuntime(logger, host, systemBb: injectedSystemBoard);
 
         Assert.NotNull(runtime.Snd);
         Assert.NotNull(runtime.SndWorld);
@@ -103,9 +102,10 @@ public class StrategyPoolAndRuntimeTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var input = new Origo.Core.Runtime.Console.ConsoleInputQueue();
-        var output = new Origo.Core.Runtime.Console.ConsoleOutputChannel();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard(), input, output);
+        var input = new ConsoleInputQueue();
+        var output = new ConsoleOutputChannel();
+        var runtime = TestFactory.CreateRuntime(logger, host, new TypeStringMapping(), new Blackboard.Blackboard(),
+            input, output);
         var messages = new List<string>();
         output.Subscribe(messages.Add);
 

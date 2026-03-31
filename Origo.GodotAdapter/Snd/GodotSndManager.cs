@@ -18,11 +18,11 @@ public partial class GodotSndManager : Node, ISndSceneHost
 {
     private readonly List<GodotSndEntity> _entities = new();
     private readonly List<GodotSndEntity> _processBuffer = new();
-    private EntityView? _entityView;
     private bool _contextBound;
+    private EntityView? _entityView;
+    private bool _inProcess;
 
     private bool _runtimeDepsBound;
-    private bool _inProcess;
 
     public SndWorld SharedWorld { get; private set; } = null!;
     public ILogger SharedLogger { get; private set; } = null!;
@@ -56,7 +56,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
             catch
             {
                 RollbackPartialLoad(staged);
-                if (snd is not null && GodotObject.IsInstanceValid(snd))
+                if (snd is not null && IsInstanceValid(snd))
                 {
                     _entities.Remove(snd);
                     if (snd.GetParent() == this)
@@ -69,15 +69,9 @@ public partial class GodotSndManager : Node, ISndSceneHost
         }
     }
 
-    public void ClearAll()
-    {
-        QuitAll();
-    }
+    public void ClearAll() => QuitAll();
 
-    public ISndEntity Spawn(SndMetaData metaData)
-    {
-        return SpawnFromMeta(metaData);
-    }
+    public ISndEntity Spawn(SndMetaData metaData) => SpawnFromMeta(metaData);
 
     public IReadOnlyCollection<ISndEntity> GetEntities() =>
         _entityView ??= new EntityView(_entities);
@@ -115,10 +109,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(logger);
 
-        if (_runtimeDepsBound)
-        {
-            throw new InvalidOperationException("Runtime dependencies are already bound.");
-        }
+        if (_runtimeDepsBound) throw new InvalidOperationException("Runtime dependencies are already bound.");
 
         SharedWorld = world;
         SharedLogger = logger;
@@ -132,15 +123,9 @@ public partial class GodotSndManager : Node, ISndSceneHost
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (!_runtimeDepsBound)
-        {
-            throw new InvalidOperationException("Call BindRuntimeDependencies before BindContext.");
-        }
+        if (!_runtimeDepsBound) throw new InvalidOperationException("Call BindRuntimeDependencies before BindContext.");
 
-        if (_contextBound)
-        {
-            throw new InvalidOperationException("Context is already bound.");
-        }
+        if (_contextBound) throw new InvalidOperationException("Context is already bound.");
 
         Context = context;
         _contextBound = true;
@@ -167,10 +152,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
         snd.DeadFromManager();
     }
 
-    public override void _Ready()
-    {
-        SetProcess(true);
-    }
+    public override void _Ready() => SetProcess(true);
 
     public override void _Process(double delta)
     {
@@ -200,9 +182,9 @@ public partial class GodotSndManager : Node, ISndSceneHost
         {
             var s = staged[i];
             _entities.Remove(s);
-            if (GodotObject.IsInstanceValid(s) && s.GetParent() == this)
+            if (IsInstanceValid(s) && s.GetParent() == this)
                 RemoveChild(s);
-            if (GodotObject.IsInstanceValid(s))
+            if (IsInstanceValid(s))
                 s.Free();
         }
     }
@@ -217,10 +199,8 @@ public partial class GodotSndManager : Node, ISndSceneHost
     private void EnsureReadyForSpawn()
     {
         if (!_runtimeDepsBound || !_contextBound || Context is null)
-        {
             throw new InvalidOperationException(
                 "GodotSndManager is not ready: call BindRuntimeDependencies and BindContext before spawning entities.");
-        }
     }
 
     private sealed class EntityView(List<GodotSndEntity> inner) : IReadOnlyList<ISndEntity>

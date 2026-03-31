@@ -12,8 +12,6 @@ namespace Origo.Core.Runtime.Lifecycle;
 /// </summary>
 public sealed class RunFactory
 {
-    internal RunDependencies Dependencies { get; }
-
     public RunFactory(
         ILogger logger,
         IFileSystem fileSystem,
@@ -23,6 +21,8 @@ public sealed class RunFactory
     {
         Dependencies = new RunDependencies(logger, fileSystem, saveRootPath, runtime, sndContext);
     }
+
+    internal RunDependencies Dependencies { get; }
 
     public ILogger Logger => Dependencies.Logger;
 
@@ -37,10 +37,7 @@ public sealed class RunFactory
     /// </summary>
     public SndContext? SndContext => Dependencies.SndContext;
 
-    public SystemRun CreateSystemRun()
-    {
-        return new SystemRun(this);
-    }
+    public SystemRun CreateSystemRun() => new(this);
 
     public ProgressRun CreateProgressRun(
         string saveId,

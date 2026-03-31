@@ -13,7 +13,8 @@ public class CoreArchitectureGuardrailTests
     public void CoreAssembly_ShouldNotReferenceGodot()
     {
         var refs = typeof(OrigoRuntime).Assembly.GetReferencedAssemblies();
-        Assert.DoesNotContain(refs, r => r.Name != null && r.Name.StartsWith("Godot", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(refs,
+            r => r.Name != null && r.Name.StartsWith("Godot", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

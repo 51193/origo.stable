@@ -17,8 +17,8 @@ public sealed class SessionRun : ISessionRun
     private readonly IFileSystem _fileSystem;
     private readonly SaveContext _saveContext;
     private readonly string _saveRootPath;
-    private readonly RunStateScope _sessionScope;
     private readonly ISndSceneAccess _sceneAccess;
+    private readonly RunStateScope _sessionScope;
     private bool _disposed;
 
     public SessionRun(
@@ -81,7 +81,9 @@ public sealed class SessionRun : ISessionRun
             LevelId = LevelId,
             SndSceneJson = _saveContext.SerializeSndScene(_sceneAccess),
             SessionJson = _saveContext.SerializeSession(),
-            SessionStateMachinesJson = _sessionScope.StateMachines.SerializeToJson(_saveContext.SndWorld.JsonOptions)
+            SessionStateMachinesJson =
+                _sessionScope.StateMachines.SerializeToDataSource(_saveContext.SndWorld.JsonCodec,
+                    _saveContext.SndWorld.ConverterRegistry)
         };
 
         var currentRel = SavePathLayout.GetCurrentDirectory();
@@ -104,8 +106,5 @@ public sealed class SessionRun : ISessionRun
         _sessionScope.Blackboard.Clear();
     }
 
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-    }
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 }

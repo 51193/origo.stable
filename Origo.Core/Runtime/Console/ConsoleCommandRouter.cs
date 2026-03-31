@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Origo.Core.Abstractions;
 
 namespace Origo.Core.Runtime.Console;
@@ -19,6 +20,22 @@ public sealed class ConsoleCommandRouter
             throw new ArgumentException("Handler name cannot be empty.", nameof(handler));
 
         _handlers[handler.Name] = handler;
+    }
+
+    /// <summary>
+    ///     返回所有已注册命令名称（有序）。
+    /// </summary>
+    public IReadOnlyList<string> GetRegisteredNames() =>
+        _handlers.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>
+    ///     返回所有已注册的命令处理器（有序）。
+    /// </summary>
+    public IReadOnlyList<IConsoleCommandHandler> GetRegisteredHandlers()
+    {
+        return _handlers.Values
+            .OrderBy(h => h.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public bool TryExecute(CommandInvocation invocation, IConsoleOutputChannel outputChannel, out string? errorMessage)

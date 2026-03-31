@@ -7,7 +7,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 /// <summary>
 ///     <c>spawn</c> 命令：仅支持 template 模式（name + template 别名）。
 /// </summary>
-public sealed class SpawnTemplateCommandHandler : IConsoleCommandHandler
+public sealed class SpawnTemplateCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 
@@ -17,16 +17,16 @@ public sealed class SpawnTemplateCommandHandler : IConsoleCommandHandler
         _runtime = runtime;
     }
 
-    public string Name => "spawn";
+    public override string Name => "spawn";
+    public override string HelpText => "spawn <name> <template> — 按模板生成 SND 实体。支持位置参数或命名参数 name=... template=...";
+    public override int MinPositionalArgs => 0;
+    public override int MaxPositionalArgs => 2;
 
-    public bool TryExecute(
+    protected override bool ExecuteCore(
         CommandInvocation invocation,
         IConsoleOutputChannel outputChannel,
         out string? errorMessage)
     {
-        ArgumentNullException.ThrowIfNull(invocation);
-        ArgumentNullException.ThrowIfNull(outputChannel);
-
         if (!TryGetSpawnArgs(invocation, out var entityName, out var templateKey, out var err))
         {
             errorMessage = err;

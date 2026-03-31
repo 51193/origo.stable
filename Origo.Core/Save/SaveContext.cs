@@ -6,14 +6,14 @@ using Origo.Core.Snd;
 namespace Origo.Core.Save;
 
 /// <summary>
-///     描述当前存档上下文（slot/save/level）并负责 Progress / Session 黑板与 SND 场景之间的转换。
-///     不执行任何文件 I/O，所有输入输出均为 JSON 字符串或内存模型。
+///     存档上下文，封装 Progress（流程级）与 Session（会话级）黑板以及 SND 世界的序列化/反序列化能力。
+///     不执行任何文件 I/O，所有输入输出均为序列化文本字符串或内存模型。由 ProgressRun / SessionRun 在生命周期内持有。
 /// </summary>
 public sealed class SaveContext
 {
-    private readonly BlackboardJsonSerializer _blackboardSerializer;
+    private readonly BlackboardSerializer _blackboardSerializer;
     private readonly SaveGamePayloadFactory _payloadFactory;
-    private readonly SndSceneJsonSerializer _sceneSerializer;
+    private readonly SndSceneSerializer _sceneSerializer;
 
     public SaveContext(
         IBlackboard progress,
@@ -27,8 +27,8 @@ public sealed class SaveContext
         Session = session;
         SndWorld = sndWorld;
 
-        _blackboardSerializer = new BlackboardJsonSerializer(SndWorld.JsonOptions);
-        _sceneSerializer = new SndSceneJsonSerializer(SndWorld);
+        _blackboardSerializer = new BlackboardSerializer(SndWorld.JsonCodec, SndWorld.ConverterRegistry);
+        _sceneSerializer = new SndSceneSerializer(SndWorld);
         _payloadFactory = new SaveGamePayloadFactory(Progress, Session, _blackboardSerializer, _sceneSerializer);
     }
 
@@ -48,59 +48,48 @@ public sealed class SaveContext
     public SndWorld SndWorld { get; }
 
     /// <summary>
-    ///     将 Progress 黑板序列化为 JSON（使用 TypedData 保留类型信息）。
+    ///     将 Progress 黑板序列化为文本（使用 TypedData 保留类型信息）。
     /// </summary>
-    public string SerializeProgress()
+    public string SerializeProgress() => _blackboardSerializer.Serialize(Progress);
+
+    /// <summary>
+    ///     将序列化文本恢复到 Progress 黑板。
+    /// </summary>
+    public void DeserializeProgress(string serializedText)
     {
-        return _blackboardSerializer.Serialize(Progress);
+        ArgumentNullException.ThrowIfNull(serializedText);
+        _blackboardSerializer.DeserializeInto(Progress, serializedText);
     }
 
     /// <summary>
-    ///     将 JSON 恢复到 Progress 黑板。
+    ///     将 Session 黑板序列化为文本（使用 TypedData 保留类型信息）。
     /// </summary>
-    public void DeserializeProgress(string json)
+    public string SerializeSession() => _blackboardSerializer.Serialize(Session);
+
+    /// <summary>
+    ///     将序列化文本恢复到 Session 黑板。
+    /// </summary>
+    public void DeserializeSession(string serializedText)
     {
-        ArgumentNullException.ThrowIfNull(json);
-        _blackboardSerializer.DeserializeInto(Progress, json);
+        ArgumentNullException.ThrowIfNull(serializedText);
+        _blackboardSerializer.DeserializeInto(Session, serializedText);
     }
 
     /// <summary>
-    ///     将 Session 黑板序列化为 JSON（使用 TypedData 保留类型信息）。
+    ///     将指定 SND 场景序列化为文本字符串。
     /// </summary>
-    public string SerializeSession()
-    {
-        return _blackboardSerializer.Serialize(Session);
-    }
+    public string SerializeSndScene(ISndSceneAccess sceneAccess) => _sceneSerializer.Serialize(sceneAccess);
 
     /// <summary>
-    ///     将 JSON 恢复到 Session 黑板。
-    /// </summary>
-    public void DeserializeSession(string json)
-    {
-        ArgumentNullException.ThrowIfNull(json);
-        _blackboardSerializer.DeserializeInto(Session, json);
-    }
-
-    /// <summary>
-    ///     将指定 SND 场景序列化为 JSON 字符串。
-    /// </summary>
-    public string SerializeSndScene(ISndSceneAccess sceneAccess)
-    {
-        return _sceneSerializer.Serialize(sceneAccess);
-    }
-
-    /// <summary>
-    ///     将 JSON 恢复到 SND 场景。
+    ///     将序列化文本恢复到 SND 场景。
     ///     支持两种形式：完整的 SndMetaData 对象，或 { "sndName": "...", "templateKey": "..." } 简写，
     ///     与入口配置保持一致，统一通过 SndMappings.ResolveMetaListFromJsonArray 解析。
     /// </summary>
-    public void DeserializeSndScene(ISndSceneAccess sceneAccess, string json, bool clearBeforeLoad = true)
-    {
-        _sceneSerializer.DeserializeInto(sceneAccess, json, clearBeforeLoad);
-    }
+    public void DeserializeSndScene(ISndSceneAccess sceneAccess, string serializedText, bool clearBeforeLoad = true) =>
+        _sceneSerializer.DeserializeInto(sceneAccess, serializedText, clearBeforeLoad);
 
     /// <summary>
-    ///     收集当前存档所需的全部数据，生成完整的 <see cref="SaveGamePayload"/>。
+    ///     收集当前存档所需的全部数据，生成完整的 <see cref="SaveGamePayload" />。
     /// </summary>
     public SaveGamePayload SaveGame(
         ISndSceneAccess sceneAccess,

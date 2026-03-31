@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
+using Origo.Core.DataSource;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
@@ -51,10 +51,8 @@ public sealed class StateMachineContainer
         return sm;
     }
 
-    public bool TryGet(string machineKey, out StackStateMachine? machine)
-    {
-        return _machines.TryGetValue(machineKey, out machine);
-    }
+    public bool TryGet(string machineKey, out StackStateMachine? machine) =>
+        _machines.TryGetValue(machineKey, out machine);
 
     public void Remove(string machineKey)
     {
@@ -97,9 +95,10 @@ public sealed class StateMachineContainer
             }
     }
 
-    public string SerializeToJson(JsonSerializerOptions options)
+    public string SerializeToDataSource(IDataSourceCodec codec, DataSourceConverterRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(codec);
+        ArgumentNullException.ThrowIfNull(registry);
 
         var payload = new StateMachineContainerPayload();
         foreach (var key in _machineOrder)
@@ -115,17 +114,22 @@ public sealed class StateMachineContainer
             });
         }
 
-        return JsonSerializer.Serialize(payload, options);
+        var node = registry.Write(payload);
+        return codec.Encode(node);
     }
 
-    public void DeserializeWithoutHooks(string json, JsonSerializerOptions options)
+    public void DeserializeWithoutHooks(string serializedText, IDataSourceCodec codec,
+        DataSourceConverterRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(serializedText);
+        ArgumentNullException.ThrowIfNull(codec);
+        ArgumentNullException.ThrowIfNull(registry);
 
-        if (string.IsNullOrWhiteSpace(json))
-            throw new InvalidOperationException("StateMachineContainer json cannot be null/empty.");
+        if (string.IsNullOrWhiteSpace(serializedText))
+            throw new InvalidOperationException("StateMachineContainer serialized text cannot be null/empty.");
 
-        var payload = JsonSerializer.Deserialize<StateMachineContainerPayload>(json, options);
+        var node = codec.Decode(serializedText);
+        var payload = registry.Read<StateMachineContainerPayload>(node);
         if (payload?.Machines is null)
             throw new InvalidOperationException("StateMachineContainer payload.machines is required.");
 

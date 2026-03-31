@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.StateMachine;
-using Origo.Core.Serialization;
 using Origo.Core.Snd;
-using Origo.Core.StateMachine;
 using Xunit;
 
 namespace Origo.Core.Tests;
@@ -16,7 +13,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -59,7 +56,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -102,7 +99,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -138,15 +135,15 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
 
-        var options = OrigoJson.CreateDefaultOptions(runtime.SndWorld.TypeMapping, _ => { });
         var container = new StateMachineContainer(pool, ctx);
 
-        Assert.Throws<InvalidOperationException>(() => container.DeserializeWithoutHooks(" ", options));
+        Assert.Throws<InvalidOperationException>(() =>
+            container.DeserializeWithoutHooks(" ", TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry()));
     }
 
     [Fact]
@@ -154,22 +151,21 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
 
-        var options = OrigoJson.CreateDefaultOptions(runtime.SndWorld.TypeMapping, _ => { });
         var c1 = new StateMachineContainer(pool, ctx);
         var sm = c1.CreateOrGet("ui", "sm.push.test", "sm.pop.test");
         sm.Push("p");
         sm.Push("q");
 
-        var json = c1.SerializeToJson(options);
+        var json = c1.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
         var c2 = new StateMachineContainer(pool, ctx);
-        c2.DeserializeWithoutHooks(json, options);
+        c2.DeserializeWithoutHooks(json, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
         c2.TryGet("ui", out var restored);
         Assert.NotNull(restored);
         Assert.Equal(new[] { "p", "q" }, restored!.Snapshot());

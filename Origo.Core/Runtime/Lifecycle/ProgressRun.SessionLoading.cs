@@ -31,7 +31,8 @@ public sealed partial class ProgressRun
 
         ProgressScope.StateMachines.DeserializeWithoutHooks(
             payload.ProgressStateMachinesJson,
-            _factory.Runtime.SndWorld.JsonOptions);
+            _factory.Runtime.SndWorld.JsonCodec,
+            _factory.Runtime.SndWorld.ConverterRegistry);
 
         var activeLevel = payload.ActiveLevelId;
         if (string.IsNullOrWhiteSpace(activeLevel))
@@ -82,7 +83,8 @@ public sealed partial class ProgressRun
 
         newSession.SessionScope.StateMachines.DeserializeWithoutHooks(
             levelPayload.SessionStateMachinesJson,
-            _factory.Runtime.SndWorld.JsonOptions);
+            _factory.Runtime.SndWorld.JsonCodec,
+            _factory.Runtime.SndWorld.ConverterRegistry);
 
         // 先创建 SessionRun / SessionStateMachines 并恢复存档栈，
         // 再 Load 场景（AfterLoad 期间策略可读取到已恢复的 session 级状态机；且不会被后续 Import 覆盖）。

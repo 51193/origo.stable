@@ -12,5 +12,20 @@ public interface IConsoleCommandHandler
     /// </summary>
     string Name { get; }
 
+    /// <summary>
+    ///     帮助信息，描述该命令的用途与用法，由 help 命令自动收集展示。
+    /// </summary>
+    string HelpText { get; }
+
+    /// <summary>
+    ///     允许的位置参数最小数量（含）。
+    /// </summary>
+    int MinPositionalArgs { get; }
+
+    /// <summary>
+    ///     允许的位置参数最大数量（含）。-1 表示无上限。
+    /// </summary>
+    int MaxPositionalArgs { get; }
+
     bool TryExecute(CommandInvocation invocation, IConsoleOutputChannel outputChannel, out string? errorMessage);
 }

@@ -1,3 +1,5 @@
+using System;
+using Origo.Core.Abstractions;
 using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
@@ -11,11 +13,11 @@ public class AutoInitializerGuardTests
     public void DiscoverAndRegisterStrategies_WithoutAttribute_Throws()
     {
         var logger = new TestLogger();
-        var world = new SndWorld(new TypeStringMapping(), logger);
+        var world = TestFactory.CreateSndWorld(logger: logger);
 
-        var ex = Assert.Throws<System.InvalidOperationException>(() =>
+        var ex = Assert.Throws<InvalidOperationException>(() =>
             OrigoAutoInitializer.DiscoverAndRegisterStrategies(world, logger));
-        Assert.Contains(nameof(MissingAttrStrategy), ex.Message, System.StringComparison.Ordinal);
+        Assert.Contains(nameof(MissingAttrStrategy), ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -25,7 +27,7 @@ public class AutoInitializerGuardTests
             typeof(StatefulAutoInitStrategy), out var mutableFieldNames);
 
         Assert.False(ok);
-        Assert.Contains("_counter", mutableFieldNames, System.StringComparison.Ordinal);
+        Assert.Contains("_counter", mutableFieldNames, StringComparison.Ordinal);
     }
 
     [StrategyIndex(IndexConst)]
@@ -36,11 +38,11 @@ public class AutoInitializerGuardTests
 
     private sealed class MissingAttrStrategy : EntityStrategyBase;
 
-    [StrategyIndex(StatefulAutoInitStrategy.IndexConst)]
+    [StrategyIndex(IndexConst)]
     private abstract class StatefulAutoInitStrategy : EntityStrategyBase
     {
         public const string IndexConst = "auto.init.stateful.local";
         private int _counter;
-        public override void Process(Origo.Core.Abstractions.ISndEntity entity, double delta, SndContext ctx) => _counter++;
+        public override void Process(ISndEntity entity, double delta, SndContext ctx) => _counter++;
     }
 }

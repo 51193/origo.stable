@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Scheduling;
-using Origo.Core.Serialization;
 using Xunit;
 
 namespace Origo.Core.Tests;

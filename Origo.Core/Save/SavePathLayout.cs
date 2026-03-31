@@ -11,13 +11,13 @@ public static class SavePathLayout
     /// <summary>活动存档目录名称常量。</summary>
     public const string CurrentDirectoryName = "current";
 
+    /// <summary>写入进行中标记文件的名称常量。</summary>
+    public const string WriteInProgressMarkerName = ".write_in_progress";
+
     /// <summary>
     ///     获取活动存档目录的相对路径（即 <c>current</c>）。
     /// </summary>
-    public static string GetCurrentDirectory()
-    {
-        return CurrentDirectoryName;
-    }
+    public static string GetCurrentDirectory() => CurrentDirectoryName;
 
     /// <summary>
     ///     根据存档 ID 获取对应快照目录的相对路径（如 <c>save_001</c>）。
@@ -108,9 +108,6 @@ public static class SavePathLayout
 
         return Combine(levelDirectory, "session_state_machines.json");
     }
-
-    /// <summary>写入进行中标记文件的名称常量。</summary>
-    public const string WriteInProgressMarkerName = ".write_in_progress";
 
     /// <summary>
     ///     获取写入进行中标记文件的相对路径。

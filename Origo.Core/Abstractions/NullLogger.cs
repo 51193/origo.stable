@@ -5,11 +5,11 @@ namespace Origo.Core.Abstractions;
 /// </summary>
 public sealed class NullLogger : ILogger
 {
-    public static NullLogger Instance { get; } = new();
-
     private NullLogger()
     {
     }
+
+    public static NullLogger Instance { get; } = new();
 
     public void Log(LogLevel level, string tag, string message)
     {

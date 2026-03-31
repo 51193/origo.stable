@@ -85,10 +85,8 @@ internal static class SavePayloadWriter
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload level,
-        bool overwrite = true)
-    {
+        bool overwrite = true) =>
         WriteLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, level, overwrite);
-    }
 
     private static void WriteLevelPayload(
         IFileSystem fileSystem,

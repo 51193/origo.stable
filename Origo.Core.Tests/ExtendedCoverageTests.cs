@@ -1,18 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Origo.Core.Abstractions;
 using Origo.Core.Logging;
 using Origo.Core.Random;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
 using Origo.Core.Save;
-using Origo.Core.Serialization;
 using Origo.Core.Snd;
 using Origo.Core.Utils;
 using Origo.Core.Utils.DataStructures;
 using Xunit;
-
 
 namespace Origo.Core.Tests;
 
@@ -21,109 +19,77 @@ namespace Origo.Core.Tests;
 public class SavePathLayoutTests
 {
     [Fact]
-    public void SavePathLayout_GetCurrentDirectory_ReturnsCurrent()
-    {
+    public void SavePathLayout_GetCurrentDirectory_ReturnsCurrent() =>
         Assert.Equal("current", SavePathLayout.GetCurrentDirectory());
-    }
 
     [Fact]
-    public void SavePathLayout_CurrentDirectoryName_Constant()
-    {
+    public void SavePathLayout_CurrentDirectoryName_Constant() =>
         Assert.Equal("current", SavePathLayout.CurrentDirectoryName);
-    }
 
     [Theory]
     [InlineData("001", "save_001")]
     [InlineData("abc", "save_abc")]
     [InlineData("my-save", "save_my-save")]
-    public void SavePathLayout_GetSaveDirectory_FormatsCorrectly(string saveId, string expected)
-    {
+    public void SavePathLayout_GetSaveDirectory_FormatsCorrectly(string saveId, string expected) =>
         Assert.Equal(expected, SavePathLayout.GetSaveDirectory(saveId));
-    }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void SavePathLayout_GetSaveDirectory_ThrowsOnInvalidId(string? saveId)
-    {
+    public void SavePathLayout_GetSaveDirectory_ThrowsOnInvalidId(string? saveId) =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetSaveDirectory(saveId!));
-    }
 
     [Fact]
-    public void SavePathLayout_GetProgressFile_CombinesCorrectly()
-    {
+    public void SavePathLayout_GetProgressFile_CombinesCorrectly() =>
         Assert.Equal("mybase/progress.json", SavePathLayout.GetProgressFile("mybase"));
-    }
 
     [Fact]
-    public void SavePathLayout_GetProgressFile_ThrowsOnEmpty()
-    {
+    public void SavePathLayout_GetProgressFile_ThrowsOnEmpty() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetProgressFile(""));
-    }
 
     [Fact]
-    public void SavePathLayout_GetProgressStateMachinesFile_CombinesCorrectly()
-    {
+    public void SavePathLayout_GetProgressStateMachinesFile_CombinesCorrectly() =>
         Assert.Equal("base/progress_state_machines.json", SavePathLayout.GetProgressStateMachinesFile("base"));
-    }
 
     [Fact]
-    public void SavePathLayout_GetProgressStateMachinesFile_ThrowsOnWhitespace()
-    {
+    public void SavePathLayout_GetProgressStateMachinesFile_ThrowsOnWhitespace() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetProgressStateMachinesFile("  "));
-    }
 
     [Fact]
-    public void SavePathLayout_GetCustomMetaFile_CombinesCorrectly()
-    {
+    public void SavePathLayout_GetCustomMetaFile_CombinesCorrectly() =>
         Assert.Equal("base/meta.map", SavePathLayout.GetCustomMetaFile("base"));
-    }
 
     [Fact]
-    public void SavePathLayout_GetCustomMetaFile_ThrowsOnNull()
-    {
+    public void SavePathLayout_GetCustomMetaFile_ThrowsOnNull() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetCustomMetaFile(null!));
-    }
 
     [Fact]
-    public void SavePathLayout_GetLevelDirectory_CombinesCorrectly()
-    {
+    public void SavePathLayout_GetLevelDirectory_CombinesCorrectly() =>
         Assert.Equal("base/level_town", SavePathLayout.GetLevelDirectory("base", "town"));
-    }
 
     [Theory]
     [InlineData("", "level1")]
     [InlineData("base", "")]
     [InlineData("", "")]
-    public void SavePathLayout_GetLevelDirectory_ThrowsOnInvalidArgs(string baseDir, string levelId)
-    {
+    public void SavePathLayout_GetLevelDirectory_ThrowsOnInvalidArgs(string baseDir, string levelId) =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetLevelDirectory(baseDir, levelId));
-    }
 
     [Fact]
-    public void SavePathLayout_GetLevelSndSceneFile_CombinesCorrectly()
-    {
-        Assert.Equal("level_dir/snd_scene.json", SavePathLayout.GetLevelSndSceneFile("level_dir"));
-    }
+    public void SavePathLayout_GetLevelSndSceneFile_CombinesCorrectly() => Assert.Equal("level_dir/snd_scene.json",
+        SavePathLayout.GetLevelSndSceneFile("level_dir"));
 
     [Fact]
-    public void SavePathLayout_GetLevelSndSceneFile_ThrowsOnEmpty()
-    {
+    public void SavePathLayout_GetLevelSndSceneFile_ThrowsOnEmpty() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetLevelSndSceneFile(""));
-    }
 
     [Fact]
-    public void SavePathLayout_GetLevelSessionFile_CombinesCorrectly()
-    {
-        Assert.Equal("level_dir/session.json", SavePathLayout.GetLevelSessionFile("level_dir"));
-    }
+    public void SavePathLayout_GetLevelSessionFile_CombinesCorrectly() => Assert.Equal("level_dir/session.json",
+        SavePathLayout.GetLevelSessionFile("level_dir"));
 
     [Fact]
-    public void SavePathLayout_GetLevelSessionFile_ThrowsOnWhitespace()
-    {
+    public void SavePathLayout_GetLevelSessionFile_ThrowsOnWhitespace() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetLevelSessionFile("   "));
-    }
 
     [Fact]
     public void SavePathLayout_GetLevelSessionStateMachinesFile_CombinesCorrectly()
@@ -133,28 +99,20 @@ public class SavePathLayoutTests
     }
 
     [Fact]
-    public void SavePathLayout_GetLevelSessionStateMachinesFile_ThrowsOnNull()
-    {
+    public void SavePathLayout_GetLevelSessionStateMachinesFile_ThrowsOnNull() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetLevelSessionStateMachinesFile(null!));
-    }
 
     [Fact]
-    public void SavePathLayout_GetWriteInProgressMarker_CombinesCorrectly()
-    {
-        Assert.Equal("base/.write_in_progress", SavePathLayout.GetWriteInProgressMarker("base"));
-    }
+    public void SavePathLayout_GetWriteInProgressMarker_CombinesCorrectly() => Assert.Equal("base/.write_in_progress",
+        SavePathLayout.GetWriteInProgressMarker("base"));
 
     [Fact]
-    public void SavePathLayout_GetWriteInProgressMarker_ThrowsOnEmpty()
-    {
+    public void SavePathLayout_GetWriteInProgressMarker_ThrowsOnEmpty() =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetWriteInProgressMarker(""));
-    }
 
     [Fact]
-    public void SavePathLayout_WriteInProgressMarkerName_Constant()
-    {
+    public void SavePathLayout_WriteInProgressMarkerName_Constant() =>
         Assert.Equal(".write_in_progress", SavePathLayout.WriteInProgressMarkerName);
-    }
 }
 
 // ── SavePathResolver ───────────────────────────────────────────────────
@@ -213,22 +171,16 @@ public class SavePathResolverTests
     }
 
     [Fact]
-    public void SavePathResolver_GetLeafDirectoryName_ReturnsLastSegment()
-    {
+    public void SavePathResolver_GetLeafDirectoryName_ReturnsLastSegment() =>
         Assert.Equal("child", SavePathResolver.GetLeafDirectoryName("root/parent/child"));
-    }
 
     [Fact]
-    public void SavePathResolver_GetLeafDirectoryName_SingleSegment()
-    {
+    public void SavePathResolver_GetLeafDirectoryName_SingleSegment() =>
         Assert.Equal("single", SavePathResolver.GetLeafDirectoryName("single"));
-    }
 
     [Fact]
-    public void SavePathResolver_GetLeafDirectoryName_TrailingSlash()
-    {
+    public void SavePathResolver_GetLeafDirectoryName_TrailingSlash() =>
         Assert.Equal("child", SavePathResolver.GetLeafDirectoryName("root/child/"));
-    }
 
     [Fact]
     public void SavePathResolver_GetLeafDirectoryName_EmptyOrWhitespace_ReturnsEmpty()
@@ -418,10 +370,8 @@ public class ConcurrentActionQueueTests
     }
 
     [Fact]
-    public void ConcurrentActionQueue_Constructor_ThrowsOnNullLogger()
-    {
+    public void ConcurrentActionQueue_Constructor_ThrowsOnNullLogger() =>
         Assert.Throws<ArgumentNullException>(() => new ConcurrentActionQueue(null!));
-    }
 
     [Fact]
     public void ConcurrentActionQueue_ExecuteAll_PropagatesException()
@@ -501,26 +451,23 @@ public class LogMessageBuilderTests
     }
 }
 
-// ── BlackboardJsonSerializer ───────────────────────────────────────────
+// ── BlackboardSerializer ───────────────────────────────────────────
 
-public class BlackboardJsonSerializerTests
+public class BlackboardSerializerTests
 {
-    private static SndWorld CreateWorld()
-    {
-        return new SndWorld(new TypeStringMapping(), NullLogger.Instance);
-    }
+    private static SndWorld CreateWorld() => TestFactory.CreateSndWorld();
 
     [Fact]
-    public void BlackboardJsonSerializer_RoundTrip_PreservesData()
+    public void BlackboardSerializer_RoundTrip_PreservesData()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardJsonSerializer(world.JsonOptions);
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var bb = new Blackboard.Blackboard();
         bb.Set("intKey", 42);
         bb.Set("strKey", "hello");
 
         var json = serializer.Serialize(bb);
-        var bb2 = new Origo.Core.Blackboard.Blackboard();
+        var bb2 = new Blackboard.Blackboard();
         serializer.DeserializeInto(bb2, json);
 
         Assert.Equal(42, bb2.TryGet<int>("intKey").value);
@@ -528,11 +475,11 @@ public class BlackboardJsonSerializerTests
     }
 
     [Fact]
-    public void BlackboardJsonSerializer_Serialize_EmptyBlackboard_ReturnsValidJson()
+    public void BlackboardSerializer_Serialize_EmptyBlackboard_ReturnsValidJson()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardJsonSerializer(world.JsonOptions);
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var bb = new Blackboard.Blackboard();
 
         var json = serializer.Serialize(bb);
         Assert.NotNull(json);
@@ -540,15 +487,15 @@ public class BlackboardJsonSerializerTests
     }
 
     [Fact]
-    public void BlackboardJsonSerializer_DeserializeInto_OverwritesExisting()
+    public void BlackboardSerializer_DeserializeInto_OverwritesExisting()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardJsonSerializer(world.JsonOptions);
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var bb = new Blackboard.Blackboard();
         bb.Set("key1", "old");
         bb.Set("key2", "keep");
 
-        var source = new Origo.Core.Blackboard.Blackboard();
+        var source = new Blackboard.Blackboard();
         source.Set("key1", "new");
         var json = serializer.Serialize(source);
         serializer.DeserializeInto(bb, json);
@@ -635,21 +582,6 @@ public class ConsoleCommandParserTests
 
 public class ConsoleCommandRouterTests
 {
-    private sealed class StubHandler : IConsoleCommandHandler
-    {
-        public string Name { get; }
-        public bool WasExecuted { get; private set; }
-
-        public StubHandler(string name) => Name = name;
-
-        public bool TryExecute(CommandInvocation invocation, IConsoleOutputChannel outputChannel, out string? errorMessage)
-        {
-            WasExecuted = true;
-            errorMessage = null;
-            return true;
-        }
-    }
-
     [Fact]
     public void ConsoleCommandRouter_Register_And_TryExecute_Success()
     {
@@ -712,6 +644,28 @@ public class ConsoleCommandRouterTests
 
         var ok = router.TryExecute(invocation, channel, out _);
         Assert.True(ok);
+    }
+
+    private sealed class StubHandler : IConsoleCommandHandler
+    {
+        public StubHandler(string name)
+        {
+            Name = name;
+        }
+
+        public bool WasExecuted { get; private set; }
+        public string Name { get; }
+        public string HelpText => $"{Name} — stub command.";
+        public int MinPositionalArgs => 0;
+        public int MaxPositionalArgs => -1;
+
+        public bool TryExecute(CommandInvocation invocation, IConsoleOutputChannel outputChannel,
+            out string? errorMessage)
+        {
+            WasExecuted = true;
+            errorMessage = null;
+            return true;
+        }
     }
 }
 
@@ -888,16 +842,12 @@ public class SaveMetaMapCodecExtendedTests
     }
 
     [Fact]
-    public void SaveMetaMapCodec_Serialize_NullMap_ReturnsEmpty()
-    {
+    public void SaveMetaMapCodec_Serialize_NullMap_ReturnsEmpty() =>
         Assert.Equal(string.Empty, SaveMetaMapCodec.Serialize(null));
-    }
 
     [Fact]
-    public void SaveMetaMapCodec_Serialize_EmptyMap_ReturnsEmpty()
-    {
-        Assert.Equal(string.Empty, SaveMetaMapCodec.Serialize(new Dictionary<string, string>()));
-    }
+    public void SaveMetaMapCodec_Serialize_EmptyMap_ReturnsEmpty() => Assert.Equal(string.Empty,
+        SaveMetaMapCodec.Serialize(new Dictionary<string, string>()));
 
     [Fact]
     public void SaveMetaMapCodec_RoundTrip()
@@ -918,7 +868,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_Set_And_TryGet_Int()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("score", 100);
         var (found, value) = bb.TryGet<int>("score");
         Assert.True(found);
@@ -928,7 +878,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_Set_And_TryGet_String()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("name", "player");
         var (found, value) = bb.TryGet<string>("name");
         Assert.True(found);
@@ -938,7 +888,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_TryGet_MissingKey_ReturnsFalse()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         var (found, _) = bb.TryGet<int>("missing");
         Assert.False(found);
     }
@@ -946,7 +896,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_TryGet_WrongType_ReturnsFalse()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("key", 42);
         var (found, _) = bb.TryGet<string>("key");
         Assert.False(found);
@@ -955,7 +905,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_Clear_RemovesAll()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("a", 1);
         bb.Set("b", 2);
         bb.Clear();
@@ -965,7 +915,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_GetKeys_ReturnsAllKeys()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("a", 1);
         bb.Set("b", "x");
         var keys = bb.GetKeys();
@@ -977,12 +927,12 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_SerializeAll_And_DeserializeAll_RoundTrip()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("key1", 42);
         bb.Set("key2", "val");
 
         var data = bb.SerializeAll();
-        var bb2 = new Origo.Core.Blackboard.Blackboard();
+        var bb2 = new Blackboard.Blackboard();
         bb2.DeserializeAll(data);
 
         Assert.Equal(42, bb2.TryGet<int>("key1").value);
@@ -992,7 +942,7 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_Set_OverwriteExisting()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         bb.Set("key", 1);
         bb.Set("key", 2);
         Assert.Equal(2, bb.TryGet<int>("key").value);
@@ -1001,21 +951,21 @@ public class BlackboardTests
     [Fact]
     public void Blackboard_Set_ThrowsOnNullKey()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
-        Assert.Throws<ArgumentException>(() => bb.Set<int>(null!, 1));
+        var bb = new Blackboard.Blackboard();
+        Assert.Throws<ArgumentException>(() => bb.Set(null!, 1));
     }
 
     [Fact]
     public void Blackboard_TryGet_ThrowsOnNullKey()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         Assert.Throws<ArgumentException>(() => bb.TryGet<int>(null!));
     }
 
     [Fact]
     public void Blackboard_Set_ThrowsOnWhitespaceKey()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         Assert.Throws<ArgumentException>(() => bb.Set("  ", 1));
     }
 }
@@ -1029,7 +979,11 @@ public class DataObserverManagerExtendedTests
     {
         var mgr = new DataObserverManager();
         object? receivedOld = null, receivedNew = null;
-        mgr.Subscribe("hp", (o, n) => { receivedOld = o; receivedNew = n; });
+        mgr.Subscribe("hp", (o, n) =>
+        {
+            receivedOld = o;
+            receivedNew = n;
+        });
 
         mgr.NotifyObservers("hp", 100, 80);
         Assert.Equal(100, receivedOld);
@@ -1106,20 +1060,17 @@ public class DataObserverManagerExtendedTests
     }
 }
 
-// ── SndSceneJsonSerializer ─────────────────────────────────────────────
+// ── SndSceneSerializer ─────────────────────────────────────────────
 
-public class SndSceneJsonSerializerTests
+public class SndSceneSerializerTests
 {
-    private static SndWorld CreateWorld()
-    {
-        return new SndWorld(new TypeStringMapping(), NullLogger.Instance);
-    }
+    private static SndWorld CreateWorld() => TestFactory.CreateSndWorld();
 
     [Fact]
-    public void SndSceneJsonSerializer_Serialize_EmptyScene()
+    public void SndSceneSerializer_Serialize_EmptyScene()
     {
         var world = CreateWorld();
-        var serializer = new SndSceneJsonSerializer(world);
+        var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
         var json = serializer.Serialize(host);
@@ -1128,10 +1079,10 @@ public class SndSceneJsonSerializerTests
     }
 
     [Fact]
-    public void SndSceneJsonSerializer_RoundTrip_PreservesMetaList()
+    public void SndSceneSerializer_RoundTrip_PreservesMetaList()
     {
         var world = CreateWorld();
-        var serializer = new SndSceneJsonSerializer(world);
+        var serializer = new SndSceneSerializer(world);
 
         var host1 = new TestSndSceneHost();
         host1.Spawn(new SndMetaData { Name = "entity1" });
@@ -1147,10 +1098,10 @@ public class SndSceneJsonSerializerTests
     }
 
     [Fact]
-    public void SndSceneJsonSerializer_DeserializeInto_ClearsBeforeLoad()
+    public void SndSceneSerializer_DeserializeInto_ClearsBeforeLoad()
     {
         var world = CreateWorld();
-        var serializer = new SndSceneJsonSerializer(world);
+        var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
         host.Spawn(new SndMetaData { Name = "existing" });
 
@@ -1159,10 +1110,10 @@ public class SndSceneJsonSerializerTests
     }
 
     [Fact]
-    public void SndSceneJsonSerializer_DeserializeInto_NoClearWhenFalse()
+    public void SndSceneSerializer_DeserializeInto_NoClearWhenFalse()
     {
         var world = CreateWorld();
-        var serializer = new SndSceneJsonSerializer(world);
+        var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
         serializer.DeserializeInto(host, "[]", false);
@@ -1170,20 +1121,18 @@ public class SndSceneJsonSerializerTests
     }
 
     [Fact]
-    public void SndSceneJsonSerializer_DeserializeInto_InvalidJson_Throws()
+    public void SndSceneSerializer_DeserializeInto_InvalidJson_Throws()
     {
         var world = CreateWorld();
-        var serializer = new SndSceneJsonSerializer(world);
+        var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
         Assert.ThrowsAny<Exception>(() => serializer.DeserializeInto(host, "{}", true));
     }
 
     [Fact]
-    public void SndSceneJsonSerializer_Constructor_ThrowsOnNullWorld()
-    {
-        Assert.Throws<ArgumentNullException>(() => new SndSceneJsonSerializer(null!));
-    }
+    public void SndSceneSerializer_Constructor_ThrowsOnNullWorld() =>
+        Assert.Throws<ArgumentNullException>(() => new SndSceneSerializer(null!));
 }
 
 // ── DelegateSaveMetaContributor ────────────────────────────────────────
@@ -1200,7 +1149,7 @@ public class DelegateSaveMetaContributorTests
             meta["custom_key"] = "custom_value";
         });
 
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         var host = new TestSndSceneHost();
         var context = new SaveMetaBuildContext("save1", "level1", bb, bb, host);
         var dict = new Dictionary<string, string>();
@@ -1211,34 +1160,29 @@ public class DelegateSaveMetaContributorTests
     }
 
     [Fact]
-    public void DelegateSaveMetaContributor_Constructor_ThrowsOnNull()
-    {
+    public void DelegateSaveMetaContributor_Constructor_ThrowsOnNull() =>
         Assert.Throws<ArgumentNullException>(() => new DelegateSaveMetaContributor(null!));
-    }
 }
 
 // ── SaveContext ─────────────────────────────────────────────────────────
 
 public class SaveContextTests
 {
-    private static SndWorld CreateWorld()
-    {
-        return new SndWorld(new TypeStringMapping(), NullLogger.Instance);
-    }
+    private static SndWorld CreateWorld() => TestFactory.CreateSndWorld();
 
     [Fact]
     public void SaveContext_SerializeProgress_And_DeserializeProgress_RoundTrip()
     {
         var world = CreateWorld();
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         progress.Set("stage", 3);
 
         var ctx = new SaveContext(progress, session, world);
         var json = ctx.SerializeProgress();
 
-        var progress2 = new Origo.Core.Blackboard.Blackboard();
-        var ctx2 = new SaveContext(progress2, new Origo.Core.Blackboard.Blackboard(), world);
+        var progress2 = new Blackboard.Blackboard();
+        var ctx2 = new SaveContext(progress2, new Blackboard.Blackboard(), world);
         ctx2.DeserializeProgress(json);
 
         Assert.Equal(3, progress2.TryGet<int>("stage").value);
@@ -1248,15 +1192,15 @@ public class SaveContextTests
     public void SaveContext_SerializeSession_And_DeserializeSession_RoundTrip()
     {
         var world = CreateWorld();
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         session.Set("hp", 100);
 
         var ctx = new SaveContext(progress, session, world);
         var json = ctx.SerializeSession();
 
-        var session2 = new Origo.Core.Blackboard.Blackboard();
-        var ctx2 = new SaveContext(new Origo.Core.Blackboard.Blackboard(), session2, world);
+        var session2 = new Blackboard.Blackboard();
+        var ctx2 = new SaveContext(new Blackboard.Blackboard(), session2, world);
         ctx2.DeserializeSession(json);
 
         Assert.Equal(100, session2.TryGet<int>("hp").value);
@@ -1266,7 +1210,7 @@ public class SaveContextTests
     public void SaveContext_SerializeSndScene_ReturnsJson()
     {
         var world = CreateWorld();
-        var ctx = new SaveContext(new Origo.Core.Blackboard.Blackboard(), new Origo.Core.Blackboard.Blackboard(), world);
+        var ctx = new SaveContext(new Blackboard.Blackboard(), new Blackboard.Blackboard(), world);
         var host = new TestSndSceneHost();
 
         var json = ctx.SerializeSndScene(host);
@@ -1277,11 +1221,11 @@ public class SaveContextTests
     public void SaveContext_DeserializeSndScene_ClearsAndLoads()
     {
         var world = CreateWorld();
-        var ctx = new SaveContext(new Origo.Core.Blackboard.Blackboard(), new Origo.Core.Blackboard.Blackboard(), world);
+        var ctx = new SaveContext(new Blackboard.Blackboard(), new Blackboard.Blackboard(), world);
         var host = new TestSndSceneHost();
         host.Spawn(new SndMetaData { Name = "old" });
 
-        ctx.DeserializeSndScene(host, "[]", true);
+        ctx.DeserializeSndScene(host, "[]");
         Assert.Equal(1, host.ClearAllCount);
     }
 
@@ -1289,8 +1233,8 @@ public class SaveContextTests
     public void SaveContext_SaveGame_CreatesSaveGamePayload()
     {
         var world = CreateWorld();
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         progress.Set("gold", 500);
 
         var ctx = new SaveContext(progress, session, world);
@@ -1308,7 +1252,7 @@ public class SaveContextTests
     public void SaveContext_SaveGame_WithCustomMeta()
     {
         var world = CreateWorld();
-        var ctx = new SaveContext(new Origo.Core.Blackboard.Blackboard(), new Origo.Core.Blackboard.Blackboard(), world);
+        var ctx = new SaveContext(new Blackboard.Blackboard(), new Blackboard.Blackboard(), world);
         var host = new TestSndSceneHost();
         var meta = new Dictionary<string, string> { ["display"] = "Save 1" };
 
@@ -1322,7 +1266,7 @@ public class SaveContextTests
     public void SaveContext_Constructor_ThrowsOnNullArgs()
     {
         var world = CreateWorld();
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         Assert.Throws<ArgumentNullException>(() => new SaveContext(null!, bb, world));
         Assert.Throws<ArgumentNullException>(() => new SaveContext(bb, null!, world));
         Assert.Throws<ArgumentNullException>(() => new SaveContext(bb, bb, null!));
@@ -1332,8 +1276,8 @@ public class SaveContextTests
     public void SaveContext_Properties_ExposeBlackboards()
     {
         var world = CreateWorld();
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         var ctx = new SaveContext(progress, session, world);
 
         Assert.Same(progress, ctx.Progress);
@@ -1347,10 +1291,7 @@ public class SaveContextTests
 public class NullLoggerTests
 {
     [Fact]
-    public void NullLogger_Instance_IsSingleton()
-    {
-        Assert.Same(NullLogger.Instance, NullLogger.Instance);
-    }
+    public void NullLogger_Instance_IsSingleton() => Assert.Same(NullLogger.Instance, NullLogger.Instance);
 
     [Fact]
     public void NullLogger_Log_DoesNotThrow()
@@ -1373,16 +1314,12 @@ public class NullLoggerTests
 public class WellKnownKeysTests
 {
     [Fact]
-    public void WellKnownKeys_ActiveSaveId_HasExpectedValue()
-    {
+    public void WellKnownKeys_ActiveSaveId_HasExpectedValue() =>
         Assert.Equal("origo.active_save_id", WellKnownKeys.ActiveSaveId);
-    }
 
     [Fact]
-    public void WellKnownKeys_ActiveLevelId_HasExpectedValue()
-    {
+    public void WellKnownKeys_ActiveLevelId_HasExpectedValue() =>
         Assert.Equal("origo.active_level_id", WellKnownKeys.ActiveLevelId);
-    }
 }
 
 // ── TypeStringMapping additional tests ─────────────────────────────────
@@ -1616,8 +1553,8 @@ public class SaveMetaBuildContextTests
     [Fact]
     public void SaveMetaBuildContext_StoresAllProperties()
     {
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         var host = new TestSndSceneHost();
         var ctx = new SaveMetaBuildContext("s1", "lvl1", progress, session, host);
 
@@ -1631,7 +1568,7 @@ public class SaveMetaBuildContextTests
     [Fact]
     public void SaveMetaBuildContext_ThrowsOnNullArgs()
     {
-        var bb = new Origo.Core.Blackboard.Blackboard();
+        var bb = new Blackboard.Blackboard();
         var host = new TestSndSceneHost();
 
         Assert.Throws<ArgumentNullException>(() => new SaveMetaBuildContext(null!, "l", bb, bb, host));
@@ -1647,10 +1584,7 @@ public class SaveMetaBuildContextTests
 public class SaveGamePayloadTests
 {
     [Fact]
-    public void SaveGamePayload_CurrentFormatVersion_IsOne()
-    {
-        Assert.Equal(1, SaveGamePayload.CurrentFormatVersion);
-    }
+    public void SaveGamePayload_CurrentFormatVersion_IsOne() => Assert.Equal(1, SaveGamePayload.CurrentFormatVersion);
 
     [Fact]
     public void SaveGamePayload_DefaultValues()
@@ -1683,8 +1617,7 @@ public class OrigoRuntimeBasicTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(),
-            systemBlackboard: new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
 
         Assert.NotNull(runtime.SndWorld);
         Assert.Same(logger, runtime.Logger);
@@ -1695,8 +1628,7 @@ public class OrigoRuntimeBasicTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(),
-            systemBlackboard: new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
 
         Assert.Null(runtime.ConsoleInput);
         Assert.Null(runtime.ConsoleOutputChannel);
@@ -1710,10 +1642,8 @@ public class OrigoRuntimeBasicTests
         var host = new TestSndSceneHost();
         var inputQueue = new ConsoleInputQueue();
         var outputChannel = new ConsoleOutputChannel();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(),
-            systemBlackboard: new Origo.Core.Blackboard.Blackboard(),
-            consoleInput: inputQueue,
-            consoleOutputChannel: outputChannel);
+        var runtime = TestFactory.CreateRuntime(logger, host, new TypeStringMapping(),
+            new Blackboard.Blackboard(), inputQueue, outputChannel);
 
         Assert.NotNull(runtime.Console);
         Assert.Same(inputQueue, runtime.ConsoleInput);
@@ -1728,10 +1658,8 @@ public class OrigoRuntimeBasicTests
         var inputQueue = new ConsoleInputQueue();
         inputQueue.Enqueue("test");
         var outputChannel = new ConsoleOutputChannel();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(),
-            systemBlackboard: new Origo.Core.Blackboard.Blackboard(),
-            consoleInput: inputQueue,
-            consoleOutputChannel: outputChannel);
+        var runtime = TestFactory.CreateRuntime(logger, host, new TypeStringMapping(),
+            new Blackboard.Blackboard(), inputQueue, outputChannel);
 
         runtime.ResetConsoleState();
         Assert.False(inputQueue.TryDequeueCommand(out _));
@@ -1742,8 +1670,7 @@ public class OrigoRuntimeBasicTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(),
-            systemBlackboard: new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
 
         var businessRan = false;
         var systemRan = false;
@@ -1782,7 +1709,7 @@ public class TestFileSystemAdditionalTests
     {
         var fs = new TestFileSystem();
         fs.WriteAllText("file.txt", "v1", false);
-        Assert.Throws<System.IO.IOException>(() => fs.WriteAllText("file.txt", "v2", false));
+        Assert.Throws<IOException>(() => fs.WriteAllText("file.txt", "v2", false));
     }
 
     [Fact]

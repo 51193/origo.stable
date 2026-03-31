@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 using Origo.Core.Snd;
@@ -15,12 +14,12 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
-        var progress = new Origo.Core.Blackboard.Blackboard();
-        var session = new Origo.Core.Blackboard.Blackboard();
+        var progress = new Blackboard.Blackboard();
+        var session = new Blackboard.Blackboard();
         session.Set("foo", 1);
         var saveContext = new SaveContext(progress, session, runtime.SndWorld);
         var run = factory.CreateSessionRun(saveContext, "default", session, host);
@@ -42,11 +41,11 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
-        var progressRun = factory.CreateProgressRun("001", "default", new Origo.Core.Blackboard.Blackboard());
+        var progressRun = factory.CreateProgressRun("001", "default", new Blackboard.Blackboard());
 
         var payload = new SaveGamePayload
         {
@@ -78,12 +77,12 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
 
-        var progressRun = factory.CreateProgressRun("001", "a", new Origo.Core.Blackboard.Blackboard());
+        var progressRun = factory.CreateProgressRun("001", "a", new Blackboard.Blackboard());
         progressRun.CreateFromAlreadyLoadedScene();
 
         // Seed target level payload into current/, as SwitchLevel is strict.
@@ -106,16 +105,17 @@ public class LifecycleRunsTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var factory = new RunFactory(logger, fs, "root", runtime, sndContext);
 
-        var progressRun = factory.CreateProgressRun("001", "a", new Origo.Core.Blackboard.Blackboard());
+        var progressRun = factory.CreateProgressRun("001", "a", new Blackboard.Blackboard());
         progressRun.CreateFromAlreadyLoadedScene();
 
         // Missing target level payload in current/ → enter empty session and clear scene (README contract).
-        runtime.Snd.SceneHost.Spawn(new SndMetaData { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
+        runtime.Snd.SceneHost.Spawn(new SndMetaData
+            { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
         Assert.NotEmpty(runtime.Snd.SerializeMetaList());
 
         progressRun.SwitchLevel("b");

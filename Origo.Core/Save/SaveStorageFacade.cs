@@ -71,10 +71,9 @@ public static class SaveStorageFacade
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 活动目录。
     /// </summary>
-    public static void WriteSavePayloadToCurrent(IFileSystem fileSystem, string saveRootPath, SaveGamePayload payload)
-    {
+    public static void
+        WriteSavePayloadToCurrent(IFileSystem fileSystem, string saveRootPath, SaveGamePayload payload) =>
         SavePayloadWriter.WriteToCurrent(fileSystem, saveRootPath, payload);
-    }
 
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 后，再将 <c>current/</c> 快照复制到 <c>save_{newSaveId}/</c>。
@@ -130,10 +129,8 @@ public static class SaveStorageFacade
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload levelPayload,
-        bool overwrite = true)
-    {
+        bool overwrite = true) =>
         SavePayloadWriter.WriteLevelPayloadOnly(fileSystem, saveRootPath, baseDirectoryRel, levelPayload, overwrite);
-    }
 
     /// <summary>
     ///     从 <c>current/</c> 活动目录读取完整的存档 payload。
@@ -143,10 +140,8 @@ public static class SaveStorageFacade
         string saveRootPath,
         string saveId,
         string activeLevelId,
-        ILogger? logger = null)
-    {
-        return SavePayloadReader.ReadFromCurrent(fileSystem, saveRootPath, saveId, activeLevelId, logger);
-    }
+        ILogger? logger = null) =>
+        SavePayloadReader.ReadFromCurrent(fileSystem, saveRootPath, saveId, activeLevelId, logger);
 
     /// <summary>
     ///     从指定存档槽的快照目录读取完整的存档 payload。
@@ -155,18 +150,14 @@ public static class SaveStorageFacade
         IFileSystem fileSystem,
         string saveRootPath,
         string saveId,
-        string activeLevelId)
-    {
-        return SavePayloadReader.ReadFromSnapshot(fileSystem, saveRootPath, saveId, activeLevelId);
-    }
+        string activeLevelId) =>
+        SavePayloadReader.ReadFromSnapshot(fileSystem, saveRootPath, saveId, activeLevelId);
 
     /// <summary>
     ///     从指定存档槽的快照目录中仅读取 Progress 黑板 JSON。
     /// </summary>
-    public static string? ReadProgressJsonFromSnapshot(IFileSystem fileSystem, string saveRootPath, string saveId)
-    {
-        return SavePayloadReader.ReadProgressJsonFromSnapshot(fileSystem, saveRootPath, saveId);
-    }
+    public static string? ReadProgressJsonFromSnapshot(IFileSystem fileSystem, string saveRootPath, string saveId) =>
+        SavePayloadReader.ReadProgressJsonFromSnapshot(fileSystem, saveRootPath, saveId);
 
     /// <summary>
     ///     将 <c>current/</c> 目录完整复制为指定存档槽的快照。
@@ -218,7 +209,15 @@ public static class SaveStorageFacade
         catch (Exception ex)
         {
             // Clean up incomplete temp directory on failure (best-effort; suppressed to avoid masking the original exception).
-            try { fileSystem.DeleteDirectory(tempAbs); } catch { /* best-effort cleanup */ }
+            try
+            {
+                fileSystem.DeleteDirectory(tempAbs);
+            }
+            catch
+            {
+                /* best-effort cleanup */
+            }
+
             throw new InvalidOperationException(
                 $"Snapshot from current/ to save '{newSaveId}' failed during copy phase.", ex);
         }

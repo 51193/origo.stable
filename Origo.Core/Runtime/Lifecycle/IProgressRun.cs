@@ -58,5 +58,4 @@ public interface IProgressRun : IDisposable
     ///     更新当前 saveId（例如 SaveGameAuto 生成新存档后）。
     /// </summary>
     void SetSaveId(string saveId);
-
 }

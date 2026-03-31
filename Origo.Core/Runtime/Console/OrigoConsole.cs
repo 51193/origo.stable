@@ -23,7 +23,18 @@ public sealed class OrigoConsole
 
         _router.Register(new SpawnTemplateCommandHandler(runtime));
         _router.Register(new SndCountCommandHandler(runtime));
+        _router.Register(new HelpCommandHandler(_router));
+        _router.Register(new FindEntityCommandHandler(runtime));
+        _router.Register(new ClearEntitiesCommandHandler(runtime));
+        _router.Register(new BlackboardGetCommandHandler(runtime));
+        _router.Register(new BlackboardSetCommandHandler(runtime));
+        _router.Register(new BlackboardKeysCommandHandler(runtime));
     }
+
+    /// <summary>
+    ///     注册额外的控制台命令处理器（供 <see cref="Snd.SndContext" /> 等延迟创建的组件使用）。
+    /// </summary>
+    public void RegisterHandler(IConsoleCommandHandler handler) => _router.Register(handler);
 
     /// <summary>
     ///     处理当前队列中的全部待执行命令（通常每帧或提交时调用一次）。

@@ -1,4 +1,3 @@
-using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -10,7 +9,7 @@ public class SndContextContinueContractTests
     public void HasContinueData_WhenNeverSet_ReturnsFalse()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
@@ -21,7 +20,7 @@ public class SndContextContinueContractTests
     public void SetContinueTarget_SetsSystemBlackboardActiveSaveId()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
@@ -37,7 +36,7 @@ public class SndContextContinueContractTests
     public void RequestContinueGame_WhenNoContinueTarget_ReturnsFalse()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
@@ -48,7 +47,7 @@ public class SndContextContinueContractTests
     public void ClearContinueTarget_AfterSetContinueTarget_RemovesContinueData()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
@@ -59,4 +58,3 @@ public class SndContextContinueContractTests
         Assert.False(ctx.HasContinueData());
     }
 }
-

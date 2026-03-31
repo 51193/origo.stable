@@ -143,6 +143,7 @@ public partial class GodotSndEntity : Node, ISndEntity
             _entity.Quit();
             _entity = null;
         }
+
         // Core 已有显式生命周期编排，直接使用 Free（即时释放）；详见 README 中 GodotSndEntity 生命周期说明。
         Free();
     }
@@ -159,6 +160,7 @@ public partial class GodotSndEntity : Node, ISndEntity
             _entity.Dead();
             _entity = null;
         }
+
         Free();
     }
 
@@ -168,10 +170,7 @@ public partial class GodotSndEntity : Node, ISndEntity
         return _entity!.SerializeMetaData();
     }
 
-    public void ProcessSnd(double delta)
-    {
-        _entity?.Process(delta);
-    }
+    public void ProcessSnd(double delta) => _entity?.Process(delta);
 
     private void EnsureEntity()
     {

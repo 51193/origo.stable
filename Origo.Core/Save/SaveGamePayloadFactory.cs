@@ -1,22 +1,21 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
-using Origo.Core.Snd;
 
 namespace Origo.Core.Save;
 
 internal sealed class SaveGamePayloadFactory
 {
-    private readonly BlackboardJsonSerializer _blackboardSerializer;
+    private readonly BlackboardSerializer _blackboardSerializer;
     private readonly IBlackboard _progress;
-    private readonly SndSceneJsonSerializer _sceneSerializer;
+    private readonly SndSceneSerializer _sceneSerializer;
     private readonly IBlackboard _session;
 
     public SaveGamePayloadFactory(
         IBlackboard progress,
         IBlackboard session,
-        BlackboardJsonSerializer blackboardSerializer,
-        SndSceneJsonSerializer sceneSerializer)
+        BlackboardSerializer blackboardSerializer,
+        SndSceneSerializer sceneSerializer)
     {
         ArgumentNullException.ThrowIfNull(progress);
         ArgumentNullException.ThrowIfNull(session);

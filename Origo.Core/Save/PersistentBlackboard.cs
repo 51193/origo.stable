@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Save;
@@ -12,11 +12,12 @@ namespace Origo.Core.Save;
 /// </summary>
 public sealed class PersistentBlackboard : IBlackboard
 {
+    private readonly IDataSourceCodec _codec;
     private readonly string _filePath;
     private readonly IFileSystem _fileSystem;
     private readonly IBlackboard _inner;
-    private readonly JsonSerializerOptions _jsonOptions;
     private readonly object _lock = new();
+    private readonly DataSourceConverterRegistry _registry;
 
     /// <summary>
     ///     创建持久化黑板实例，包装指定的内部黑板并绑定到磁盘文件路径。
@@ -24,12 +25,16 @@ public sealed class PersistentBlackboard : IBlackboard
     public PersistentBlackboard(
         IFileSystem fileSystem,
         string filePath,
-        JsonSerializerOptions jsonOptions,
+        IDataSourceCodec codec,
+        DataSourceConverterRegistry registry,
         IBlackboard inner)
     {
         _fileSystem = fileSystem;
         _filePath = filePath;
-        _jsonOptions = jsonOptions;
+        ArgumentNullException.ThrowIfNull(codec);
+        ArgumentNullException.ThrowIfNull(registry);
+        _codec = codec;
+        _registry = registry;
         ArgumentNullException.ThrowIfNull(inner);
         _inner = inner;
     }
@@ -114,7 +119,8 @@ public sealed class PersistentBlackboard : IBlackboard
                 return;
 
             var json = _fileSystem.ReadAllText(_filePath);
-            var dict = JsonSerializer.Deserialize<Dictionary<string, TypedData>>(json, _jsonOptions);
+            var node = _codec.Decode(json);
+            var dict = _registry.Read<IReadOnlyDictionary<string, TypedData>>(node);
             if (dict is not null)
                 _inner.DeserializeAll(dict);
         }
@@ -125,7 +131,8 @@ public sealed class PersistentBlackboard : IBlackboard
         SavePathResolver.EnsureParentDirectory(_fileSystem, _filePath);
 
         var data = _inner.SerializeAll();
-        var json = JsonSerializer.Serialize(data, _jsonOptions);
+        var node = _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
+        var json = _codec.Encode(node);
         _fileSystem.WriteAllText(_filePath, json, true);
     }
 }

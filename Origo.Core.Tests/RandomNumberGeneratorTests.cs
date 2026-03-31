@@ -34,4 +34,3 @@ public class RandomNumberGeneratorTests
         Assert.NotEqual(a, b);
     }
 }
-

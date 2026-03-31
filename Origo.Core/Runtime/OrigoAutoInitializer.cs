@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using Origo.Core.Abstractions;
+using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
@@ -20,12 +20,12 @@ public static class OrigoAutoInitializer
 {
     private const string LogTag = nameof(OrigoAutoInitializer);
 
+    /// <summary>Legacy assembly name that should always be skipped during strategy scanning.</summary>
+    private const string LegacyCorLibAssemblyName = "mscorlib";
+
     /// <summary>Assembly simple name prefixes skipped when scanning for <see cref="BaseStrategy" /> types.</summary>
     private static readonly string[] DefaultSkipPrefixes =
         ["System", "Microsoft", "netstandard"];
-
-    /// <summary>Legacy assembly name that should always be skipped during strategy scanning.</summary>
-    private const string LegacyCorLibAssemblyName = "mscorlib";
 
     public static int DiscoverAndRegisterStrategies(
         SndWorld world,
@@ -76,6 +76,7 @@ public static class OrigoAutoInitializer
                         .Build($"Invalid strategy constructor: {ex.Message}"));
                     throw ex;
                 }
+
                 if (!IsStatelessStrategyType(type, out var mutableFieldNames))
                 {
                     var ex = new InvalidOperationException(
@@ -150,9 +151,8 @@ public static class OrigoAutoInitializer
             throw ex;
         }
 
-        var jsonOptions = snd.World.JsonOptions;
-        using var doc = JsonDocument.Parse(json);
-        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+        var root = snd.World.JsonCodec.Decode(json);
+        if (root.Kind != DataSourceNodeKind.Array)
         {
             var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");
             logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
@@ -161,7 +161,7 @@ public static class OrigoAutoInitializer
             throw ex;
         }
 
-        var metaList = snd.World.ResolveMetaListFromJsonArray(doc.RootElement);
+        var metaList = snd.World.ResolveMetaListFromJsonArray(root);
         snd.SpawnMany(metaList);
 
         watch.Stop();

@@ -98,7 +98,8 @@ internal sealed class SndStrategyManager
             _strategies.Add(new StrategyEntry
                 { Index = index, Strategy = _pool.GetStrategy<EntityStrategyBase>(index) });
 
-        _logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));
+        _logger.Log(LogLevel.Info, LogTag,
+            new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));
     }
 
     private void Release()

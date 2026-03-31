@@ -1,5 +1,4 @@
 using System;
-using System.Text.Json;
 using Origo.Core.Save;
 using Origo.Core.StateMachine;
 
@@ -41,10 +40,7 @@ public sealed partial class ProgressRun
         LoadOrCreateNewSession(newLevelId, shouldLoadFromPayload, targetLevelPayload);
     }
 
-    private void PersistCurrentSession()
-    {
-        _currentSession?.PersistLevelState();
-    }
+    private void PersistCurrentSession() => _currentSession?.PersistLevelState();
 
     private (bool shouldLoad, LevelPayload? payload) ValidateTargetLevel(string newLevelId)
     {
@@ -66,9 +62,10 @@ public sealed partial class ProgressRun
             throw new InvalidOperationException(
                 $"Target level '{newLevelId}' has invalid session_state_machines.json (empty).");
 
-        _ = JsonSerializer.Deserialize<StateMachineContainerPayload>(
-                targetLevelPayload.SessionStateMachinesJson,
-                _factory.Runtime.SndWorld.JsonOptions)
+        var smCodec = _factory.Runtime.SndWorld.JsonCodec;
+        var smRegistry = _factory.Runtime.SndWorld.ConverterRegistry;
+        var smNode = smCodec.Decode(targetLevelPayload.SessionStateMachinesJson);
+        _ = smRegistry.Read<StateMachineContainerPayload>(smNode)
             ?? throw new InvalidOperationException(
                 $"Target level '{newLevelId}' has invalid session state machines json (null payload).");
 

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
-using System.Text.Json;
-using Origo.Core.Runtime;
+using Origo.Core.Abstractions;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
@@ -16,7 +15,7 @@ public class SndEntityAfterLoadTests
     public void SndEntity_Load_FromJson_InvokesAfterLoad_ForAllStrategies_InIndexOrder()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         runtime.SndWorld.RegisterStrategy(() => new AfterLoadProbeAStrategy());
         runtime.SndWorld.RegisterStrategy(() => new AfterLoadProbeBStrategy());
 
@@ -36,11 +35,13 @@ public class SndEntityAfterLoadTests
                          "data": { "pairs": {} }
                        }
                        """;
-            var meta = JsonSerializer.Deserialize<SndMetaData>(json, runtime.SndWorld.JsonOptions);
-            Assert.NotNull(meta);
+            var codec = runtime.SndWorld.JsonCodec;
+            var registry = runtime.SndWorld.ConverterRegistry;
+            var node = codec.Decode(json);
+            var meta = registry.Read<SndMetaData>(node);
 
             var entity = runtime.SndWorld.CreateEntity(nodeFactory, ctx, logger);
-            entity.Load(meta!);
+            entity.Load(meta);
 
             Assert.Equal(new[] { "afterload:a", "afterload:b" }, AfterLoadProbeAStrategy.Events);
         }
@@ -54,17 +55,15 @@ public class SndEntityAfterLoadTests
     private sealed class AfterLoadProbeAStrategy : EntityStrategyBase
     {
         public static List<string>? Events { get; set; }
-        public override void AfterLoad(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx)
+
+        public override void AfterLoad(ISndEntity entity, SndContext ctx)
             => Events?.Add("afterload:a");
     }
 
     [StrategyIndex(BIndex)]
     private sealed class AfterLoadProbeBStrategy : EntityStrategyBase
     {
-        public override void AfterLoad(Origo.Core.Abstractions.ISndEntity entity, SndContext ctx)
-        {
+        public override void AfterLoad(ISndEntity entity, SndContext ctx) =>
             AfterLoadProbeAStrategy.Events?.Add("afterload:b");
-        }
     }
 }
-

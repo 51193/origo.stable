@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Text.Json;
 using Origo.Core.Abstractions;
 using Origo.Core.Save;
-using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
@@ -37,13 +34,11 @@ public sealed class SystemRun : ISystemRun
             throw new InvalidOperationException(
                 $"Missing required progress.json in save '{effectiveSaveId}'.");
 
-        var progressDict = JsonSerializer.Deserialize<Dictionary<string, TypedData>>(
-                               progressJson, _factory.Runtime.SndWorld.JsonOptions)
-                           ?? throw new InvalidOperationException(
-                               $"Failed to deserialize progress.json in save '{effectiveSaveId}'.");
+        var progressDict = _factory.Runtime.SndWorld.DeserializeTypedDataMap(progressJson);
 
         if (!progressDict.TryGetValue(WellKnownKeys.ActiveLevelId, out var levelData)
-            || levelData.Data is not string activeLevelId)
+            || levelData.Data is not string activeLevelId
+            || string.IsNullOrWhiteSpace(activeLevelId))
             throw new InvalidOperationException(
                 $"Cannot determine ActiveLevelId from progress in save '{effectiveSaveId}'.");
 

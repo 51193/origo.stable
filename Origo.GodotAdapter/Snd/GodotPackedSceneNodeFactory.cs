@@ -20,10 +20,8 @@ public sealed class GodotPackedSceneNodeFactory : INodeFactory
     {
         var scene = ResourceLoader.Load<PackedScene>(resourceId);
         if (scene is null)
-        {
             throw new InvalidOperationException(
                 $"PackedScene not found for logicalName='{logicalName}', resourceId='{resourceId}'.");
-        }
 
         var node = scene.Instantiate<Node>();
         node.Name = logicalName;

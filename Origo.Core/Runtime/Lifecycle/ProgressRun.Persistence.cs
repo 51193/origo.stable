@@ -14,7 +14,8 @@ public sealed partial class ProgressRun
             ProgressBlackboard,
             _currentSession.SessionBlackboard);
         var progressJson = serializer.SerializeProgress();
-        var smJson = ProgressScope.StateMachines.SerializeToJson(_factory.Runtime.SndWorld.JsonOptions);
+        var smJson = ProgressScope.StateMachines.SerializeToDataSource(_factory.Runtime.SndWorld.JsonCodec,
+            _factory.Runtime.SndWorld.ConverterRegistry);
 
         SavePayloadWriter.WriteProgressOnlyToCurrent(
             _factory.FileSystem,

@@ -1,5 +1,4 @@
 using System;
-using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -12,7 +11,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -38,7 +37,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -47,7 +46,8 @@ public class SndContextChangeLevelContractTests
         ctx.FlushDeferredActionsForCurrentFrame();
 
         // Add some scene state we can observe being cleared.
-        runtime.Snd.SceneHost.Spawn(new SndMetaData { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
+        runtime.Snd.SceneHost.Spawn(new SndMetaData
+            { Name = "Temp", NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData() });
         Assert.NotEmpty(runtime.Snd.SerializeMetaList());
 
         // level_c payload not seeded in current/ => should clear and enter empty session per README contract.
@@ -66,7 +66,7 @@ public class SndContextChangeLevelContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
 
@@ -87,11 +87,10 @@ public class SndContextChangeLevelContractTests
     public void RequestChangeLevel_WhenNewLevelIdIsWhitespace_Throws()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
         Assert.Throws<ArgumentException>(() => ctx.RequestChangeLevel(" "));
     }
 }
-

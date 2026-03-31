@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Origo.Core.Abstractions;
-using Origo.Core.Serialization;
+using Origo.Core.DataSource;
 
 namespace Origo.Core.Snd;
 
@@ -12,19 +11,23 @@ namespace Origo.Core.Snd;
 internal sealed class SndTemplateResolver
 {
     private readonly Dictionary<string, SndMetaData> _cache = new(StringComparer.Ordinal);
+    private readonly DataSourceConverter<SndMetaData> _converter;
     private readonly IFileSystem _fileSystem;
-    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IDataSourceCodec _jsonCodec;
     private readonly Dictionary<string, string> _paths;
 
     public SndTemplateResolver(
         IFileSystem fileSystem,
-        JsonSerializerOptions jsonOptions,
+        IDataSourceCodec jsonCodec,
+        DataSourceConverter<SndMetaData> converter,
         Dictionary<string, string> templatePaths)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        ArgumentNullException.ThrowIfNull(jsonOptions);
+        ArgumentNullException.ThrowIfNull(jsonCodec);
+        ArgumentNullException.ThrowIfNull(converter);
         _fileSystem = fileSystem;
-        _jsonOptions = jsonOptions;
+        _jsonCodec = jsonCodec;
+        _converter = converter;
         _paths = new Dictionary<string, string>(templatePaths, StringComparer.Ordinal);
     }
 
@@ -40,7 +43,8 @@ internal sealed class SndTemplateResolver
             throw new KeyNotFoundException($"Template alias '{alias}' not found in template map.");
 
         var json = _fileSystem.ReadAllText(path);
-        var meta = OrigoJson.DeserializeSndMetaData(json, _jsonOptions);
+        var node = _jsonCodec.Decode(json);
+        var meta = _converter.Read(node);
         if (meta is null)
             throw new InvalidOperationException($"Template '{alias}' at '{path}' deserialized to null.");
 

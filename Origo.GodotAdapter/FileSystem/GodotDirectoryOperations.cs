@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Godot;
 
@@ -7,21 +8,15 @@ namespace Origo.GodotAdapter.FileSystem;
 
 internal static class GodotDirectoryOperations
 {
-    public static bool Exists(string path)
-    {
-        return DirAccess.DirExistsAbsolute(path);
-    }
+    public static bool Exists(string path) => DirAccess.DirExistsAbsolute(path);
 
-    public static void Create(string directoryPath)
-    {
-        DirAccess.MakeDirRecursiveAbsolute(directoryPath);
-    }
+    public static void Create(string directoryPath) => DirAccess.MakeDirRecursiveAbsolute(directoryPath);
 
     public static IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
     {
         using var dir = DirAccess.Open(directoryPath);
         if (dir is null)
-            throw new System.IO.DirectoryNotFoundException($"Cannot open directory: {directoryPath}");
+            throw new DirectoryNotFoundException($"Cannot open directory: {directoryPath}");
 
         var normalizedDir = directoryPath.TrimEnd('/');
         IEnumerable<string> fileNames = dir.GetFiles();
@@ -45,7 +40,7 @@ internal static class GodotDirectoryOperations
     {
         using var dir = DirAccess.Open(directoryPath);
         if (dir is null)
-            throw new System.IO.DirectoryNotFoundException($"Cannot open directory: {directoryPath}");
+            throw new DirectoryNotFoundException($"Cannot open directory: {directoryPath}");
 
         var normalizedDir = directoryPath.TrimEnd('/');
         return dir.GetDirectories().Select(d => $"{normalizedDir}/{d}").ToArray();
@@ -55,12 +50,12 @@ internal static class GodotDirectoryOperations
     {
         using var dir = DirAccess.Open(GodotPathHelper.GetParentDirectory(sourcePath));
         if (dir is null)
-            throw new System.IO.DirectoryNotFoundException(
+            throw new DirectoryNotFoundException(
                 $"Cannot open parent directory for rename: {sourcePath}");
 
         var err = dir.Rename(sourcePath, destinationPath);
         if (err != Error.Ok)
-            throw new System.IO.IOException(
+            throw new IOException(
                 $"Failed to rename '{sourcePath}' to '{destinationPath}': {err}");
     }
 
@@ -89,9 +84,9 @@ internal static class GodotDirectoryOperations
         // Delete the directory itself
         var parent = DirAccess.Open(GodotPathHelper.GetParentDirectory(directoryPath));
         if (parent is not null)
-        {
             using (parent)
+            {
                 parent.Remove(directoryPath);
-        }
+            }
     }
 }

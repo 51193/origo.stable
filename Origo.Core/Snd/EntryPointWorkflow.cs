@@ -18,15 +18,9 @@ internal sealed class EntryPointWorkflow
         _ctx = ctx;
     }
 
-    internal void RequestLoadInitialSave()
-    {
-        _ctx.EnqueueSystemDeferred(ExecuteLoadInitialSaveNow);
-    }
+    internal void RequestLoadInitialSave() => _ctx.EnqueueSystemDeferred(ExecuteLoadInitialSaveNow);
 
-    internal void RequestLoadMainMenuEntrySave()
-    {
-        _ctx.EnqueueSystemDeferred(ExecuteLoadMainMenuEntrySaveNow);
-    }
+    internal void RequestLoadMainMenuEntrySave() => _ctx.EnqueueSystemDeferred(ExecuteLoadMainMenuEntrySaveNow);
 
     private void ExecuteLoadInitialSaveNow()
     {

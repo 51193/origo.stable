@@ -37,15 +37,9 @@ public sealed class RandomNumberGenerator : IRandom
         return _state0 + _state1;
     }
 
-    public long NextInt64()
-    {
-        return (long)NextUInt64();
-    }
+    public long NextInt64() => (long)NextUInt64();
 
-    public int NextInt32()
-    {
-        return (int)(NextUInt64() & 0xFFFFFFFF);
-    }
+    public int NextInt32() => (int)(NextUInt64() & 0xFFFFFFFF);
 
     private static ulong GetStableHash64(string str)
     {

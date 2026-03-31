@@ -1,5 +1,4 @@
 using System;
-using Origo.Core.Runtime;
 using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
@@ -13,7 +12,7 @@ public class SndContextLoadGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_777/progress.json",
@@ -48,7 +47,7 @@ public class SndContextLoadGameContractTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_001/progress.json",
@@ -72,7 +71,7 @@ public class SndContextLoadGameContractTests
     public void RequestLoadGame_WhenProgressMissingActiveLevelId_Throws()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_001/progress.json", "{}");
@@ -83,4 +82,3 @@ public class SndContextLoadGameContractTests
         Assert.Throws<InvalidOperationException>(() => ctx.FlushDeferredActionsForCurrentFrame());
     }
 }
-

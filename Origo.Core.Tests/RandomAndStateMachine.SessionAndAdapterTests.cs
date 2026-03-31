@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Lifecycle;
-using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
 using Origo.Core.Snd;
 using Origo.Core.StateMachine;
@@ -17,7 +14,7 @@ public partial class RandomAndStateMachineTests
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
-        var runtime = new OrigoRuntime(logger, host, new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var pool = runtime.SndWorld.StrategyPool;
@@ -32,8 +29,8 @@ public partial class RandomAndStateMachineTests
         try
         {
             var factory = new RunFactory(logger, fs, "root", runtime, ctx);
-            var progress = new Origo.Core.Blackboard.Blackboard();
-            var session = new Origo.Core.Blackboard.Blackboard();
+            var progress = new Blackboard.Blackboard();
+            var session = new Blackboard.Blackboard();
             var saveContext = new SaveContext(progress, session, runtime.SndWorld);
             var run = factory.CreateSessionRun(saveContext, "default", session, host);
 

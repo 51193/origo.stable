@@ -1,5 +1,4 @@
 using System;
-using Origo.Core.Serialization;
 using Xunit;
 
 namespace Origo.Core.Tests;
@@ -16,4 +15,3 @@ public class TypeStringMappingTests
         Assert.Throws<InvalidOperationException>(() => mapping.RegisterType<DateTime>("OtherName"));
     }
 }
-

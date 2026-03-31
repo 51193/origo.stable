@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -11,7 +10,7 @@ public class SndContextListSavesContractTests
     public void ListSaves_WhenNoSaveRoot_ReturnsEmpty()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
 
@@ -22,7 +21,7 @@ public class SndContextListSavesContractTests
     public void ListSavesWithMetaData_ReturnsIdsAndParsesMetaMap_WhenMissingMetaMap_UsesEmptyDictionary()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
 
         fs.SeedFile("root/save_002/progress.json", "{}");
@@ -62,7 +61,7 @@ public class SndContextListSavesContractTests
     public void ListSaves_SortsIdsOrdinal()
     {
         var logger = new TestLogger();
-        var runtime = new OrigoRuntime(logger, new TestSndSceneHost(), new TypeStringMapping(), null, new Origo.Core.Blackboard.Blackboard());
+        var runtime = TestFactory.CreateRuntime(logger, new TestSndSceneHost());
         var fs = new TestFileSystem();
         fs.CreateDirectory("root/save_2");
         fs.CreateDirectory("root/save_10");
@@ -74,4 +73,3 @@ public class SndContextListSavesContractTests
         Assert.Equal(new List<string> { "1", "10", "2" }, ids);
     }
 }
-
