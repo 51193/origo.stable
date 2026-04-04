@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.DataSource;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Snd;
 
@@ -43,7 +44,7 @@ internal sealed class SndTemplateResolver
             throw new KeyNotFoundException($"Template alias '{alias}' not found in template map.");
 
         var json = _fileSystem.ReadAllText(path);
-        var node = _jsonCodec.Decode(json);
+        using var node = _jsonCodec.Decode(json);
         var meta = _converter.Read(node);
         if (meta is null)
             throw new InvalidOperationException($"Template '{alias}' at '{path}' deserialized to null.");

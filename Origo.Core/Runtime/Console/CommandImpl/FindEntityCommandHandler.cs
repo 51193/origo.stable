@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
@@ -7,7 +7,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     <c>find_entity</c> 命令：按名称查找 SND 实体并显示其数据键。
 ///     用法：<c>find_entity &lt;name&gt;</c>
 /// </summary>
-public sealed class FindEntityCommandHandler : ConsoleCommandHandlerBase
+internal sealed class FindEntityCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

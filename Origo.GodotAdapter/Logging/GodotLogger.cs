@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
 
 namespace Origo.GodotAdapter.Logging;
 

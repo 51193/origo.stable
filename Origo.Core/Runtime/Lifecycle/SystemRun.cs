@@ -1,23 +1,27 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Save;
+using Origo.Core.Save.Storage;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
 ///     系统级运行时实现，持有系统黑板，负责创建 ProgressRun。
 ///     加载路径统一为：读取进度索引 -> 读取 payload -> 创建 ProgressRun -> 更新 continue 索引。
+///     通过 <see cref="ISaveStorageService" /> 与外围存储系统解耦。
 /// </summary>
 public sealed class SystemRun : ISystemRun
 {
     private readonly RunFactory _factory;
 
-    public SystemRun(RunFactory factory)
+    internal SystemRun(RunFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
         _factory = factory;
         SystemBlackboard = _factory.Runtime.SystemBlackboard;
     }
+
+    private ISaveStorageService Storage => _factory.StorageService;
 
     public IBlackboard SystemBlackboard { get; }
 
@@ -28,8 +32,7 @@ public sealed class SystemRun : ISystemRun
         if (string.IsNullOrWhiteSpace(effectiveSaveId))
             return null;
 
-        var progressJson = SaveStorageFacade.ReadProgressJsonFromSnapshot(
-            _factory.FileSystem, _factory.SaveRootPath, effectiveSaveId);
+        var progressJson = Storage.ReadProgressJsonFromSnapshot(effectiveSaveId);
         if (progressJson is null)
             throw new InvalidOperationException(
                 $"Missing required progress.json in save '{effectiveSaveId}'.");
@@ -42,13 +45,12 @@ public sealed class SystemRun : ISystemRun
             throw new InvalidOperationException(
                 $"Cannot determine ActiveLevelId from progress in save '{effectiveSaveId}'.");
 
-        var payload = SaveStorageFacade.ReadSavePayloadFromSnapshot(
-            _factory.FileSystem, _factory.SaveRootPath, effectiveSaveId, activeLevelId);
-        SaveStorageFacade.WriteSavePayloadToCurrent(_factory.FileSystem, _factory.SaveRootPath, payload);
+        var payload = Storage.ReadSavePayloadFromSnapshot(effectiveSaveId, activeLevelId);
+        Storage.DeleteCurrentDirectory();
+        Storage.WriteSavePayloadToCurrent(payload);
 
         var progressRun = _factory.CreateProgressRun(
             effectiveSaveId,
-            activeLevelId,
             new Blackboard.Blackboard());
         progressRun.LoadFromPayload(payload);
         SetActiveSaveSlot(effectiveSaveId);

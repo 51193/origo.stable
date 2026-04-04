@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -7,7 +7,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 /// <summary>
 ///     <c>spawn</c> 命令：仅支持 template 模式（name + template 别名）。
 /// </summary>
-public sealed class SpawnTemplateCommandHandler : ConsoleCommandHandlerBase
+internal sealed class SpawnTemplateCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

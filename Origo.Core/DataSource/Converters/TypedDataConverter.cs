@@ -1,6 +1,6 @@
 using System;
 using Origo.Core.Serialization;
-using Origo.Core.Snd;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.DataSource.Converters;
 

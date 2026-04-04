@@ -1,12 +1,12 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
 /// <summary>
 ///     <c>snd_count</c> 命令：显示当前 SND 实体数量。
 /// </summary>
-public sealed class SndCountCommandHandler : ConsoleCommandHandlerBase
+internal sealed class SndCountCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

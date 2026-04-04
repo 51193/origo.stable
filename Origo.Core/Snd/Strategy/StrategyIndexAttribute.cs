@@ -10,8 +10,7 @@ public sealed class StrategyIndexAttribute : Attribute
 {
     public StrategyIndexAttribute(string index)
     {
-        if (string.IsNullOrWhiteSpace(index))
-            throw new ArgumentException("Strategy index cannot be null or whitespace.", nameof(index));
+        ArgumentException.ThrowIfNullOrWhiteSpace(index);
         Index = index;
     }
 

@@ -1,4 +1,4 @@
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Random;
 
 namespace Origo.Core.Random;
 

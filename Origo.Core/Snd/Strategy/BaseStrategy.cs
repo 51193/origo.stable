@@ -1,4 +1,4 @@
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
 
 namespace Origo.Core.Snd.Strategy;
 

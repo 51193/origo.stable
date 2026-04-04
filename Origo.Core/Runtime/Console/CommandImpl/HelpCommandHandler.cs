@@ -1,12 +1,12 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
 /// <summary>
 ///     <c>help</c> 命令：列出所有已注册的控制台命令及其帮助信息。
 /// </summary>
-public sealed class HelpCommandHandler : ConsoleCommandHandlerBase
+internal sealed class HelpCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly ConsoleCommandRouter _router;
 

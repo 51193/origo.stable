@@ -1,4 +1,4 @@
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
 
 namespace Origo.Core.Snd.Strategy;
 
@@ -7,35 +7,35 @@ namespace Origo.Core.Snd.Strategy;
 /// </summary>
 public abstract class EntityStrategyBase : BaseStrategy
 {
-    public virtual void Process(ISndEntity entity, double delta, SndContext ctx)
+    public virtual void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
     }
 
-    public virtual void AfterSpawn(ISndEntity entity, SndContext ctx)
+    public virtual void AfterSpawn(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void AfterLoad(ISndEntity entity, SndContext ctx)
+    public virtual void AfterLoad(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void AfterAdd(ISndEntity entity, SndContext ctx)
+    public virtual void AfterAdd(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void BeforeRemove(ISndEntity entity, SndContext ctx)
+    public virtual void BeforeRemove(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void BeforeSave(ISndEntity entity, SndContext ctx)
+    public virtual void BeforeSave(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void BeforeQuit(ISndEntity entity, SndContext ctx)
+    public virtual void BeforeQuit(ISndEntity entity, ISndContext ctx)
     {
     }
 
-    public virtual void BeforeDead(ISndEntity entity, SndContext ctx)
+    public virtual void BeforeDead(ISndEntity entity, ISndContext ctx)
     {
     }
 }

@@ -1,5 +1,5 @@
 using Godot;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Node;
 
 namespace Origo.GodotAdapter.Snd;
 

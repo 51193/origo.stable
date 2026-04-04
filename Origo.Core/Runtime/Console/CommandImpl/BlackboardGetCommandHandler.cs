@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     用法：<c>bb_get &lt;layer&gt; &lt;key&gt;</c>
 ///     layer: system | progress | session
 /// </summary>
-public sealed class BlackboardGetCommandHandler : ConsoleCommandHandlerBase
+internal sealed class BlackboardGetCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

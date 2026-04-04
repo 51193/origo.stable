@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
 
 namespace Origo.Core.Snd.Strategy;

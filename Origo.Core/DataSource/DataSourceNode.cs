@@ -6,12 +6,15 @@ namespace Origo.Core.DataSource;
 
 /// <summary>
 ///     数据源树中的单个节点，支持延迟展开。
+///     实现 <see cref="IDisposable" /> 以显式释放节点树所持有的资源（子节点、延迟展开闭包等），
+///     防止大型节点树在不再需要时继续占用内存。
 /// </summary>
-public sealed class DataSourceNode
+public sealed class DataSourceNode : IDisposable
 {
     private readonly List<DataSourceNode> _arrayChildren = [];
     private readonly Dictionary<string, DataSourceNode> _objectChildren = new(StringComparer.Ordinal);
     private readonly List<string> _orderedKeys = [];
+    private bool _disposed;
     private bool _expanded;
     private Func<string, DataSourceNode>? _expander;
 
@@ -107,6 +110,29 @@ public sealed class DataSourceNode
         }
     }
 
+    /// <summary>
+    ///     释放此节点及其所有子节点所持有的资源。
+    ///     释放后任何访问操作将抛出 <see cref="ObjectDisposedException" />。
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        foreach (var child in _arrayChildren)
+            child.Dispose();
+        _arrayChildren.Clear();
+
+        foreach (var child in _objectChildren.Values)
+            child.Dispose();
+        _objectChildren.Clear();
+        _orderedKeys.Clear();
+
+        _rawText = null;
+        _expander = null;
+        _value = null;
+    }
+
     public bool TryGetValue(string key, out DataSourceNode? node)
     {
         EnsureExpanded();
@@ -134,16 +160,52 @@ public sealed class DataSourceNode
         };
     }
 
+    public byte AsByte()
+    {
+        EnsureExpanded();
+        return byte.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public sbyte AsSByte()
+    {
+        EnsureExpanded();
+        return sbyte.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public short AsShort()
+    {
+        EnsureExpanded();
+        return short.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public ushort AsUShort()
+    {
+        EnsureExpanded();
+        return ushort.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
     public int AsInt()
     {
         EnsureExpanded();
         return int.Parse(_value!, CultureInfo.InvariantCulture);
     }
 
+    public uint AsUInt()
+    {
+        EnsureExpanded();
+        return uint.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
     public long AsLong()
     {
         EnsureExpanded();
         return long.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public ulong AsULong()
+    {
+        EnsureExpanded();
+        return ulong.Parse(_value!, CultureInfo.InvariantCulture);
     }
 
     public float AsFloat()
@@ -156,6 +218,18 @@ public sealed class DataSourceNode
     {
         EnsureExpanded();
         return double.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public decimal AsDecimal()
+    {
+        EnsureExpanded();
+        return decimal.Parse(_value!, CultureInfo.InvariantCulture);
+    }
+
+    public char AsChar()
+    {
+        EnsureExpanded();
+        return _value is not null && _value.Length > 0 ? _value[0] : '\0';
     }
 
     public bool AsBool()
@@ -217,13 +291,17 @@ public sealed class DataSourceNode
 
     // ── Private ──
 
+    private void EnsureNotDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+
     private void EnsureExpanded()
     {
+        EnsureNotDisposed();
+
         if (_expanded)
             return;
 
-        _expanded = true;
-
+        // Expand first, then mark as expanded. If the expander throws,
+        // the node stays in the lazy state and can be retried or disposed safely.
         var expanded = _expander!(_rawText!);
 
         _kind = expanded._kind;
@@ -237,6 +315,9 @@ public sealed class DataSourceNode
 
         foreach (var child in expanded._arrayChildren)
             _arrayChildren.Add(child);
+
+        // Mark expanded only after all state has been committed successfully.
+        _expanded = true;
 
         // Release references for GC
         _rawText = null;

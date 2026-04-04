@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -7,7 +7,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 /// <summary>
 ///     <c>list_saves</c> 命令：列出所有存档槽位。
 /// </summary>
-public sealed class ListSavesCommandHandler : ConsoleCommandHandlerBase
+internal sealed class ListSavesCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 

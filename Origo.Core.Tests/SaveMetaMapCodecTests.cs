@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Save;
 using Xunit;
+using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Tests;
 

@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
 
 namespace Origo.Core.Snd.Strategy;
@@ -25,31 +26,31 @@ internal sealed class SndStrategyManager
         _logger = logger;
     }
 
-    public void Load(IEnumerable<string> indices, ISndEntity entity, SndContext ctx)
+    public void Load(IEnumerable<string> indices, ISndEntity entity, ISndContext ctx)
     {
         Recover(indices);
         TriggerAfterLoad(entity, ctx);
     }
 
-    public void Spawn(IEnumerable<string> indices, ISndEntity entity, SndContext ctx)
+    public void Spawn(IEnumerable<string> indices, ISndEntity entity, ISndContext ctx)
     {
         Recover(indices);
         TriggerAfterSpawn(entity, ctx);
     }
 
-    public void Quit(ISndEntity entity, SndContext ctx)
+    public void Quit(ISndEntity entity, ISndContext ctx)
     {
         TriggerBeforeQuit(entity, ctx);
         Release();
     }
 
-    public void Dead(ISndEntity entity, SndContext ctx)
+    public void Dead(ISndEntity entity, ISndContext ctx)
     {
         TriggerBeforeDead(entity, ctx);
         Release();
     }
 
-    public void Add(ISndEntity entity, string index, SndContext ctx)
+    public void Add(ISndEntity entity, string index, ISndContext ctx)
     {
         var strategy = _pool.GetStrategy<EntityStrategyBase>(index);
 
@@ -61,7 +62,7 @@ internal sealed class SndStrategyManager
             .Build("Strategy added."));
     }
 
-    public void Remove(ISndEntity entity, string index, SndContext ctx)
+    public void Remove(ISndEntity entity, string index, ISndContext ctx)
     {
         var i = _strategies.FindLastIndex(s => s.Index == index);
         if (i < 0) return;
@@ -76,13 +77,13 @@ internal sealed class SndStrategyManager
             .Build("Strategy removed."));
     }
 
-    public IReadOnlyCollection<string> SerializeIndices(ISndEntity entity, SndContext ctx)
+    public IReadOnlyCollection<string> SerializeIndices(ISndEntity entity, ISndContext ctx)
     {
         TriggerBeforeSave(entity, ctx);
         return _strategies.Select(s => s.Index).ToArray();
     }
 
-    public void Process(ISndEntity entity, double delta, SndContext ctx)
+    public void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         // 允许策略在 Process 中通过实体接口增删策略，因此基于快照进行迭代（复用缓冲以减少每帧数组分配）。
         _processBuffer.Clear();
@@ -109,31 +110,31 @@ internal sealed class SndStrategyManager
         _strategies.Clear();
     }
 
-    private void TriggerAfterSpawn(ISndEntity entity, SndContext ctx)
+    private void TriggerAfterSpawn(ISndEntity entity, ISndContext ctx)
     {
         // 允许 AfterSpawn 中增删策略/清场等导致集合变化，因此对快照迭代。
         foreach (var s in _strategies.ToArray()) s.Strategy.AfterSpawn(entity, ctx);
     }
 
-    private void TriggerAfterLoad(ISndEntity entity, SndContext ctx)
+    private void TriggerAfterLoad(ISndEntity entity, ISndContext ctx)
     {
         // 允许 AfterLoad 中增删策略/清场等导致集合变化，因此对快照迭代。
         foreach (var s in _strategies.ToArray()) s.Strategy.AfterLoad(entity, ctx);
     }
 
-    private void TriggerBeforeSave(ISndEntity entity, SndContext ctx)
+    private void TriggerBeforeSave(ISndEntity entity, ISndContext ctx)
     {
         // 允许 BeforeSave 中增删策略，因此对快照迭代。
         foreach (var s in _strategies.ToArray()) s.Strategy.BeforeSave(entity, ctx);
     }
 
-    private void TriggerBeforeQuit(ISndEntity entity, SndContext ctx)
+    private void TriggerBeforeQuit(ISndEntity entity, ISndContext ctx)
     {
         // 允许 BeforeQuit 中触发清场/销毁导致集合变化，因此对快照迭代。
         foreach (var s in _strategies.ToArray()) s.Strategy.BeforeQuit(entity, ctx);
     }
 
-    private void TriggerBeforeDead(ISndEntity entity, SndContext ctx)
+    private void TriggerBeforeDead(ISndEntity entity, ISndContext ctx)
     {
         // 允许 BeforeDead 中触发销毁导致集合变化，因此对快照迭代。
         foreach (var s in _strategies.ToArray()) s.Strategy.BeforeDead(entity, ctx);

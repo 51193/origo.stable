@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     <c>auto_save</c> 命令：请求自动存档。
 ///     用法：<c>auto_save</c> 或 <c>auto_save &lt;saveId&gt;</c>
 /// </summary>
-public sealed class AutoSaveCommandHandler : ConsoleCommandHandlerBase
+internal sealed class AutoSaveCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 

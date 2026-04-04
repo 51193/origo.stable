@@ -1,4 +1,4 @@
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Lifecycle;

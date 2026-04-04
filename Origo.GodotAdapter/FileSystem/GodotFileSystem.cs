@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.FileSystem;
 
 namespace Origo.GodotAdapter.FileSystem;
 

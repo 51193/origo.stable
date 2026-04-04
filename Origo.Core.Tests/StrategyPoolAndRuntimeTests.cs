@@ -5,6 +5,8 @@ using Origo.Core.Runtime.Console;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
+using Origo.Core.Snd.Metadata;
+using Origo.Core.Snd.Scene;
 
 namespace Origo.Core.Tests;
 

@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     <c>change_level</c> 命令：请求切换关卡。
 ///     用法：<c>change_level &lt;newLevelId&gt;</c>
 /// </summary>
-public sealed class ChangeLevelCommandHandler : ConsoleCommandHandlerBase
+internal sealed class ChangeLevelCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 
@@ -19,7 +19,7 @@ public sealed class ChangeLevelCommandHandler : ConsoleCommandHandlerBase
     }
 
     public override string Name => "change_level";
-    public override string HelpText => "change_level <newLevelId> — 请求切换关卡。";
+    public override string HelpText => "change_level <newLevelId> — 请求切换前台关卡。";
     public override int MinPositionalArgs => 1;
     public override int MaxPositionalArgs => 1;
 
@@ -29,7 +29,7 @@ public sealed class ChangeLevelCommandHandler : ConsoleCommandHandlerBase
         out string? errorMessage)
     {
         var newLevelId = invocation.PositionalArgs[0].Trim();
-        _context.RequestChangeLevel(newLevelId);
+        _context.RequestSwitchForegroundLevel(newLevelId);
         outputChannel.Publish($"Level change requested: '{newLevelId}'.");
         errorMessage = null;
         return true;

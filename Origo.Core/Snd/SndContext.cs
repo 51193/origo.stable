@@ -1,34 +1,48 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.Abstractions.Scene;
+using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console.CommandImpl;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
+using Origo.Core.Save.Meta;
+using Origo.Core.Save.Storage;
+using Origo.Core.Snd.Metadata;
+using Origo.Core.Snd.Scene;
+using Origo.Core.Snd.Workflow;
 
 namespace Origo.Core.Snd;
 
 /// <summary>
 ///     面向策略与游戏层的统一生命周期编排门面。
+///     实现 <see cref="IStateMachineContext" /> 以便状态机钩子统一使用接口而非具体类型。
 ///     对外暴露的存档、继续游戏、切换关卡 API，统一编排到三层运行实例：
 ///     <list type="bullet">
 ///         <item>
 ///             <description>SystemRun：系统级实例，维护 continue/active slot/save 等全局索引。</description>
 ///         </item>
 ///         <item>
-///             <description>ProgressRun：流程级实例，维护 ProgressBlackboard 与 ActiveLevelId。</description>
+///             <description>ProgressRun：流程级实例，维护 ProgressBlackboard 与 SessionManager。</description>
 ///         </item>
 ///         <item>
 ///             <description>SessionRun：会话级实例，维护 SessionBlackboard 与当前 SND 场景。</description>
 ///         </item>
 ///     </list>
 ///     该类不再直接持有流程/会话黑板实例，避免实例生命周期与逻辑生命周期不一致。
-///     在尚未建立流程（<see cref="IProgressRun" />）时，<see cref="ProgressBlackboard" /> 与
-///     <see cref="SessionBlackboard" /> 为 null；不得在无流程时向"空黑板替身"写入。
+///     在尚未建立流程（<see cref="IProgressRun" />）时，<see cref="ProgressBlackboard" /> 为 null；
+///     不得在无流程时向"空黑板替身"写入。
+///     <para>
+///         Session 内部能力不经由 Context 泄露：实体管理、状态机、黑板读写等由
+///         <see cref="ISessionRun" /> 自身成员方法提供，策略通过
+///         <see cref="SessionManager" /> 获取会话引用后直接调用。
+///     </para>
 /// </summary>
-public sealed partial class SndContext
+public sealed partial class SndContext : IStateMachineContext, ISndContext
 {
     private readonly EntryPointWorkflow _entryPointWorkflow;
 
@@ -36,7 +50,7 @@ public sealed partial class SndContext
     private readonly List<ISaveMetaContributor> _saveMetaContributors = new();
     private readonly SystemRun _systemRun;
     private int _pendingPersistenceRequests;
-    private IProgressRun? _progressRun;
+    private ProgressRun? _progressRun;
 
     /// <summary>
     ///     Guard flag to prevent concurrent lifecycle workflows.
@@ -50,7 +64,11 @@ public sealed partial class SndContext
         IFileSystem fileSystem,
         string saveRootPath,
         string initialSaveRootPath,
-        string entryConfigPath)
+        string entryConfigPath,
+        ISaveStorageService? storageService = null,
+        ISaveStorageService? initialStorageService = null,
+        ISessionDefaultsProvider? defaultsProvider = null,
+        ISavePathPolicy? savePathPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(fileSystem);
@@ -69,7 +87,14 @@ public sealed partial class SndContext
         InitialSaveRootPath = initialSaveRootPath;
         EntryConfigPath = entryConfigPath;
 
-        RunFactory = new RunFactory(Runtime.Logger, FileSystem, SaveRootPath, Runtime, this);
+        SavePathPolicy = savePathPolicy ?? new DefaultSavePathPolicy();
+        StorageService = storageService ?? new DefaultSaveStorageService(fileSystem, saveRootPath, SavePathPolicy);
+        InitialStorageService =
+            initialStorageService ?? new DefaultSaveStorageService(fileSystem, initialSaveRootPath, SavePathPolicy);
+        DefaultsProvider = defaultsProvider ?? new DefaultSessionDefaultsProvider();
+
+        RunFactory = new RunFactory(Runtime.Logger, FileSystem, SaveRootPath, Runtime, this, this,
+            StorageService, SavePathPolicy);
         _systemRun = RunFactory.CreateSystemRun();
 
         _saveGameWorkflow = new SaveGameWorkflow(this);
@@ -105,6 +130,26 @@ public sealed partial class SndContext
     public string EntryConfigPath { get; }
 
     /// <summary>
+    ///     存档读写服务实例，封装 <see cref="SaveStorageFacade" /> 的能力为可替换接口。
+    /// </summary>
+    internal ISaveStorageService StorageService { get; }
+
+    /// <summary>
+    ///     初始存档读写服务实例（指向 initialSaveRootPath）。
+    /// </summary>
+    internal ISaveStorageService InitialStorageService { get; }
+
+    /// <summary>
+    ///     会话默认值提供者，避免硬编码常量散布在业务代码中。
+    /// </summary>
+    internal ISessionDefaultsProvider DefaultsProvider { get; }
+
+    /// <summary>
+    ///     存档路径策略，提供目录和文件路径拼装规则。
+    /// </summary>
+    internal ISavePathPolicy SavePathPolicy { get; }
+
+    /// <summary>
     ///     运行实例工厂，负责创建 SystemRun / ProgressRun / SessionRun 三层运行实例。
     /// </summary>
     internal RunFactory RunFactory { get; }
@@ -125,15 +170,32 @@ public sealed partial class SndContext
     public IBlackboard? ProgressBlackboard => _progressRun?.ProgressBlackboard;
 
     /// <summary>
-    ///     当前关卡会话黑板（来自当前 SessionRun）；无活动会话时为 null。
+    ///     会话管理器，统一管理所有挂载的会话。
+    ///     当 ProgressRun 尚未建立时，返回一个空的只读 SessionManager。
     /// </summary>
-    public IBlackboard? SessionBlackboard => _progressRun?.CurrentSession?.SessionBlackboard;
+    public ISessionManager SessionManager => _progressRun?.SessionManager ?? EmptySessionManager.Instance;
 
     /// <summary>
     ///     SND 运行时门面（来自 Runtime.Snd），提供 Spawn / 查询 / 序列化等操作。
     ///     此属性与 Runtime.Snd 是同一实例，此处提供快捷访问。
     /// </summary>
     public SndRuntime SndRuntime => Runtime.Snd;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     SndContext 是全局/流程级默认实现，此处返回前台 SceneHost。
+    ///     会话级状态机不直接使用此实现；它们通过 <see cref="SessionStateMachineContext" />
+    ///     获取当前会话各自的 SceneHost，确保前后台无语义分差。
+    /// </remarks>
+    ISndSceneAccess IStateMachineContext.SceneAccess => Runtime.Snd.SceneHost;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     SndContext 是全局/流程级默认实现，此处返回前台会话黑板。
+    ///     会话级状态机不直接使用此实现；它们通过 <see cref="SessionStateMachineContext" />
+    ///     获取当前会话各自的 SessionBlackboard，确保前后台无语义分差。
+    /// </remarks>
+    IBlackboard? IStateMachineContext.SessionBlackboard => SessionManager.ForegroundSession?.SessionBlackboard;
 
     private void RegisterConsoleCommands()
     {
@@ -159,21 +221,16 @@ public sealed partial class SndContext
 
     internal void SetActiveSaveState(string saveId) => _systemRun.SetActiveSaveSlot(saveId);
 
-    internal IProgressRun EnsureProgressRun()
+    internal ProgressRun EnsureProgressRun()
     {
         return _progressRun ?? throw new InvalidOperationException(
             "No active ProgressRun. Call RequestLoadGame/RequestContinueGame/RequestLoadInitialSave/RequestLoadMainMenuEntrySave first.");
     }
 
-    internal (IProgressRun progressRun, ISessionRun sessionRun) EnsureProgressAndSession()
+    internal void SetProgressRun(ProgressRun? progressRun)
     {
-        var progressRun = EnsureProgressRun();
-        var sessionRun = progressRun.CurrentSession ?? throw new InvalidOperationException(
-            "No active SessionRun. Current progress run has not created a session instance.");
-        return (progressRun, sessionRun);
+        _progressRun = progressRun;
     }
-
-    internal void SetProgressRun(IProgressRun? progressRun) => _progressRun = progressRun;
 
     /// <summary>
     ///     标记工作流开始。若已有工作流正在执行则抛出，防止并发工作流导致 <see cref="_progressRun" /> 竞态。
@@ -224,21 +281,6 @@ public sealed partial class SndContext
     ///     执行当前帧的所有延迟动作，委托给 Runtime.FlushEndOfFrameDeferred。
     /// </summary>
     public void FlushDeferredActionsForCurrentFrame() => Runtime.FlushEndOfFrameDeferred();
-
-    /// <summary>
-    ///     清除所有 SND 实体，委托给 Runtime.Snd.ClearAll。
-    /// </summary>
-    public void ClearAllSndEntities() => Runtime.Snd.ClearAll();
-
-    /// <summary>
-    ///     批量生成多个 SND 实体，委托给 Runtime.Snd.SpawnMany。
-    /// </summary>
-    public void SpawnManySndEntities(IEnumerable<SndMetaData> metaList) => Runtime.Snd.SpawnMany(metaList);
-
-    /// <summary>
-    ///     按名称查找 SND 实体，委托给 Runtime.Snd.FindByName。
-    /// </summary>
-    public ISndEntity? FindSndEntity(string name) => Runtime.Snd.FindByName(name);
 
     /// <summary>
     ///     克隆指定模板并可选地覆盖名称，便于按模板批量创建实体。
@@ -293,12 +335,7 @@ public sealed partial class SndContext
     /// <summary>
     ///     流程级字符串栈状态机容器；无 <see cref="IProgressRun" /> 时为 null。
     /// </summary>
-    public StateMachineContainer? GetProgressStateMachines() => _progressRun?.ProgressScope.StateMachines;
-
-    /// <summary>
-    ///     当前关卡会话级字符串栈状态机容器。
-    /// </summary>
-    public StateMachineContainer? GetSessionStateMachines() => _progressRun?.CurrentSession?.SessionScope.StateMachines;
+    public StateMachineContainer? GetProgressStateMachines() => _progressRun?.GetProgressStateMachines();
 
     // ── Save flow delegation（委托给 SaveGameWorkflow）─────────────────
 
@@ -370,7 +407,21 @@ public sealed partial class SndContext
     public void RequestLoadMainMenuEntrySave() => _entryPointWorkflow.RequestLoadMainMenuEntrySave();
 
     /// <summary>
-    ///     请求切换到新关卡，委托给 EntryPointWorkflow。
+    ///     请求切换前台关卡，委托给 EntryPointWorkflow。
+    ///     语法糖：等价于卸载当前前台会话 + 加载新关卡为前台会话。
     /// </summary>
-    public void RequestChangeLevel(string newLevelId) => _entryPointWorkflow.RequestChangeLevel(newLevelId);
+    public void RequestSwitchForegroundLevel(string newLevelId) =>
+        _entryPointWorkflow.RequestSwitchForegroundLevel(newLevelId);
+
+    // ── Level builder ─────────────────────────────────────────────────
+
+    /// <summary>
+    ///     创建一个 <see cref="LevelBuilder" />，用于离线构建关卡场景。
+    ///     构建完成后可调用 <see cref="LevelBuilder.Build" /> 生成 <see cref="Save.LevelPayload" />，
+    ///     或调用 <see cref="LevelBuilder.Commit" /> 直接持久化到 current/ 目录。
+    /// </summary>
+    public LevelBuilder CreateLevelBuilder(string levelId) =>
+        new(levelId, Runtime.SndWorld, StorageService);
 }
+
+    // ── Save meta contributors ─────────────────────────────────────────

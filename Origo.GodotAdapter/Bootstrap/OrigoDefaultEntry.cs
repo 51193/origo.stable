@@ -12,7 +12,10 @@ namespace Origo.GodotAdapter.Bootstrap;
 public partial class OrigoDefaultEntry : OrigoAutoHost
 {
     private static readonly string[] GodotSkipPrefixes = ["Godot", "GodotSharp"];
-    private SndContext? _sndContext;
+    // CA1859 suppressed: intentionally using the interface type for decoupling.
+#pragma warning disable CA1859
+    private ISndContext? _sndContext;
+#pragma warning restore CA1859
 
     [Export] public string ConfigPath { get; set; } = "res://origo/entry/entry.json";
     [Export] public string SceneAliasMapPath { get; set; } = "res://origo/maps/scene_aliases.map";
@@ -25,7 +28,7 @@ public partial class OrigoDefaultEntry : OrigoAutoHost
     ///     在 <see cref="SndContext" /> 创建并绑定到 <see cref="GodotSndManager" /> 之后调用；
     ///     子类可覆写并在其中调用 <c>context.RegisterSaveMetaContributor(...)</c> 注册展示用 <c>meta.map</c> 贡献者。
     /// </summary>
-    protected virtual void ConfigureSaveMetadataContributors(SndContext context)
+    protected virtual void ConfigureSaveMetadataContributors(ISndContext context)
     {
     }
 }

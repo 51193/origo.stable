@@ -5,6 +5,8 @@ using Origo.Core.Runtime;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 
@@ -143,6 +145,53 @@ public class SndEntityAndAutoInitializerTests
         Assert.Equal("BootEntity", runtime.Snd.SerializeMetaList()[0].Name);
     }
 
+    [Fact]
+    public void OrigoAutoInitializer_LoadAndSpawnFromFile_EmptyPath_Throws()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        Assert.Throws<ArgumentException>(() =>
+            OrigoAutoInitializer.LoadAndSpawnFromFile("  ", runtime.Snd, fs, logger));
+        Assert.True(logger.Errors.Exists(e => e.Contains("Invalid config path", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void OrigoAutoInitializer_LoadAndSpawnFromFile_MissingFile_Throws()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        Assert.Throws<InvalidOperationException>(() =>
+            OrigoAutoInitializer.LoadAndSpawnFromFile("missing.json", runtime.Snd, fs, logger));
+    }
+
+    [Fact]
+    public void OrigoAutoInitializer_LoadAndSpawnFromFile_EmptyFile_Throws()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        fs.SeedFile("empty.json", "   ");
+        Assert.Throws<InvalidOperationException>(() =>
+            OrigoAutoInitializer.LoadAndSpawnFromFile("empty.json", runtime.Snd, fs, logger));
+    }
+
+    [Fact]
+    public void OrigoAutoInitializer_LoadAndSpawnFromFile_NotArrayRoot_Throws()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        fs.SeedFile("obj.json", """{"not":"array"}""");
+        Assert.Throws<InvalidOperationException>(() =>
+            OrigoAutoInitializer.LoadAndSpawnFromFile("obj.json", runtime.Snd, fs, logger));
+    }
+
     private static SndContext CreateContext(TestLogger logger)
     {
         var host = new TestSndSceneHost();
@@ -161,11 +210,11 @@ public class SndEntityAndAutoInitializerTests
             _events = events;
         }
 
-        public override void AfterSpawn(ISndEntity entity, SndContext ctx) => _events.Add("AfterSpawn");
-        public override void AfterAdd(ISndEntity entity, SndContext ctx) => _events.Add("AfterAdd");
-        public override void BeforeRemove(ISndEntity entity, SndContext ctx) => _events.Add("BeforeRemove");
-        public override void BeforeSave(ISndEntity entity, SndContext ctx) => _events.Add("BeforeSave");
-        public override void BeforeQuit(ISndEntity entity, SndContext ctx) => _events.Add("BeforeQuit");
+        public override void AfterSpawn(ISndEntity entity, ISndContext ctx) => _events.Add("AfterSpawn");
+        public override void AfterAdd(ISndEntity entity, ISndContext ctx) => _events.Add("AfterAdd");
+        public override void BeforeRemove(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeRemove");
+        public override void BeforeSave(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeSave");
+        public override void BeforeQuit(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeQuit");
     }
 }
 
@@ -186,5 +235,5 @@ public abstract class StatefulAutoInitStrategy : EntityStrategyBase
 {
     public const string IndexConst = "auto.init.stateful";
     private int _counter;
-    public override void Process(ISndEntity entity, double delta, SndContext ctx) => _counter++;
+    public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
 }

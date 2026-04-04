@@ -16,20 +16,40 @@ public sealed class TypeStringMapping
     public TypeStringMapping()
     {
         RegisterType<byte>(BclTypeNames.Byte);
+        RegisterType<sbyte>(BclTypeNames.SByte);
         RegisterType<short>(BclTypeNames.Int16);
+        RegisterType<ushort>(BclTypeNames.UInt16);
         RegisterType<int>(BclTypeNames.Int32);
+        RegisterType<uint>(BclTypeNames.UInt32);
         RegisterType<long>(BclTypeNames.Int64);
+        RegisterType<ulong>(BclTypeNames.UInt64);
         RegisterType<bool>(BclTypeNames.Boolean);
         RegisterType<float>(BclTypeNames.Single);
         RegisterType<double>(BclTypeNames.Double);
+        RegisterType<decimal>(BclTypeNames.Decimal);
+        RegisterType<char>(BclTypeNames.Char);
         RegisterType<string>(BclTypeNames.String);
+
+        // Array types
+        RegisterType<byte[]>(BclTypeNames.ArrayByte);
+        RegisterType<sbyte[]>(BclTypeNames.ArraySByte);
+        RegisterType<short[]>(BclTypeNames.ArrayInt16);
+        RegisterType<ushort[]>(BclTypeNames.ArrayUInt16);
+        RegisterType<int[]>(BclTypeNames.ArrayInt32);
+        RegisterType<uint[]>(BclTypeNames.ArrayUInt32);
+        RegisterType<long[]>(BclTypeNames.ArrayInt64);
+        RegisterType<ulong[]>(BclTypeNames.ArrayUInt64);
+        RegisterType<float[]>(BclTypeNames.ArraySingle);
+        RegisterType<double[]>(BclTypeNames.ArrayDouble);
+        RegisterType<decimal[]>(BclTypeNames.ArrayDecimal);
+        RegisterType<bool[]>(BclTypeNames.ArrayBoolean);
+        RegisterType<char[]>(BclTypeNames.ArrayChar);
         RegisterType<string[]>(BclTypeNames.ArrayString);
     }
 
     public void RegisterType<T>(string typeName)
     {
-        if (string.IsNullOrWhiteSpace(typeName))
-            throw new ArgumentException("Type name cannot be null or whitespace.", nameof(typeName));
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
 
         var type = typeof(T);
 

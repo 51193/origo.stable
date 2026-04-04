@@ -3,6 +3,8 @@ using Origo.Core.Abstractions;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Xunit;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 
@@ -56,14 +58,14 @@ public class SndEntityAfterLoadTests
     {
         public static List<string>? Events { get; set; }
 
-        public override void AfterLoad(ISndEntity entity, SndContext ctx)
+        public override void AfterLoad(ISndEntity entity, ISndContext ctx)
             => Events?.Add("afterload:a");
     }
 
     [StrategyIndex(BIndex)]
     private sealed class AfterLoadProbeBStrategy : EntityStrategyBase
     {
-        public override void AfterLoad(ISndEntity entity, SndContext ctx) =>
+        public override void AfterLoad(ISndEntity entity, ISndContext ctx) =>
             AfterLoadProbeAStrategy.Events?.Add("afterload:b");
     }
 }

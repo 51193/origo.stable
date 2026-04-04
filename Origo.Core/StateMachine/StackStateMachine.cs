@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
-using Origo.Core.Snd;
+using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.Snd.Strategy;
 
 namespace Origo.Core.StateMachine;
@@ -14,7 +13,7 @@ namespace Origo.Core.StateMachine;
 /// </summary>
 public sealed class StackStateMachine : IStateMachine, IDisposable
 {
-    private readonly SndContext _ctx;
+    private readonly IStateMachineContext _ctx;
     private readonly SndStrategyPool _pool;
     private readonly StateMachineStrategyBase _popStrategy;
     private readonly StateMachineStrategyBase _pushStrategy;
@@ -26,7 +25,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         string pushStrategyIndex,
         string popStrategyIndex,
         SndStrategyPool pool,
-        SndContext ctx)
+        IStateMachineContext ctx)
     {
         ArgumentNullException.ThrowIfNull(machineKey);
         ArgumentNullException.ThrowIfNull(pushStrategyIndex);
@@ -43,6 +42,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         _popStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PopStrategyIndex);
     }
 
+    /// <summary>释放 Push/Pop 策略的池引用。</summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -52,12 +52,16 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         _disposed = true;
     }
 
+    /// <summary>此状态机在容器中的逻辑键。</summary>
     public string MachineKey { get; }
 
+    /// <summary>入栈策略在策略池中的索引。</summary>
     public string PushStrategyIndex { get; }
 
+    /// <summary>出栈策略在策略池中的索引。</summary>
     public string PopStrategyIndex { get; }
 
+    /// <summary>运行时入栈：将值压入栈顶，然后调用 Push 策略的 <see cref="StateMachineStrategyBase.OnPushRuntime" />。</summary>
     public void Push(string value)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -72,6 +76,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         _pushStrategy.OnPushRuntime(context, _ctx);
     }
 
+    /// <summary>运行时出栈：调用 Pop 策略的 <see cref="StateMachineStrategyBase.OnPopRuntime" />，然后移除栈顶。</summary>
     public bool TryPopRuntime(out string? popped)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -91,6 +96,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         return true;
     }
 
+    /// <summary>退出流程出栈：调用 Pop 策略的 <see cref="StateMachineStrategyBase.OnPopBeforeQuit" />，然后移除栈顶。</summary>
     public bool TryPopOnQuit(out string? popped)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -110,6 +116,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         return true;
     }
 
+    /// <summary>查看栈顶元素，不弹出。空栈时 found 为 false。</summary>
     public (bool found, string? top) Peek()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -118,12 +125,14 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         return (true, _stack[^1]);
     }
 
+    /// <summary>返回栈的只读快照（从栈底到栈顶）。</summary>
     public IReadOnlyList<string> Snapshot()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _stack.ToArray();
     }
 
+    /// <summary>从快照恢复栈内容，不触发任何策略钩子。配合 <see cref="FlushAfterLoad" /> 使用。</summary>
     public void RestoreStackWithoutHooks(IReadOnlyList<string> stackBottomToTop)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -138,6 +147,7 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         }
     }
 
+    /// <summary>读档恢复后，按从栈底到栈顶顺序对每层调用 Push 策略的 <see cref="StateMachineStrategyBase.OnPushAfterLoad" />。</summary>
     public void FlushAfterLoad()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);

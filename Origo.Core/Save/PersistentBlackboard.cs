@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.DataSource;
-using Origo.Core.Snd;
+using Origo.Core.Save.Storage;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Save;
 
@@ -119,7 +121,7 @@ public sealed class PersistentBlackboard : IBlackboard
                 return;
 
             var json = _fileSystem.ReadAllText(_filePath);
-            var node = _codec.Decode(json);
+            using var node = _codec.Decode(json);
             var dict = _registry.Read<IReadOnlyDictionary<string, TypedData>>(node);
             if (dict is not null)
                 _inner.DeserializeAll(dict);
@@ -131,7 +133,7 @@ public sealed class PersistentBlackboard : IBlackboard
         SavePathResolver.EnsureParentDirectory(_fileSystem, _filePath);
 
         var data = _inner.SerializeAll();
-        var node = _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
+        using var node = _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
         var json = _codec.Encode(node);
         _fileSystem.WriteAllText(_filePath, json, true);
     }

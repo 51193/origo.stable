@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     <c>save</c> 命令：请求保存游戏。
 ///     用法：<c>save &lt;newSaveId&gt; &lt;baseSaveId&gt;</c>
 /// </summary>
-public sealed class SaveGameCommandHandler : ConsoleCommandHandlerBase
+internal sealed class SaveGameCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 

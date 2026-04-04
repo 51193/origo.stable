@@ -3,8 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.Scene;
 using Origo.Core.Snd;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.GodotAdapter.Snd;
 
@@ -26,7 +29,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
 
     public SndWorld SharedWorld { get; private set; } = null!;
     public ILogger SharedLogger { get; private set; } = null!;
-    public SndContext? Context { get; private set; }
+    public ISndContext? Context { get; private set; }
     public int ProcessTickCount { get; private set; }
     public double ProcessDeltaSum { get; private set; }
 
@@ -117,9 +120,9 @@ public partial class GodotSndManager : Node, ISndSceneHost
     }
 
     /// <summary>
-    ///     绑定存档/生命周期门面（由入口节点在创建 <see cref="SndContext" /> 后调用一次）。
+    ///     绑定存档/生命周期门面（由入口节点在创建 <see cref="ISndContext" /> 后调用一次）。
     /// </summary>
-    public void BindContext(SndContext context)
+    public void BindContext(ISndContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Snd;
+using Origo.Core.Snd.Metadata;
 using Origo.Core.StateMachine;
 
 namespace Origo.Core.DataSource.Converters;

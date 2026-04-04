@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Origo.Core.Save;
+using Origo.Core.Save.Meta;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -32,9 +34,9 @@ public class SndContextSaveGameContractTests
         Assert.Equal("001", c0.SaveId);
         Assert.Equal("main_menu", c0.CurrentLevelId);
         Assert.NotNull(ctx.ProgressBlackboard);
-        Assert.NotNull(ctx.SessionBlackboard);
+        Assert.NotNull(ctx.SessionManager.ForegroundSession?.SessionBlackboard);
         Assert.Same(ctx.ProgressBlackboard, c0.Progress);
-        Assert.Same(ctx.SessionBlackboard, c0.Session);
+        Assert.Same(ctx.SessionManager.ForegroundSession?.SessionBlackboard, c0.Session);
         Assert.Same(runtime.Snd.SceneHost, c0.SceneAccess);
     }
 
@@ -112,5 +114,44 @@ public class SndContextSaveGameContractTests
         ctx.FlushDeferredActionsForCurrentFrame();
 
         Assert.Throws<ArgumentException>(() => ctx.RequestSaveGame(" ", "000"));
+    }
+
+    [Fact]
+    public void SndContext_PendingPersistenceCounter_IsThreadSafe()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        fs.SeedFile("res://entry/entry.json", "[]");
+
+        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        ctx.RequestLoadMainMenuEntrySave();
+        ctx.FlushDeferredActionsForCurrentFrame();
+
+        // RequestSaveGame increments the counter synchronously (before the deferred action runs).
+        const int threadCount = 20;
+        var barrier = new Barrier(threadCount);
+        var threads = new Thread[threadCount];
+        for (var i = 0; i < threadCount; i++)
+        {
+            var saveId = $"s{i:D4}";
+            threads[i] = new Thread(() =>
+            {
+                barrier.SignalAndWait();
+                ctx.RequestSaveGame(saveId, "000");
+            });
+            threads[i].Start();
+        }
+
+        foreach (var t in threads)
+            t.Join();
+
+        // All increments should be visible; none lost to a race.
+        Assert.Equal(threadCount, ctx.GetPendingPersistenceRequestCount());
+
+        // After flushing deferred actions the counter must return to zero.
+        ctx.FlushDeferredActionsForCurrentFrame();
+        Assert.Equal(0, ctx.GetPendingPersistenceRequestCount());
     }
 }

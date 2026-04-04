@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.DataSource;
-using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
 
@@ -10,15 +10,16 @@ namespace Origo.Core.Runtime.StateMachine;
 
 /// <summary>
 ///     按字符串 key 管理多个 <see cref="StackStateMachine" />，生命周期与策略池引用计数对齐。
+///     依赖 <see cref="IStateMachineContext" /> 而非具体上下文类型，确保前后台可共用同一状态机语义。
 /// </summary>
 public sealed class StateMachineContainer
 {
-    private readonly SndContext _ctx;
+    private readonly IStateMachineContext _ctx;
     private readonly List<string> _machineOrder = new();
     private readonly Dictionary<string, StackStateMachine> _machines = new(StringComparer.Ordinal);
     private readonly SndStrategyPool _pool;
 
-    internal StateMachineContainer(SndStrategyPool pool, SndContext ctx)
+    internal StateMachineContainer(SndStrategyPool pool, IStateMachineContext ctx)
     {
         ArgumentNullException.ThrowIfNull(pool);
         ArgumentNullException.ThrowIfNull(ctx);
@@ -26,6 +27,7 @@ public sealed class StateMachineContainer
         _ctx = ctx;
     }
 
+    /// <summary>按 key 创建或获取一个 <see cref="StackStateMachine" />。若 key 已存在但策略索引不同，则抛异常。</summary>
     public StackStateMachine CreateOrGet(string machineKey, string pushStrategyIndex, string popStrategyIndex)
     {
         if (string.IsNullOrWhiteSpace(machineKey))
@@ -51,9 +53,11 @@ public sealed class StateMachineContainer
         return sm;
     }
 
+    /// <summary>按 key 查找已有的状态机实例。</summary>
     public bool TryGet(string machineKey, out StackStateMachine? machine) =>
         _machines.TryGetValue(machineKey, out machine);
 
+    /// <summary>按 key 移除并释放一个状态机。</summary>
     public void Remove(string machineKey)
     {
         if (!_machines.TryGetValue(machineKey, out var sm)) return;
@@ -62,6 +66,7 @@ public sealed class StateMachineContainer
         _machineOrder.Remove(machineKey);
     }
 
+    /// <summary>释放所有状态机并清空容器。</summary>
     public void Clear()
     {
         foreach (var sm in _machines.Values)
@@ -71,12 +76,14 @@ public sealed class StateMachineContainer
         _machineOrder.Clear();
     }
 
+    /// <summary>读档恢复后，按插入顺序对所有状态机执行 <see cref="StackStateMachine.FlushAfterLoad" />。</summary>
     public void FlushAllAfterLoad()
     {
         foreach (var sm in EnumerateMachinesInInsertionOrder())
             sm.FlushAfterLoad();
     }
 
+    /// <summary>运行时逐个弹空所有状态机栈。</summary>
     public void PopAllRuntime()
     {
         foreach (var sm in EnumerateMachinesInInsertionOrder())
@@ -86,6 +93,7 @@ public sealed class StateMachineContainer
             }
     }
 
+    /// <summary>退出流程逐个弹空所有状态机栈。</summary>
     public void PopAllOnQuit()
     {
         foreach (var sm in EnumerateMachinesInInsertionOrder())
@@ -95,6 +103,7 @@ public sealed class StateMachineContainer
             }
     }
 
+    /// <summary>将所有状态机序列化为 DataSource 文本。</summary>
     public string SerializeToDataSource(IDataSourceCodec codec, DataSourceConverterRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(codec);
@@ -114,10 +123,11 @@ public sealed class StateMachineContainer
             });
         }
 
-        var node = registry.Write(payload);
+        using var node = registry.Write(payload);
         return codec.Encode(node);
     }
 
+    /// <summary>从 DataSource 文本恢复所有状态机（不触发钩子），配合 <see cref="FlushAllAfterLoad" /> 使用。</summary>
     public void DeserializeWithoutHooks(string serializedText, IDataSourceCodec codec,
         DataSourceConverterRegistry registry)
     {
@@ -128,7 +138,7 @@ public sealed class StateMachineContainer
         if (string.IsNullOrWhiteSpace(serializedText))
             throw new InvalidOperationException("StateMachineContainer serialized text cannot be null/empty.");
 
-        var node = codec.Decode(serializedText);
+        using var node = codec.Decode(serializedText);
         var payload = registry.Read<StateMachineContainerPayload>(node);
         if (payload?.Machines is null)
             throw new InvalidOperationException("StateMachineContainer payload.machines is required.");

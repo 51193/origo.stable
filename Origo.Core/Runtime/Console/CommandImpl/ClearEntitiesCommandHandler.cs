@@ -1,12 +1,12 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
 /// <summary>
 ///     <c>clear_entities</c> 命令：销毁所有已生成的 SND 实体。
 /// </summary>
-public sealed class ClearEntitiesCommandHandler : ConsoleCommandHandlerBase
+internal sealed class ClearEntitiesCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

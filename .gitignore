@@ -15,12 +15,22 @@ riderModule.iml
 
 # UID files: ignore all by default, then whitelist [GlobalClass] Node scripts
 *.uid
-!Origo.GodotAdapter/Bootstrap/*.uid
+
+# Snd: only keep explicit UIDs
 !Origo.GodotAdapter/Snd/GodotSndEntity.cs.uid
 !Origo.GodotAdapter/Snd/GodotSndManager.cs.uid
 
+# Bootstrap: only keep explicit UIDs
+!Origo.GodotAdapter/Bootstrap/OrigoAutoHost.cs.uid
+!Origo.GodotAdapter/Bootstrap/OrigoDefaultEntry.cs.uid
+!Origo.GodotAdapter/Bootstrap/OrigoDefaultEntry.Bootstrap.cs.uid
+
 # Build output
 publish/
+
+# Coverlet (local / CI artifact)
+coverage.cobertura.xml
+TestResults/
 
 # OS
 .DS_Store

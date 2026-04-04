@@ -5,6 +5,10 @@ using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
 using MemoryBlackboard = Origo.Core.Blackboard.Blackboard;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.Scene;
+using Origo.Core.Save.Meta;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 

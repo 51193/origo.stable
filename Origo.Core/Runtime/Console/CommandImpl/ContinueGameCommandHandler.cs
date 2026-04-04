@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -7,7 +7,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 /// <summary>
 ///     <c>continue</c> 命令：请求继续上次游戏。
 /// </summary>
-public sealed class ContinueGameCommandHandler : ConsoleCommandHandlerBase
+internal sealed class ContinueGameCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 

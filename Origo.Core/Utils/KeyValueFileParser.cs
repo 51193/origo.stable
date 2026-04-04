@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
 
 namespace Origo.Core.Utils;

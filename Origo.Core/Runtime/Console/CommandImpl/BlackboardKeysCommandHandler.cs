@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     用法：<c>bb_keys &lt;layer&gt;</c>
 ///     layer: system
 /// </summary>
-public sealed class BlackboardKeysCommandHandler : ConsoleCommandHandlerBase
+internal sealed class BlackboardKeysCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

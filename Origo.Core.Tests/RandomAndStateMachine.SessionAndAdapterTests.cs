@@ -4,6 +4,7 @@ using Origo.Core.Save;
 using Origo.Core.Snd;
 using Origo.Core.StateMachine;
 using Xunit;
+using Origo.Core.Save.Serialization;
 
 namespace Origo.Core.Tests;
 
@@ -34,7 +35,7 @@ public partial class RandomAndStateMachineTests
             var saveContext = new SaveContext(progress, session, runtime.SndWorld);
             var run = factory.CreateSessionRun(saveContext, "default", session, host);
 
-            var sm = run.SessionScope.StateMachines.CreateOrGet("ui", "sm.push.test", "sm.pop.test");
+            var sm = run.GetSessionStateMachines().CreateOrGet("ui", "sm.push.test", "sm.pop.test");
             sm.Push("a");
             sm.Push("b");
 

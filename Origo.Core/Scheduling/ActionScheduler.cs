@@ -1,5 +1,6 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.Runtime;
 using Origo.Core.Utils.DataStructures;
 
 namespace Origo.Core.Scheduling;

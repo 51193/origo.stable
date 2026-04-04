@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.Node;
 using Origo.Core.DataSource;
 using Origo.Core.Serialization;
+using Origo.Core.Snd.Entity;
+using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Strategy;
 
 namespace Origo.Core.Snd;
@@ -100,13 +104,13 @@ public sealed class SndWorld
     public IReadOnlyDictionary<string, TypedData> DeserializeTypedDataMap(string serializedText)
     {
         ArgumentNullException.ThrowIfNull(serializedText);
-        var node = JsonCodec.Decode(serializedText);
+        using var node = JsonCodec.Decode(serializedText);
         return ConverterRegistry.Read<IReadOnlyDictionary<string, TypedData>>(node);
     }
 
     public SndEntity CreateEntity(
         INodeFactory nodeFactory,
-        SndContext context,
+        ISndContext context,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -115,28 +119,28 @@ public sealed class SndWorld
 
     public string SerializeMeta(SndMetaData metaData)
     {
-        var node = ConverterRegistry.Write(metaData);
+        using var node = ConverterRegistry.Write(metaData);
         return JsonCodec.Encode(node);
     }
 
     public SndMetaData DeserializeMeta(string serializedText)
     {
         ArgumentNullException.ThrowIfNull(serializedText);
-        var node = JsonCodec.Decode(serializedText);
+        using var node = JsonCodec.Decode(serializedText);
         return ConverterRegistry.Read<SndMetaData>(node);
     }
 
     public string SerializeMetaList(IEnumerable<SndMetaData> metaDataList)
     {
         var list = metaDataList as IReadOnlyList<SndMetaData> ?? metaDataList.ToList();
-        var node = ConverterRegistry.Write(list);
+        using var node = ConverterRegistry.Write(list);
         return JsonCodec.Encode(node);
     }
 
     public IReadOnlyList<SndMetaData> DeserializeMetaList(string serializedText)
     {
         ArgumentNullException.ThrowIfNull(serializedText);
-        var node = JsonCodec.Decode(serializedText);
+        using var node = JsonCodec.Decode(serializedText);
         return ConverterRegistry.Read<IReadOnlyList<SndMetaData>>(node);
     }
 }

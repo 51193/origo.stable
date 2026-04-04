@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     <c>load</c> 命令：请求读取存档。
 ///     用法：<c>load &lt;saveId&gt;</c>
 /// </summary>
-public sealed class LoadGameCommandHandler : ConsoleCommandHandlerBase
+internal sealed class LoadGameCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly SndContext _context;
 

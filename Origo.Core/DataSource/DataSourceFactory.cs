@@ -15,11 +15,35 @@ public static class DataSourceFactory
 
         // Primitives
         registry.Register(new StringDataSourceConverter());
+        registry.Register(new ByteDataSourceConverter());
+        registry.Register(new SByteDataSourceConverter());
+        registry.Register(new Int16DataSourceConverter());
+        registry.Register(new UInt16DataSourceConverter());
         registry.Register(new Int32DataSourceConverter());
+        registry.Register(new UInt32DataSourceConverter());
         registry.Register(new Int64DataSourceConverter());
+        registry.Register(new UInt64DataSourceConverter());
         registry.Register(new SingleDataSourceConverter());
         registry.Register(new DoubleDataSourceConverter());
+        registry.Register(new DecimalDataSourceConverter());
+        registry.Register(new CharDataSourceConverter());
         registry.Register(new BooleanDataSourceConverter());
+
+        // Primitive arrays
+        registry.Register(new ByteArrayDataSourceConverter());
+        registry.Register(new SByteArrayDataSourceConverter());
+        registry.Register(new Int16ArrayDataSourceConverter());
+        registry.Register(new UInt16ArrayDataSourceConverter());
+        registry.Register(new Int32ArrayDataSourceConverter());
+        registry.Register(new UInt32ArrayDataSourceConverter());
+        registry.Register(new Int64ArrayDataSourceConverter());
+        registry.Register(new UInt64ArrayDataSourceConverter());
+        registry.Register(new SingleArrayDataSourceConverter());
+        registry.Register(new DoubleArrayDataSourceConverter());
+        registry.Register(new DecimalArrayDataSourceConverter());
+        registry.Register(new BooleanArrayDataSourceConverter());
+        registry.Register(new CharArrayDataSourceConverter());
+        registry.Register(new StringArrayDataSourceConverter());
 
         // Domain converters
         var typedDataConverter = new TypedDataConverter(typeMapping, registry);

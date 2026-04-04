@@ -10,6 +10,20 @@
 
 ---
 
+## Table of contents
+
+**Basics & governance:** [Design principles](#design-principles-and-consensus) · [Save I/O contracts](#save-system-contracts) · [Release checklist](#release-checklist) · [Testing](#testing) · [License](#license)
+
+**Getting started:** [Features](#features) · [Project layout](#project-layout) · [Quick Start (Godot 4)](#quick-start-godot-4) · [Architecture overview](#architecture-overview) · [Core concepts](#core-concepts)
+
+**Reference:** [API reference](#api-reference) · [Built-in console](#built-in-console-commands) · [JSON & config](#json--config-formats) · [Startup (Godot)](#startup-sequence-godot) · [Key flows](#key-flows) · [Side effects & threading](#side-effects--threading-model) · [Naming](#naming-conventions) · [GodotAdapter modules](#godotadapter-modules) · [Abstractions](#abstractions-interfaces) · [How to extend](#how-to-extend)
+
+**Advanced:** [Custom type serialization](#custom-type-serialization-tutorial) · [DataSourceNode lifecycle](#datasourcenode-resource-lifecycle)
+
+On GitHub, fragment IDs are generated from heading text (emoji is stripped). [`README.zh-CN.md`](README.zh-CN.md) uses explicit `<a id="…">` tags with the **same** English fragment names so bilingual jumps stay aligned.
+
+---
+
 ## ✨ Features
 
 - **SND entity model** — compose entities from Data, Nodes, and Strategies instead of deep class hierarchies
@@ -21,21 +35,112 @@
 - **Built-in developer console** — 14 built-in commands (`help`, `spawn`, `snd_count`, `find_entity`, `clear_entities`, `bb_get`, `bb_set`, `bb_keys`, `list_saves`, `save`, `load`, `auto_save`, `continue`, `change_level`) with pub/sub output and custom command extensibility
 - **Deterministic RNG** — XorShift128+ implementation behind `IRandom`
 - **Platform-agnostic Core** — depends only on .NET 8; no engine symbols leak into `Origo.Core`
+- **Background sessions** — foreground and background levels share the same `ISessionRun` interface, differing only in the injected `ISndSceneHost`. Create via `ctx.SessionManager.CreateBackgroundSession(key, levelId)` for in-memory simulation; serialization and persistence are managed by `SessionManager` internally
 - **Godot 4 adapter** — thin implementations + DI wiring; swap with your own adapter for Unity, MonoGame, etc.
 
 ---
 
 ## 📂 Project Layout
 
+Paths below are relative to **this repository’s root** (the directory that contains `Origo.sln`). If you embed Origo as a **Git submodule** inside a game repo, `cd` into the submodule folder first — it is still the Origo root for all commands here.
+
 ```
 Origo.Core/               Pure C# core (Microsoft.NET.Sdk, net8.0, no engine dependency)
 Origo.GodotAdapter/       Godot 4 adapter (Godot.NET.Sdk 4.6.1, thin implementations + DI)
-Origo.Core.Tests/         Core unit tests (xUnit v3, 353 tests)
-Origo.GodotAdapter.Tests/ Adapter unit tests (xUnit v3, 1 test)
-scripts/                  Build & utility scripts
+Origo.Core.Tests/         Core unit tests (xUnit v3; see Testing for current count)
+Origo.GodotAdapter.Tests/ Adapter unit tests (xUnit v3; see Testing)
+scripts/                  ci.sh (full CI pipeline), run-test.sh (test-only shortcut)
 Directory.Build.props     Shared MSBuild properties
 Origo.sln                 Solution file
 ```
+
+---
+
+## Design principles and consensus
+
+Origo is written for **integrators**: stable boundaries and observable behavior outweigh hiding every implementation detail.
+
+- **Engine-free Core** — `Origo.Core` targets only .NET; any engine API stays behind interfaces implemented in an adapter project.
+- **Fail-fast contracts** — save I/O, deserialization, and strategy resolution prefer explicit errors over silent coercion (see [Save system contracts](#save-system-contracts)).
+- **One session abstraction** — foreground and background levels share `ISessionRun`; they differ by the injected `ISndSceneHost` and who ticks them, not by parallel type systems.
+- **Pooled, stateless strategies** — strategies are shared instances; instance fields on a strategy type are invalid and guarded by tests.
+- **What belongs in this README** — setup, on-disk layout, public APIs, and integration contracts. Internals belong in source and `Origo.Core.Tests`.
+- **Placeholder types are intentional** — `EmptySessionManager`, `NullNodeFactory`, and similar types document null-object / no-op edges; they are not “unfinished gameplay modules”.
+
+**Release scope for this repository** — [`Origo.Core`](Origo.Core), [`Origo.GodotAdapter`](Origo.GodotAdapter). Games that consume Origo validate full-stack behaviour on their side.
+
+---
+
+## Save system contracts
+
+Rules integrators should rely on for **Origo.Core** persistence (`SaveStorageFacade`, `SavePayloadReader`).
+
+### Strict reads (fail-fast)
+
+For each level on disk, reads use **strict** semantics:
+
+- If **none** of the three files exist (`snd_scene.json`, `session.json`, `session_state_machines.json`), the level is treated as **having no save yet** — APIs may return `null`; upper layers decide whether that is legal.
+- If **only some** files exist, data is treated as **corrupt** — `InvalidOperationException` is thrown (with path hints); there is **no** silent merge.
+
+Regression coverage: `SaveStorageAndPayloadTests` (`ReadCurrent_ActiveLevelPartial_*`, `ReadCurrent_BackgroundLevelPartial_*`, `TryReadLevelPayloadFromCurrent_AllFilesAbsent_ReturnsNull`).
+
+### `WriteSavePayloadToCurrentThenSnapshot` (two steps, not atomic)
+
+1. Write payload to `current/` (including `.write_in_progress` marker handling).
+2. Copy `current/` wholesale to `save_{newSaveId}/` (temp directory + rename).
+
+If **step 2 fails**, `current/` may already be updated while the slot directory is incomplete — index and disk can diverge. The library logs **Error** (message includes `Snapshot failed after current/ was written`) and **rethrows**; the marker may **remain** so hosts can detect interrupted writes.
+
+**Integration guidance:** tell the player that the last save did not finish, offer retry / restore from another slot, or clear the marker only after you have verified consistency.
+
+Regression coverage: `WriteSavePayloadToCurrentThenSnapshot_WhenSnapshotFails_LogsError_LeavesMarkerAndUpdatedCurrent`.
+
+### `SnapshotCurrentToSave` and `baseSaveId`
+
+`baseSaveId` is reserved for **future API shape**; it does **not** merge or fall back today. Snapshots are always a **full copy** of `current/`. Do not depend on “merge from base slot” semantics.
+
+---
+
+## Release checklist
+
+Use before tagging or publishing a package built from this repo.
+
+### 1. Documentation & metadata
+
+- [ ] `README.md` / `README.zh-CN.md` commands and API notes match this tree.
+- [ ] [`LICENSE`](LICENSE) exists and is linked from the README.
+
+### 2. Build, tests, coverage
+
+- [ ] `bash scripts/ci.sh` succeeds from the repo root (same entry point as [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+- [ ] `Origo.Core` **line coverage ≥ 90 %** via Coverlet in `Origo.Core.Tests` (`Runtime/OrigoAutoInitializer.cs` excluded — see `Origo.Core.Tests.csproj`).
+- [ ] Optional: `dotnet test … --list-tests` for release notes.
+
+### 3. Saves vs product expectations
+
+- [ ] Behaviour under [Save system contracts](#save-system-contracts) matches your shipping profile.
+- [ ] Manual smoke: save → load → change level (staging build or integrated game).
+
+### 4. Feature completeness
+
+- [ ] No `TODO` / `FIXME` / `NotImplementedException` on ship paths in `Origo.Core` or `Origo.GodotAdapter` (test-only stubs excluded).
+- [ ] Known placeholders (`EmptySessionManager`, `NullNodeFactory`, …) are understood as contracts, not hidden WIP.
+
+### 5. CI
+
+- [ ] GitHub Actions on the default branch runs `bash scripts/ci.sh` without divergent extra steps.
+
+### Module → tests (sample map)
+
+| Area | Main tests |
+|------|------------|
+| Save I/O / strict read | `SaveStorageAndPayloadTests` |
+| Two-phase write failure | `WriteSavePayloadToCurrentThenSnapshot_*` |
+| Sessions / background | `BackgroundSessionTests`, `CoreArchitectureGuardrailTests` |
+| State machine container | `RandomAndStateMachine.ContainerTests` |
+| Console / spawn | `ConsoleTests`, `ConsoleCommandExtendedTests`, `SpawnTemplateCommandHandlerTests` |
+| Memory filesystem | `MemoryFileSystemTests` |
+| Discovery / type mapping | `SndWorldAndDiscoveryCoverageTests`, `AutoInitializerGuardTests` |
 
 ---
 
@@ -76,7 +181,7 @@ Attach `OrigoDefaultEntry` as the root (or a child) node. Its exported propertie
 | `InitialSaveRootPath` | `res://origo/initial` | Read-only initial save |
 | `AutoDiscoverStrategies` | `true` | Auto-register strategy subclasses via reflection |
 
-You can override `ConfigureSaveMetadataContributors(SndContext context)` to register custom `meta.map` contributors.
+You can override `ConfigureSaveMetadataContributors(ISndContext context)` to register custom `meta.map` contributors.
 
 ### 4. Write your first strategy
 
@@ -87,7 +192,7 @@ using Origo.Core.Snd.Strategy;
 [StrategyIndex("game.player_move")]
 public sealed class PlayerMoveStrategy : EntityStrategyBase
 {
-    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    public override void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         // Read state from entity Data — strategies must be stateless
         var (found, speed) = entity.TryGetData<float>("speed");
@@ -96,7 +201,7 @@ public sealed class PlayerMoveStrategy : EntityStrategyBase
         // Game logic here...
     }
 
-    public override void AfterSpawn(ISndEntity entity, SndContext ctx)
+    public override void AfterSpawn(ISndEntity entity, ISndContext ctx)
     {
         // Initialize entity data on spawn
         entity.SetData("speed", 200f);
@@ -188,7 +293,7 @@ OrigoDefaultEntry (Godot entry node)
             ├─ SndRuntime (ISndSceneHost facade)
             └─ SystemBlackboard
        └─ SndContext (save / load / change-level orchestration)
-            └─ RunFactory
+            └─ RunFactory (internal)
                  └─ SystemRun → ProgressRun → SessionRun
 ```
 
@@ -247,14 +352,14 @@ BaseStrategy                       ← root type (index + pool identity)
 #### EntityStrategyBase — Virtual Methods
 
 ```csharp
-public virtual void Process(ISndEntity entity, double delta, SndContext ctx);
-public virtual void AfterSpawn(ISndEntity entity, SndContext ctx);
-public virtual void AfterLoad(ISndEntity entity, SndContext ctx);
-public virtual void AfterAdd(ISndEntity entity, SndContext ctx);
-public virtual void BeforeRemove(ISndEntity entity, SndContext ctx);
-public virtual void BeforeSave(ISndEntity entity, SndContext ctx);
-public virtual void BeforeQuit(ISndEntity entity, SndContext ctx);
-public virtual void BeforeDead(ISndEntity entity, SndContext ctx);
+public virtual void Process(ISndEntity entity, double delta, ISndContext ctx);
+public virtual void AfterSpawn(ISndEntity entity, ISndContext ctx);
+public virtual void AfterLoad(ISndEntity entity, ISndContext ctx);
+public virtual void AfterAdd(ISndEntity entity, ISndContext ctx);
+public virtual void BeforeRemove(ISndEntity entity, ISndContext ctx);
+public virtual void BeforeSave(ISndEntity entity, ISndContext ctx);
+public virtual void BeforeQuit(ISndEntity entity, ISndContext ctx);
+public virtual void BeforeDead(ISndEntity entity, ISndContext ctx);
 ```
 
 #### Registration
@@ -266,7 +371,7 @@ Every concrete strategy **must** declare `[StrategyIndex("dot.namespace")]`. Dis
 public sealed class AttackStrategy : EntityStrategyBase
 {
     // No instance fields allowed — state goes in entity Data or blackboards
-    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    public override void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         var (found, cooldown) = entity.TryGetData<double>("attack_cooldown");
         if (found && cooldown > 0)
@@ -315,8 +420,9 @@ Each blackboard layer aligns 1:1 with its corresponding **Run** object:
 #### Well-Known Keys
 
 ```csharp
-WellKnownKeys.ActiveSaveId  = "origo.active_save_id";
-WellKnownKeys.ActiveLevelId = "origo.active_level_id";
+WellKnownKeys.ActiveSaveId       = "origo.active_save_id";
+WellKnownKeys.ActiveLevelId      = "origo.active_level_id";
+WellKnownKeys.BackgroundLevelIds = "origo.background_level_ids";
 ```
 
 ---
@@ -330,10 +436,10 @@ Each machine is constructed with a **machine key**, a **push strategy index**, a
 #### StateMachineStrategyBase — Virtual Methods
 
 ```csharp
-public virtual void OnPushRuntime(StateMachineStrategyContext context, SndContext ctx);
-public virtual void OnPushAfterLoad(StateMachineStrategyContext context, SndContext ctx);
-public virtual void OnPopRuntime(StateMachineStrategyContext context, SndContext ctx);
-public virtual void OnPopBeforeQuit(StateMachineStrategyContext context, SndContext ctx);
+public virtual void OnPushRuntime(StateMachineStrategyContext context, IStateMachineContext ctx);
+public virtual void OnPushAfterLoad(StateMachineStrategyContext context, IStateMachineContext ctx);
+public virtual void OnPopRuntime(StateMachineStrategyContext context, IStateMachineContext ctx);
+public virtual void OnPopBeforeQuit(StateMachineStrategyContext context, IStateMachineContext ctx);
 ```
 
 #### StateMachineStrategyContext
@@ -363,7 +469,7 @@ State machines are managed by `StateMachineContainer`, scoped to `ProgressRun` o
 - `progress_state_machines.json` — progress-scoped machines
 - `session_state_machines.json` — session-scoped machines
 
-Access via `SndContext.GetProgressStateMachines()` / `GetSessionStateMachines()`.
+Access via `SndContext.GetProgressStateMachines()` / `SessionManager.ForegroundSession?.GetSessionStateMachines()`.
 
 ---
 
@@ -463,16 +569,21 @@ saveRoot/
 
 ### SndContext
 
-`SndContext` is the primary facade strategies interact with for blackboards, save/load, level switching, and console.
+`SndContext` implements `ISndContext` — the primary facade strategies interact with for blackboards, save/load, level switching, and console. `ISndContext` exposes the complete business API needed by entity strategies; internal details (`SndRuntime`, file paths) remain on the concrete class only.
 
-#### Properties
+#### Properties (via `ISndContext`)
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `SystemBlackboard` | `IBlackboard` | System-level blackboard (always available) |
 | `ProgressBlackboard` | `IBlackboard?` | Progress-level blackboard (available after load) |
-| `SessionBlackboard` | `IBlackboard?` | Session-level blackboard (available after load) |
-| `SndRuntime` | `SndRuntime` | SND entity runtime |
+| `SessionManager` | `ISessionManager` | Sole entry point for creating, serializing, persisting, and destroying sessions; access `ForegroundSession` and background sessions through this manager |
+
+#### Concrete-only Properties (not on `ISndContext`)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `SndRuntime` | `SndRuntime` | SND entity runtime (internal detail) |
 | `SaveRootPath` | `string` | Root path for save files |
 | `InitialSaveRootPath` | `string` | Path to initial (read-only) save |
 | `EntryConfigPath` | `string` | Path to entry configuration JSON |
@@ -484,9 +595,6 @@ saveRoot/
 | `EnqueueBusinessDeferred(Action)` | Enqueue action for end-of-frame business phase |
 | `FlushDeferredActionsForCurrentFrame()` | Flush all deferred actions immediately |
 | `GetPendingPersistenceRequestCount()` | Count of pending persistence requests |
-| `ClearAllSndEntities()` | Remove all entities from the scene |
-| `SpawnManySndEntities(IEnumerable<SndMetaData>)` | Batch-spawn entities |
-| `FindSndEntity(string name)` | Find an entity by name |
 | `CloneTemplate(string templateKey, string? overrideName)` | Clone an entity from a template |
 
 #### Save / Load Methods
@@ -502,7 +610,8 @@ saveRoot/
 | `ClearContinueTarget()` | Clear the continue target |
 | `RequestLoadInitialSave()` | Load the initial (shipped) save |
 | `RequestLoadMainMenuEntrySave()` | Load main-menu entry (no implicit save) |
-| `RequestChangeLevel(string newLevelId)` | Switch to a different level |
+| `RequestSwitchForegroundLevel(string newLevelId)` | Switch to a different level |
+| `CreateLevelBuilder(string levelId)` | Create a `LevelBuilder` for offline level construction |
 | `ListSaves()` | List available save slot IDs |
 | `ListSavesWithMetaData()` | List saves with parsed `meta.map` |
 | `RegisterSaveMetaContributor(ISaveMetaContributor)` | Register a meta.map contributor |
@@ -522,7 +631,7 @@ saveRoot/
 | Method | Description |
 |--------|-------------|
 | `GetProgressStateMachines()` | Access progress-scoped state machines |
-| `GetSessionStateMachines()` | Access session-scoped state machines |
+| `SessionManager.ForegroundSession?.GetSessionStateMachines()` | Access foreground session-scoped state machines (via `ISessionRun`) |
 
 ---
 
@@ -536,7 +645,7 @@ Top-level runtime object created by the adapter.
 | `SndWorld` | property | Strategy pool, type mapping, JsonCodec, ConverterRegistry |
 | `Snd` | property | `SndRuntime` entity runtime facade |
 | `SystemBlackboard` | property | System blackboard |
-| `ConsoleInput` | property | `IConsoleInputSource?` console input source |
+| `ConsoleInput` | property | `ConsoleInputQueue?` console input source |
 | `ConsoleOutputChannel` | property | `IConsoleOutputChannel?` console output channel |
 | `Console` | property | `OrigoConsole?` console instance |
 | `EnqueueBusinessDeferred(Action)` | method | Enqueue business-phase deferred action |
@@ -560,6 +669,225 @@ Facade combining `SndWorld` and `ISndSceneHost`.
 | `ClearAll()` | method | Remove all entities |
 | `GetEntities()` | method | Get all active entities |
 | `FindByName(string)` | method | Find entity by name |
+
+### Foreground & Background Levels
+
+In Origo, a **level** is a combination of an `ISndSceneHost` (entity management) with the lifecycle infrastructure (`IStateMachineContext` / `ProgressRun` / `SessionRun`). Both foreground and background levels implement the same `ISessionRun` interface — the concrete `SessionRun` class is an internal implementation detail. The only difference is the injected **scene host / node factory**:
+
+| | Foreground Level | Background Level |
+|---|---|---|
+| Session type | `ISessionRun` | `ISessionRun` (same interface) |
+| Scene host | Engine adapter's `ISndSceneHost` (e.g. Godot adapter) | `FullMemorySndSceneHost` |
+| Node factory | Engine adapter (e.g. `GodotPackedSceneNodeFactory`) | `NullNodeFactory` (name-only, no instantiation) |
+| Rendering | Nodes are instantiated and visible | No nodes, no rendering |
+| Entity type | Real `SndEntity` with full strategy hooks | Real `SndEntity` with full strategy hooks |
+| Progress blackboard | Shared | Shared (when created from `IStateMachineContext`) |
+| Session blackboard | Own | Own |
+| State machines | Own | Own |
+| Process / Tick | Engine calls `_Process` | Caller manually calls `ProcessAll(delta)` on `FullMemorySndSceneHost` |
+| Format | Save/load via standard `LevelPayload` | Same — fully interchangeable |
+
+Both use the **same** `SndEntity` code path, the **same** strategy lifecycle, and produce **identical** serialized formats. A background level can be saved to disk and later loaded as a foreground level, and vice versa.
+
+#### Architecture: Why Foreground and Background Share `ISessionRun`
+
+The foreground level is always unique and **permanently resident** — it exists for the entire game session and is managed by `ProgressRun`. Background levels are **ephemeral** — they are created on demand (e.g. for runtime procedural generation, AI simulation) and disposed when no longer needed.
+
+Because the foreground level is "always there", background levels are conceptually **dependent** on the foreground level. When `ctx.SessionManager.CreateBackgroundSession(key, levelId)` is called, it:
+
+1. **Copies shared references** from the foreground level — `SndWorld` (strategy pool, codecs), `ProgressBlackboard`, `IFileSystem`, `SaveRootPath`
+2. **Creates isolated data** unique to the background level — new `SessionBlackboard`, new `StateMachineContainer`, new `FullMemorySndSceneHost`
+3. **Auto-mounts** the session in `SessionManager` under the given key and returns an `ISessionRun`
+
+This design ensures:
+- **Consistency** — background levels automatically see the same strategies, templates, and progress data as the foreground
+- **Isolation** — each background level has its own session state and entities that cannot interfere with the foreground scene
+- **Simplicity** — no separate class or wrapper; the caller works with the familiar `ISessionRun` contract
+
+#### Creating a Background Level
+
+**From an existing `SndContext`** (recommended for production — shares strategy pool, progress blackboard, and file system):
+
+```csharp
+// Inside a strategy or game logic that has access to SndContext:
+using var bgSession = ctx.SessionManager.CreateBackgroundSession("dungeon", "generated_dungeon");
+
+// SceneHost provides full entity operations directly — no casting required.
+var host = bgSession.SceneHost;
+
+// All strategies registered on the foreground SndWorld are available.
+host.Spawn(new SndMetaData
+{
+    Name = "Boss_01",
+    NodeMetaData = new NodeMetaData(),
+    StrategyMetaData = new StrategyMetaData { Indices = { "ai.boss" } },
+    DataMetaData = new DataMetaData()
+});
+
+// Set session data for the background level.
+bgSession.SessionBlackboard.Set("difficulty", "nightmare");
+
+// Write to ProgressBlackboard — visible to the foreground level too.
+ctx.ProgressBlackboard!.Set("dungeon_ready", true);
+
+// Run a frame — Process fires on all entities.
+host.ProcessAll(0.016);
+
+// Serialization and persistence are managed by SessionManager internally.
+// The foreground level can now switch to this level:
+// ctx.RequestSwitchForegroundLevel("generated_dungeon");
+```
+
+**For tests** — use `CreateForegroundContext` pattern (see `BackgroundSessionTests.cs`):
+
+```csharp
+// Create a background session for testing via SessionManager:
+using var bg = ctx.SessionManager.CreateBackgroundSession("test", "test_level");
+var host = bg.SceneHost;
+
+// Spawn entities — AfterSpawn hook fires on each strategy.
+var guard = host.Spawn(new SndMetaData
+{
+    Name = "Guard_01",
+    NodeMetaData = new NodeMetaData(),
+    StrategyMetaData = new StrategyMetaData { Indices = { "patrol" } },
+    DataMetaData = new DataMetaData()
+});
+
+// Read/write blackboards.
+bg.SessionBlackboard.Set("alert_level", 3);
+
+// Run one frame — calls Process on every entity.
+host.ProcessAll(0.016);
+
+// Dynamically add/remove strategies at runtime.
+guard.AddStrategy("combat");
+guard.RemoveStrategy("patrol");
+
+// Serialize all entities.
+var snapshot = bg.SceneHost.SerializeMetaList();
+
+// Kill a specific entity — BeforeDead hook fires.
+host.DeadByName("Guard_01");
+
+// Dispose clears all entities (BeforeQuit fires) and tears down the runtime.
+```
+
+> **Persistence:** When saving via `RequestSaveGame` or `RequestSaveGameAuto`, all background sessions managed by `SessionManager` are automatically serialized into the save payload alongside the foreground session. On load, background sessions are restored from the save data and re-created in `SessionManager` with their original keys. The key→level ID mapping is stored in `ProgressBlackboard` under `WellKnownKeys.BackgroundLevelIds`.
+>
+> **Lifecycle ownership:** `SessionManager` fully owns the `SessionRun` lifecycle. Sessions are always created through `SessionManager` and auto-mounted — there are no separate Mount/Unmount operations. Background sessions are destroyed via `ctx.SessionManager.DestroySession(key)`. The caller is still responsible for ticking background sessions each frame; use `ctx.SessionManager.ProcessBackgroundSessions(delta)` for convenience.
+>
+> **Serialization:** Serialization and persistence of session state (blackboards, state machines, entities) are managed internally by `SessionManager`. `ISessionRun` no longer exposes `SerializeToPayload()`, `LoadFromPayload()`, or `PersistLevelState()`.
+
+#### Serializing & Loading Background Sessions
+
+Background sessions support the same `LevelPayload` serialization format as foreground levels. Serialization and persistence are managed internally by `SessionManager`. To create a background session pre-loaded from an existing payload, use `CreateBackgroundSessionFromPayload`.
+
+**Create from payload:**
+
+```csharp
+// Create a background session pre-loaded from a LevelPayload.
+using var restored = ctx.SessionManager.CreateBackgroundSessionFromPayload("arena", "ai_arena", payload);
+```
+
+**Round-trip: background → foreground level:**
+
+```csharp
+// 1. Background session builds a level.
+using var bg = ctx.SessionManager.CreateBackgroundSession("dungeon", "procedural_dungeon");
+var host = bg.SceneHost;
+// ... populate entities ...
+
+// 2. SessionManager handles persistence internally.
+// 3. Foreground switches to the generated level.
+ctx.RequestSwitchForegroundLevel("procedural_dungeon");
+```
+
+**Create background session for simulation:**
+
+```csharp
+// Create a background session for AI simulation.
+using var simulation = ctx.SessionManager.CreateBackgroundSession("sim", "sim_arena");
+var simHost = simulation.SceneHost;
+
+// Run 100 simulated frames.
+for (int i = 0; i < 100; i++)
+    simHost.ProcessAll(0.016);
+
+// Read results from the simulation's blackboard.
+var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
+```
+
+#### API Surface
+
+Since background levels implement the standard `ISessionRun` interface, the API is the same as foreground levels:
+
+| Member | Kind | Description |
+|--------|------|-------------|
+| `ISessionManager.ForegroundKey` | `ISessionManager` constant | Reserved mount key for the foreground session (`"__foreground__"`) |
+| `ctx.SessionManager.ForegroundSession` | `ISessionManager` property | Access the foreground session (available after load); equivalent to `TryGet(ForegroundKey)` |
+| `ctx.SessionManager.Keys` | `ISessionManager` property | All mounted session keys (including foreground if present) |
+| `ctx.SessionManager.Contains(key)` | `ISessionManager` method | Check whether a session with the given key is mounted |
+| `ctx.SessionManager.TryGet(key)` | `ISessionManager` method | Look up a session by key |
+| `ctx.SessionManager.CreateBackgroundSession(key, levelId, syncProcess?)` | `ISessionManager` method | Create a background `ISessionRun` (auto-mounted) — shares `SndWorld`, `ProgressBlackboard`, file system. When `syncProcess` is `true`, the session participates in `ProcessBackgroundSessions` frame updates |
+| `ctx.SessionManager.CreateBackgroundSessionFromPayload(key, levelId, payload, syncProcess?)` | `ISessionManager` method | Create a background `ISessionRun` pre-loaded from a `LevelPayload` (auto-mounted). When `syncProcess` is `true`, the session participates in `ProcessBackgroundSessions` frame updates |
+| `ctx.SessionManager.DestroySession(key)` | `ISessionManager` method | Destroy and dispose a background session |
+| `ctx.SessionManager.ProcessBackgroundSessions(delta)` | `ISessionManager` method | Process all background sessions for one frame |
+| `LevelId` | `ISessionRun` property | Level identifier |
+| `SessionBlackboard` | `ISessionRun` property | Session-level blackboard (own) |
+| `GetSessionStateMachines()` | `ISessionRun` method | Access session-level state machines |
+| `SceneHost` | `ISessionRun` property | `ISndSceneHost` — provides full entity operations (Spawn/FindByName/GetEntities) directly, no casting required |
+| `Dispose()` | `ISessionRun` method | Shutdown level (clears entities, blackboard, state machines) |
+
+Entity operations available on `SceneHost` via the `ISndSceneHost` interface:
+
+| Member | Kind | Description |
+|--------|------|-------------|
+| `Spawn(SndMetaData)` | method | Spawn entity → `AfterSpawn` |
+| `FindByName(string)` | method | Lookup by name |
+| `GetEntities()` | method | All alive entities |
+| `ClearAll()` | method | Remove all → `BeforeQuit` |
+| `SerializeMetaList()` | method | Snapshot all metadata → `BeforeSave` |
+| `LoadFromMetaList(IEnumerable)` | method | Clear and reload from metadata |
+
+Additional methods on `FullMemorySndSceneHost` (background levels only):
+
+| Member | Kind | Description |
+|--------|------|-------------|
+| `DeadByName(string)` | method | Kill entity by name → `BeforeDead` |
+| `ProcessAll(double)` | method | `Process` all entities for one frame |
+
+#### Supporting Types
+
+| Type | Description |
+|------|-------------|
+| `FullMemorySndSceneHost` | `ISndSceneHost` backed by real `SndEntity` instances (no engine nodes); additionally provides `DeadByName` and `ProcessAll` |
+| `MemoryFileSystem` | Pure in-memory `IFileSystem` — no disk I/O |
+
+#### Allowed vs Prohibited Differences
+
+Because foreground and background levels share the `ISessionRun` contract, code consuming sessions should remain type-agnostic:
+
+| | Allowed ✅ | Prohibited ❌ |
+|---|---|---|
+| Scene access | Different `ISndSceneHost` implementations (foreground engine adapter vs background `FullMemorySndSceneHost`) | Business logic branching based on session type (e.g. `if (isForeground) { … }`) |
+| Entity operations | Using `ISndSceneHost` methods uniformly via `SceneHost` | Casting `ISessionRun` to the concrete `SessionRun` class |
+| Extension | Custom `ISndSceneHost` implementations for new backends | Hardcoded foreground / background checks in strategies or game logic |
+
+> **Rule of thumb:** If your code needs to know *which kind* of session it is running in, the design should be revisited. Session-type-specific behaviour belongs in the injected `ISndSceneHost` / `INodeFactory`, not in the consumer.
+
+#### Injectable Services
+
+The following interfaces decouple lifecycle infrastructure from concrete implementations, making it easier to test, swap adapters, and configure behaviour:
+
+| Interface | Replaces | Description |
+|-----------|----------|-------------|
+| `IStateMachineContext` | direct `SndContext` dependency | Context interface consumed by `StateMachineContainer` — provides `SessionBlackboard` (current session), `SceneAccess` (current session's scene), and session metadata without coupling to the full context. **Two implementations**: `SndContext` acts as the global/process-level default (points to the foreground session); `SessionStateMachineContext` is an internal adapter that binds each session's own blackboard and scene host, so foreground and background session state-machine hooks have **no semantic difference** |
+| `ISaveStorageService` | direct file-system save logic | Abstraction for save-slot persistence (list, read, write, snapshot, enumerate). **All** methods — including `EnumerateSaveIds`, `EnumerateSavesWithMetaData`, `WriteSavePayloadToCurrentThenSnapshot`, and `SnapshotCurrentToSave` — are fully driven by the injected `ISavePathPolicy`. Inject to replace file-system storage with cloud, database, or in-memory backends |
+| `ISessionDefaultsProvider` | hardcoded `SndDefaults` | Supplies default values (e.g. initial blackboard entries, default level ID). Implement to override defaults per-game or per-platform |
+| `ISavePathPolicy` | hardcoded path layout | Determines save-file directory structure and naming. When injected via `SndContext` constructor, it is automatically propagated to the default `DefaultSaveStorageService` (both primary and initial), `RunFactory`, `SessionRun`, and `LevelBuilder` — **all** storage paths are driven by this single policy instance. Implement to customise save folder layout without modifying core code |
+
+Strategy hooks receive `IStateMachineContext` instead of the concrete `SndContext`, so strategies remain testable and decoupled from the full runtime. Session-level state machines receive `SessionStateMachineContext`, which guarantees that `ctx.SessionBlackboard` and `ctx.SceneAccess` always point to the current session — this holds equally for foreground and background sessions.
 
 ---
 
@@ -734,7 +1062,7 @@ sequenceDiagram
     Entry->>Host: _Ready()
     Host->>RT: Create OrigoRuntime
     Host->>Host: GodotFileSystem + PersistentBlackboard<br/>load system.json
-    Host->>RT: Register Godot types on TypeMapping
+    Host->>RT: Register Godot types (TypeStringMapping via runtime setup)
     Host->>RT: Reflection-register all BaseStrategy subclasses
     Entry->>Ctx: Create SndContext (RunFactory + SystemRun)
     Entry->>SM: Inject SndContext into GodotSndManager
@@ -748,7 +1076,7 @@ sequenceDiagram
 
 1. `OrigoDefaultEntry._Ready()` → `OrigoAutoHost._Ready()` creates `OrigoRuntime`
 2. `GodotFileSystem` + `PersistentBlackboard` load `saveRoot/system.json`
-3. Register Godot types on `SndWorld.TypeMapping`
+3. Register Godot types on the runtime’s `TypeStringMapping` (e.g. `GodotJsonConverterRegistry.RegisterTypeMappings(...)` before building `SndWorld`, as in `OrigoAutoHost`)
 4. Reflection registers all concrete `BaseStrategy` subclasses
 5. Create `SndContext` (`RunFactory` + `SystemRun`), inject into `GodotSndManager`
 6. Load scene alias and template map files
@@ -786,13 +1114,45 @@ Game calls SndContext.RequestLoadGame(saveId)
 ### Change Level
 
 ```
-Game calls SndContext.RequestChangeLevel(newLevelId)
+Game calls SndContext.RequestSwitchForegroundLevel(newLevelId)
   → Enqueues on BusinessDeferred (runs before SystemDeferred)
   → SessionRun persists current level to current/level_xxx/
   → Updates ActiveLevelId, persists progress.json
   → Disposes old SessionRun
   → Restores current/level_{newLevelId}/ (or starts empty)
 ```
+
+---
+
+## ⚠️ Side Effects & Threading Model
+
+### Deferred Execution
+
+All `Request*` methods (`RequestSaveGame`, `RequestLoadGame`, `RequestSwitchForegroundLevel`, etc.) do **not** execute immediately. They enqueue deferred actions on the game loop queue.
+
+| Behavior | Detail |
+|----------|--------|
+| **When do deferred actions execute?** | Only when `FlushDeferredActionsForCurrentFrame()` is called (typically once per frame by the adapter) |
+| **Execution order** | Business deferred → System deferred, strictly sequential |
+| **Reentrancy guard** | Only one lifecycle workflow (save/load/change-level) can be in-flight at a time; overlapping requests throw `InvalidOperationException` |
+| **Persistence counter** | `RequestSaveGame` atomically increments a counter before enqueuing; check with `GetPendingPersistenceRequestCount()` |
+
+### Threading
+
+| Rule | Detail |
+|------|--------|
+| **Single-thread assumption** | `SndContext`, all Run types, and entity lifecycle must be accessed from the game loop thread only |
+| **Deferred queues** | Thread-safe for enqueue; flush is game-loop-only |
+| **Console** | `ConsoleInputQueue.Enqueue()` and `ConsoleOutputChannel.Subscribe/Publish` are thread-safe |
+| **Blackboards** | `IBlackboard` implementations are **not** thread-safe |
+| **Background sessions** | Created on game loop, then safe to Process on any single thread (not concurrent) |
+
+### Common Pitfalls
+
+- **Accessing `ProgressBlackboard` / `SessionManager.ForegroundSession?.SessionBlackboard` before a load** — returns `null`; always check or call `RequestLoad*` + flush first
+- **Calling `SwitchForegroundLevel` with a non-existing target** — creates an empty session and clears the scene; this is intentional (not an error)
+- **Disposing a `SessionRun`** — all property access after disposal throws `ObjectDisposedException`; the disposal order is: auto-persist (best-effort) → auto-unmount from `SessionManager` → pop all state machines → clear state machines → clear scene → clear blackboard
+- **Background session lifetime** — background sessions are created and destroyed through `SessionManager`; the caller is responsible for calling `ProcessBackgroundSessions(delta)` or manually ticking each session
 
 ---
 
@@ -816,9 +1176,9 @@ Invalid or missing data **fails fast** — there are no compatibility shims or s
 | Module | Location | Responsibility |
 |--------|----------|----------------|
 | **OrigoAutoHost** | `Bootstrap/` | Creates `OrigoRuntime`; `PersistentBlackboard` for system; `ConsoleInputQueue` + `ConsoleOutputChannel` |
-| **GodotSndBootstrap** | `Bootstrap/` | One-call `BindRuntimeAndContext(GodotSndManager, SndWorld, ILogger, SndContext)` |
+| **GodotSndBootstrap** | `Bootstrap/` | One-call `BindRuntimeAndContext(GodotSndManager, SndWorld, ILogger, ISndContext)` |
 | **OrigoConsolePump** | `Bootstrap/` | Each frame: `OrigoRuntime.Console.ProcessPending()` |
-| **OrigoDefaultEntry** | `Bootstrap/` | Subclasses `OrigoAutoHost`; startup partials; override `ConfigureSaveMetadataContributors(SndContext)` |
+| **OrigoDefaultEntry** | `Bootstrap/` | Subclasses `OrigoAutoHost`; startup partials; override `ConfigureSaveMetadataContributors(ISndContext)` |
 | **GodotFileSystem** | `FileSystem/` | `IFileSystem` for `res://` and `user://` paths |
 | **GodotLogger** | `Logging/` | `ILogger` implementation using Godot output |
 | **GodotSndEntity** | `Snd/` | Binds `SndEntity` to Godot `Node` lifetime |
@@ -873,12 +1233,12 @@ All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
 [StrategyIndex("game.enemy_ai")]
 public sealed class EnemyAiStrategy : EntityStrategyBase
 {
-    public override void Process(ISndEntity entity, double delta, SndContext ctx)
+    public override void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         // AI logic — read/write entity Data for state
     }
 
-    public override void AfterSpawn(ISndEntity entity, SndContext ctx)
+    public override void AfterSpawn(ISndEntity entity, ISndContext ctx)
     {
         entity.SetData("ai_state", "idle");
     }
@@ -895,7 +1255,7 @@ public sealed class EnemyAiStrategy : EntityStrategyBase
 [StrategyIndex("sm.push.camera")]
 public sealed class CameraPushStrategy : StateMachineStrategyBase
 {
-    public override void OnPushRuntime(StateMachineStrategyContext context, SndContext ctx)
+    public override void OnPushRuntime(StateMachineStrategyContext context, IStateMachineContext ctx)
     {
         // React to state being pushed (e.g., switch camera mode)
     }
@@ -909,26 +1269,191 @@ To port Origo to a different engine (Unity, MonoGame, etc.):
 1. **Implement the Abstractions** — provide concrete types for `IFileSystem`, `ISndSceneHost`, `INodeFactory`, `INodeHandle`, `ILogger`, and any other interfaces your game needs
 2. **Bootstrap the runtime** — create an `OrigoRuntime` with your implementations, similar to `OrigoAutoHost`
 3. **Drive the frame loop** — call `Process` on entities each frame and `FlushEndOfFrameDeferred()` at frame end
-4. **Register engine types** — add your engine's types to `SndWorld.TypeMapping` and register `DataSourceConverter<T>` implementations via `SndWorld.ConverterRegistry`
+4. **Register engine types** — map CLR types to stable names via `SndWorld.RegisterTypeMappings(...)` (or populate `TypeStringMapping` before constructing `SndWorld`) and register `DataSourceConverter<T>` implementations via `SndWorld.ConverterRegistry`
 
 The Core library has **zero** engine dependencies — only your adapter project references the target engine SDK.
 
 ---
 
-## 🧪 Testing
+## 📦 Custom Type Serialization Tutorial
 
-Run all tests from the repository root:
+Origo uses a `DataSourceNode` tree as its intermediate representation for serialization. To serialize and deserialize your own types, you need to:
 
-```bash
-dotnet test Origo.sln
+1. **Write a converter** — implement `DataSourceConverter<T>`
+2. **Register it** — add it to the `DataSourceConverterRegistry`
+3. **Register the type name** — add it to `TypeStringMapping` (needed for `TypedData` / blackboard usage)
+
+### Step 1: Define Your Type
+
+```csharp
+public sealed class Inventory
+{
+    public string OwnerName { get; set; } = "";
+    public int[] ItemIds { get; set; } = [];
+    public double TotalWeight { get; set; }
+}
 ```
 
-| Project | Tests | Coverage |
-|---------|-------|----------|
-| `Origo.Core.Tests` | 353 | SND, Save, Lifecycle, Console, DataSource, Serialization, Blackboard |
-| `Origo.GodotAdapter.Tests` | 1 | Minimal adapter behavior |
+### Step 2: Implement a Converter
 
-Test projects use **xUnit v3** and are excluded from the main game build.
+```csharp
+using Origo.Core.DataSource;
+
+public sealed class InventoryConverter : DataSourceConverter<Inventory>
+{
+    public override Inventory Read(DataSourceNode node)
+    {
+        return new Inventory
+        {
+            OwnerName = node["ownerName"].AsString(),
+            ItemIds   = node["itemIds"].Elements.Select(e => e.AsInt()).ToArray(),
+            TotalWeight = node["totalWeight"].AsDouble()
+        };
+    }
+
+    public override DataSourceNode Write(Inventory value)
+    {
+        var itemIds = DataSourceNode.CreateArray();
+        foreach (var id in value.ItemIds)
+            itemIds.Add(DataSourceNode.CreateNumber(id));
+
+        return DataSourceNode.CreateObject()
+            .Add("ownerName",   DataSourceNode.CreateString(value.OwnerName))
+            .Add("itemIds",     itemIds)
+            .Add("totalWeight", DataSourceNode.CreateNumber(value.TotalWeight));
+    }
+}
+```
+
+### Step 3: Register the Converter and Type Name
+
+During startup (e.g. in your bootstrap code), register the converter and type name:
+
+```csharp
+// Register the type name (needed for TypedData / Blackboard). Type mapping is internal to SndWorld; use:
+sndWorld.RegisterTypeMappings(m => m.RegisterType<Inventory>("Game.Inventory"));
+
+// Register the converter
+sndWorld.ConverterRegistry.Register(new InventoryConverter());
+```
+
+### Step 4: Use It
+
+```csharp
+// Serialize
+using var node = registry.Write(myInventory);
+string json = jsonCodec.Encode(node);
+
+// Deserialize
+using var decoded = jsonCodec.Decode(json);
+Inventory restored = registry.Read<Inventory>(decoded);
+```
+
+### Supported Built-in Types
+
+All of the following types have built-in converters and can be used directly with `TypedData` and blackboards:
+
+| Primitive Types | Array Types |
+|-----------------|-------------|
+| `byte`, `sbyte` | `byte[]`, `sbyte[]` |
+| `short`, `ushort` | `short[]`, `ushort[]` |
+| `int`, `uint` | `int[]`, `uint[]` |
+| `long`, `ulong` | `long[]`, `ulong[]` |
+| `float`, `double`, `decimal` | `float[]`, `double[]`, `decimal[]` |
+| `bool`, `char`, `string` | `bool[]`, `char[]`, `string[]` |
+
+---
+
+## ♻️ DataSourceNode Resource Lifecycle
+
+`DataSourceNode` implements `IDisposable`. It is a **resource** that should be explicitly disposed after use to promptly release the node tree (child nodes, lazy expansion closures, cached strings, etc.).
+
+### One-Shot Deserialization (Most Common)
+
+When you decode JSON, read the data, and are done, wrap the node in a `using` statement:
+
+```csharp
+using var node = codec.Decode(json);
+var result = registry.Read<MyType>(node);
+// node is disposed here — all children are recursively released
+```
+
+### One-Shot Serialization
+
+Similarly, when writing data to JSON:
+
+```csharp
+using var node = registry.Write(myObject);
+string json = codec.Encode(node);
+// node is disposed here
+```
+
+### Long-Lived DataSourceNode
+
+If you need to hold a `DataSourceNode` beyond a single method (e.g. as a cache or lazy-loaded config), store it as a field and dispose it when the owner is done:
+
+```csharp
+public sealed class ConfigCache : IDisposable
+{
+    private DataSourceNode? _root;
+
+    public void Load(IDataSourceCodec codec, string json)
+    {
+        _root?.Dispose();           // dispose previous if reloading
+        _root = codec.Decode(json);
+    }
+
+    public string GetValue(string key) => _root![key].AsString();
+
+    public void Dispose()
+    {
+        _root?.Dispose();
+        _root = null;
+    }
+}
+```
+
+### Key Rules
+
+- **Always use `using`** for transient (decode → read → done) workflows.
+- **Store in a field + implement `IDisposable`** if the node must outlive a single method.
+- **After `Dispose()`**, any access throws `ObjectDisposedException` — fail-fast, no silent corruption.
+- **Dispose is recursive** — disposing the root disposes all children automatically.
+- **Dispose is idempotent** — calling it multiple times is safe.
+
+---
+
+## 🧪 Testing
+
+**Same pipeline locally and on GitHub:** from the Origo repository root, run:
+
+```bash
+bash scripts/ci.sh
+```
+
+That performs `dotnet restore`, `dotnet build` (Release), and `dotnet test` on `Origo.sln` — the workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) invokes this script with no extra steps. **Line coverage is enforced inside `dotnet test`** via Coverlet on `Origo.Core.Tests` (total line coverage for `Origo.Core` ≥ 90%); the script prints a banner before restore/test, and Coverlet prints a summary table after Core tests (the job fails if the gate is not met — there is no separate “coverage-only” step).
+
+Quick test-only shortcut (after you have already built): `bash scripts/run-test.sh` (optional).
+
+Manual equivalent:
+
+```bash
+dotnet test Origo.sln --configuration Release
+```
+
+CI enforces **line coverage ≥ 90%** for `Origo.Core` (via Coverlet). The file `Runtime/OrigoAutoInitializer.cs` is **excluded** from that percentage (reflection/bootstrap); see `Origo.Core.Tests.csproj`. To reproduce the coverage report locally:
+
+```bash
+dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
+  -p:CollectCoverage=true -p:Threshold=90 -p:ThresholdType=line -p:ThresholdStat=total
+```
+
+| Project | Role |
+|---------|------|
+| `Origo.Core.Tests` | SND, Save, Lifecycle, Console, DataSource, Serialization, Blackboard, Background Sessions |
+| `Origo.GodotAdapter.Tests` | Adapter guardrails and targeted tests |
+
+Test projects use **xUnit v3**. Use `dotnet test ... --list-tests` for the current test count. For a shipping gate, follow [Release checklist](#release-checklist) and [Save system contracts](#save-system-contracts) above.
 
 ---
 

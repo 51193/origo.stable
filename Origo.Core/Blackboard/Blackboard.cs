@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
-using Origo.Core.Snd;
+using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Blackboard;
 

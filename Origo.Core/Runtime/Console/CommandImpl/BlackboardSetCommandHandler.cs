@@ -1,6 +1,6 @@
 using System;
 using System.Globalization;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Runtime.Console.CommandImpl;
 
@@ -10,7 +10,7 @@ namespace Origo.Core.Runtime.Console.CommandImpl;
 ///     layer: system
 ///     值将自动推断类型：整数 → Int32、浮点 → Single、"true"/"false" → Boolean、其余 → String。
 /// </summary>
-public sealed class BlackboardSetCommandHandler : ConsoleCommandHandlerBase
+internal sealed class BlackboardSetCommandHandler : ConsoleCommandHandlerBase
 {
     private readonly OrigoRuntime _runtime;
 

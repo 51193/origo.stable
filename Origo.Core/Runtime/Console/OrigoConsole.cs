@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Runtime.Console.CommandImpl;
 
 namespace Origo.Core.Runtime.Console;

@@ -1,3 +1,5 @@
+using Origo.Core.Abstractions.Logging;
+
 namespace Origo.Core.Abstractions;
 
 /// <summary>

@@ -6,6 +6,7 @@ using Origo.Core.DataSource.Converters;
 using Origo.Core.Snd;
 using Origo.Core.StateMachine;
 using Xunit;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 
@@ -686,11 +687,35 @@ public class DataSourceTests
 
         // Primitives
         Assert.NotNull(registry.Get<string>());
+        Assert.NotNull(registry.Get<byte>());
+        Assert.NotNull(registry.Get<sbyte>());
+        Assert.NotNull(registry.Get<short>());
+        Assert.NotNull(registry.Get<ushort>());
         Assert.NotNull(registry.Get<int>());
+        Assert.NotNull(registry.Get<uint>());
         Assert.NotNull(registry.Get<long>());
+        Assert.NotNull(registry.Get<ulong>());
         Assert.NotNull(registry.Get<float>());
         Assert.NotNull(registry.Get<double>());
+        Assert.NotNull(registry.Get<decimal>());
+        Assert.NotNull(registry.Get<char>());
         Assert.NotNull(registry.Get<bool>());
+
+        // Primitive arrays
+        Assert.NotNull(registry.Get<byte[]>());
+        Assert.NotNull(registry.Get<sbyte[]>());
+        Assert.NotNull(registry.Get<short[]>());
+        Assert.NotNull(registry.Get<ushort[]>());
+        Assert.NotNull(registry.Get<int[]>());
+        Assert.NotNull(registry.Get<uint[]>());
+        Assert.NotNull(registry.Get<long[]>());
+        Assert.NotNull(registry.Get<ulong[]>());
+        Assert.NotNull(registry.Get<float[]>());
+        Assert.NotNull(registry.Get<double[]>());
+        Assert.NotNull(registry.Get<decimal[]>());
+        Assert.NotNull(registry.Get<bool[]>());
+        Assert.NotNull(registry.Get<char[]>());
+        Assert.NotNull(registry.Get<string[]>());
 
         // Domain types
         Assert.NotNull(registry.Get<TypedData>());
@@ -769,5 +794,620 @@ public class DataSourceTests
         Assert.Equal("npc", result.Name);
         Assert.Equal(new[] { "patrol" }, result.StrategyMetaData!.Indices);
         Assert.Equal(5.5, (double)result.DataMetaData!.Pairs["speed"].Data!);
+    }
+
+    // ── 19. Extended primitive converter round-trips ──
+
+    [Fact]
+    public void ByteConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write<byte>(0);
+        Assert.Equal((byte)0, registry.Read<byte>(n1));
+
+        using var n2 = registry.Write<byte>(255);
+        Assert.Equal((byte)255, registry.Read<byte>(n2));
+
+        using var n3 = registry.Write<byte>(128);
+        Assert.Equal((byte)128, registry.Read<byte>(n3));
+    }
+
+    [Fact]
+    public void SByteConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write<sbyte>(-128);
+        Assert.Equal((sbyte)-128, registry.Read<sbyte>(n1));
+
+        using var n2 = registry.Write<sbyte>(0);
+        Assert.Equal((sbyte)0, registry.Read<sbyte>(n2));
+
+        using var n3 = registry.Write<sbyte>(127);
+        Assert.Equal((sbyte)127, registry.Read<sbyte>(n3));
+    }
+
+    [Fact]
+    public void Int16Converter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write<short>(-32768);
+        Assert.Equal((short)-32768, registry.Read<short>(n1));
+
+        using var n2 = registry.Write<short>(0);
+        Assert.Equal((short)0, registry.Read<short>(n2));
+
+        using var n3 = registry.Write<short>(32767);
+        Assert.Equal((short)32767, registry.Read<short>(n3));
+    }
+
+    [Fact]
+    public void UInt16Converter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write<ushort>(0);
+        Assert.Equal((ushort)0, registry.Read<ushort>(n1));
+
+        using var n2 = registry.Write<ushort>(65535);
+        Assert.Equal((ushort)65535, registry.Read<ushort>(n2));
+    }
+
+    [Fact]
+    public void UInt32Converter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write(0u);
+        Assert.Equal(0u, registry.Read<uint>(n1));
+
+        using var n2 = registry.Write(4294967295u);
+        Assert.Equal(4294967295u, registry.Read<uint>(n2));
+    }
+
+    [Fact]
+    public void UInt64Converter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write(0ul);
+        Assert.Equal(0ul, registry.Read<ulong>(n1));
+
+        using var n2 = registry.Write(18446744073709551615ul);
+        Assert.Equal(18446744073709551615ul, registry.Read<ulong>(n2));
+    }
+
+    [Fact]
+    public void DecimalConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write(0m);
+        Assert.Equal(0m, registry.Read<decimal>(n1));
+
+        using var n2 = registry.Write(79228162514264337593543950335m);
+        Assert.Equal(79228162514264337593543950335m, registry.Read<decimal>(n2));
+
+        using var n3 = registry.Write(-3.14159m);
+        Assert.Equal(-3.14159m, registry.Read<decimal>(n3));
+    }
+
+    [Fact]
+    public void CharConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+
+        using var n1 = registry.Write('A');
+        Assert.Equal('A', registry.Read<char>(n1));
+
+        using var n2 = registry.Write(' ');
+        Assert.Equal(' ', registry.Read<char>(n2));
+
+        using var n3 = registry.Write('\u4e2d');
+        Assert.Equal('\u4e2d', registry.Read<char>(n3)); // Chinese character
+    }
+
+    // ── 20. Array converter round-trips ──
+
+    [Fact]
+    public void ByteArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new byte[] { 0, 1, 128, 255 };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<byte[]>(node));
+    }
+
+    [Fact]
+    public void ByteArrayConverter_RoundTrip_Empty()
+    {
+        var registry = TestFactory.CreateRegistry();
+        using var node = registry.Write(Array.Empty<byte>());
+        Assert.Empty(registry.Read<byte[]>(node));
+    }
+
+    [Fact]
+    public void SByteArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new sbyte[] { -128, -1, 0, 1, 127 };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<sbyte[]>(node));
+    }
+
+    [Fact]
+    public void Int16ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new short[] { short.MinValue, -1, 0, 1, short.MaxValue };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<short[]>(node));
+    }
+
+    [Fact]
+    public void UInt16ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new ushort[] { 0, 1, 32768, 65535 };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<ushort[]>(node));
+    }
+
+    [Fact]
+    public void Int32ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { int.MinValue, -1, 0, 1, int.MaxValue };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<int[]>(node));
+    }
+
+    [Fact]
+    public void UInt32ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new uint[] { 0, 1, uint.MaxValue };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<uint[]>(node));
+    }
+
+    [Fact]
+    public void Int64ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { long.MinValue, -1L, 0L, 1L, long.MaxValue };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<long[]>(node));
+    }
+
+    [Fact]
+    public void UInt64ArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new ulong[] { 0, 1, ulong.MaxValue };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<ulong[]>(node));
+    }
+
+    [Fact]
+    public void SingleArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { 0f, -1.5f, 3.14f, float.MaxValue };
+        using var node = registry.Write(original);
+        var result = registry.Read<float[]>(node);
+        Assert.Equal(original.Length, result.Length);
+        for (var i = 0; i < original.Length; i++)
+            Assert.Equal(original[i], result[i], 0.001f);
+    }
+
+    [Fact]
+    public void DoubleArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { 0.0, -1.5, 2.718281828, double.MaxValue };
+        using var node = registry.Write(original);
+        var result = registry.Read<double[]>(node);
+        Assert.Equal(original.Length, result.Length);
+        for (var i = 0; i < original.Length; i++)
+            Assert.Equal(original[i], result[i], 0.000001);
+    }
+
+    [Fact]
+    public void DecimalArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { 0m, -3.14m, 99999.99999m };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<decimal[]>(node));
+    }
+
+    [Fact]
+    public void BooleanArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { true, false, true, true, false };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<bool[]>(node));
+    }
+
+    [Fact]
+    public void CharArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { 'A', 'B', ' ', '\u4e2d' };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<char[]>(node));
+    }
+
+    [Fact]
+    public void StringArrayConverter_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var original = new[] { "hello", "world", "", "test" };
+        using var node = registry.Write(original);
+        Assert.Equal(original, registry.Read<string[]>(node));
+    }
+
+    [Fact]
+    public void StringArrayConverter_RoundTrip_Empty()
+    {
+        var registry = TestFactory.CreateRegistry();
+        using var node = registry.Write(Array.Empty<string>());
+        Assert.Empty(registry.Read<string[]>(node));
+    }
+
+    // ── 21. Array converter JSON integration ──
+
+    [Fact]
+    public void IntArrayConverter_JsonIntegration_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var codec = TestFactory.CreateJsonCodec();
+
+        var original = new[] { 1, 2, 3, 4, 5 };
+        using var node = registry.Write(original);
+        var json = codec.Encode(node);
+        using var decoded = codec.Decode(json);
+        var result = registry.Read<int[]>(decoded);
+
+        Assert.Equal(original, result);
+    }
+
+    [Fact]
+    public void ByteArrayConverter_JsonIntegration_RoundTrip()
+    {
+        var registry = TestFactory.CreateRegistry();
+        var codec = TestFactory.CreateJsonCodec();
+
+        var original = new byte[] { 0, 127, 255 };
+        using var node = registry.Write(original);
+        var json = codec.Encode(node);
+        using var decoded = codec.Decode(json);
+        var result = registry.Read<byte[]>(decoded);
+
+        Assert.Equal(original, result);
+    }
+
+    // ── 22. TypedData with new types ──
+
+    [Fact]
+    public void TypedDataConverter_RoundTrip_ByteValue()
+    {
+        var tm = new TypeStringMapping();
+        var registry = TestFactory.CreateRegistry(tm);
+
+        var original = new TypedData(typeof(byte), (byte)42);
+        using var node = registry.Write(original);
+        var result = registry.Read<TypedData>(node);
+
+        Assert.Equal(typeof(byte), result.DataType);
+        Assert.Equal((byte)42, result.Data);
+    }
+
+    [Fact]
+    public void TypedDataConverter_RoundTrip_DecimalValue()
+    {
+        var tm = new TypeStringMapping();
+        var registry = TestFactory.CreateRegistry(tm);
+
+        var original = new TypedData(typeof(decimal), 3.14159m);
+        using var node = registry.Write(original);
+        var result = registry.Read<TypedData>(node);
+
+        Assert.Equal(typeof(decimal), result.DataType);
+        Assert.Equal(3.14159m, result.Data);
+    }
+
+    [Fact]
+    public void TypedDataConverter_RoundTrip_CharValue()
+    {
+        var tm = new TypeStringMapping();
+        var registry = TestFactory.CreateRegistry(tm);
+
+        var original = new TypedData(typeof(char), 'X');
+        using var node = registry.Write(original);
+        var result = registry.Read<TypedData>(node);
+
+        Assert.Equal(typeof(char), result.DataType);
+        Assert.Equal('X', result.Data);
+    }
+
+    [Fact]
+    public void TypedDataConverter_RoundTrip_IntArrayValue()
+    {
+        var tm = new TypeStringMapping();
+        var registry = TestFactory.CreateRegistry(tm);
+
+        var original = new TypedData(typeof(int[]), new[] { 1, 2, 3 });
+        using var node = registry.Write(original);
+        var result = registry.Read<TypedData>(node);
+
+        Assert.Equal(typeof(int[]), result.DataType);
+        Assert.Equal(new[] { 1, 2, 3 }, (int[])result.Data!);
+    }
+
+    [Fact]
+    public void TypedDataConverter_RoundTrip_ByteArrayValue()
+    {
+        var tm = new TypeStringMapping();
+        var registry = TestFactory.CreateRegistry(tm);
+
+        var original = new TypedData(typeof(byte[]), new byte[] { 0, 128, 255 });
+        using var node = registry.Write(original);
+        var result = registry.Read<TypedData>(node);
+
+        Assert.Equal(typeof(byte[]), result.DataType);
+        Assert.Equal(new byte[] { 0, 128, 255 }, (byte[])result.Data!);
+    }
+
+    // ── 23. DataSourceNode IDisposable ──
+
+    [Fact]
+    public void Dispose_PreventsSubsequentAccess()
+    {
+        var node = DataSourceNode.CreateString("test");
+        node.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => _ = node.Kind);
+        Assert.Throws<ObjectDisposedException>(() => _ = node.AsString());
+        Assert.Throws<ObjectDisposedException>(() => _ = node.IsNull);
+    }
+
+    [Fact]
+    public void Dispose_RecursivelyDisposesChildren()
+    {
+        var child = DataSourceNode.CreateString("child");
+        var parent = DataSourceNode.CreateObject()
+            .Add("key", child);
+
+        parent.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => _ = child.Kind);
+    }
+
+    [Fact]
+    public void Dispose_RecursivelyDisposesArrayChildren()
+    {
+        var child = DataSourceNode.CreateNumber(42);
+        var parent = DataSourceNode.CreateArray()
+            .Add(child);
+
+        parent.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => _ = child.AsInt());
+    }
+
+    [Fact]
+    public void Dispose_CanBeCalledMultipleTimes()
+    {
+        var node = DataSourceNode.CreateNull();
+        node.Dispose();
+        node.Dispose(); // Should not throw
+    }
+
+    [Fact]
+    public void Dispose_LazyNodeReleasesExpander()
+    {
+        var expanderCalled = false;
+        var node = DataSourceNode.CreateLazy("{}", _ =>
+        {
+            expanderCalled = true;
+            return DataSourceNode.CreateObject();
+        });
+
+        node.Dispose();
+
+        Assert.False(expanderCalled);
+        Assert.Throws<ObjectDisposedException>(() => _ = node.Kind);
+    }
+
+    [Fact]
+    public void UsingStatement_DisposesAfterScope()
+    {
+        DataSourceNode captured;
+        using (var node = DataSourceNode.CreateString("scoped"))
+        {
+            captured = node;
+            Assert.Equal("scoped", captured.AsString());
+        }
+
+        Assert.Throws<ObjectDisposedException>(() => _ = captured.AsString());
+    }
+
+    // ── 24. DataSourceNode new accessor methods ──
+
+    [Fact]
+    public void AsByte_ParsesCorrectly()
+    {
+        Assert.Equal((byte)0, DataSourceNode.CreateNumber("0").AsByte());
+        Assert.Equal((byte)255, DataSourceNode.CreateNumber("255").AsByte());
+    }
+
+    [Fact]
+    public void AsSByte_ParsesCorrectly()
+    {
+        Assert.Equal((sbyte)-128, DataSourceNode.CreateNumber("-128").AsSByte());
+        Assert.Equal((sbyte)127, DataSourceNode.CreateNumber("127").AsSByte());
+    }
+
+    [Fact]
+    public void AsShort_ParsesCorrectly()
+    {
+        Assert.Equal((short)-32768, DataSourceNode.CreateNumber("-32768").AsShort());
+        Assert.Equal((short)32767, DataSourceNode.CreateNumber("32767").AsShort());
+    }
+
+    [Fact]
+    public void AsUShort_ParsesCorrectly()
+    {
+        Assert.Equal((ushort)0, DataSourceNode.CreateNumber("0").AsUShort());
+        Assert.Equal((ushort)65535, DataSourceNode.CreateNumber("65535").AsUShort());
+    }
+
+    [Fact]
+    public void AsUInt_ParsesCorrectly()
+    {
+        Assert.Equal(0u, DataSourceNode.CreateNumber("0").AsUInt());
+        Assert.Equal(4294967295u, DataSourceNode.CreateNumber("4294967295").AsUInt());
+    }
+
+    [Fact]
+    public void AsULong_ParsesCorrectly()
+    {
+        Assert.Equal(0ul, DataSourceNode.CreateNumber("0").AsULong());
+        Assert.Equal(18446744073709551615ul, DataSourceNode.CreateNumber("18446744073709551615").AsULong());
+    }
+
+    [Fact]
+    public void AsDecimal_ParsesCorrectly()
+    {
+        Assert.Equal(3.14159m, DataSourceNode.CreateNumber("3.14159").AsDecimal());
+        Assert.Equal(-99.99m, DataSourceNode.CreateNumber("-99.99").AsDecimal());
+    }
+
+    [Fact]
+    public void AsChar_ParsesCorrectly()
+    {
+        Assert.Equal('A', DataSourceNode.CreateString("A").AsChar());
+        Assert.Equal('\u4e2d', DataSourceNode.CreateString("\u4e2d").AsChar());
+    }
+
+    // ── 25. TypeStringMapping new type registrations ──
+
+    [Fact]
+    public void TypeStringMapping_RegistersAllNewTypes()
+    {
+        var tm = new TypeStringMapping();
+
+        // Verify all primitive types are registered
+        Assert.Equal(typeof(byte), tm.GetTypeByName("Byte"));
+        Assert.Equal(typeof(sbyte), tm.GetTypeByName("SByte"));
+        Assert.Equal(typeof(short), tm.GetTypeByName("Int16"));
+        Assert.Equal(typeof(ushort), tm.GetTypeByName("UInt16"));
+        Assert.Equal(typeof(int), tm.GetTypeByName("Int32"));
+        Assert.Equal(typeof(uint), tm.GetTypeByName("UInt32"));
+        Assert.Equal(typeof(long), tm.GetTypeByName("Int64"));
+        Assert.Equal(typeof(ulong), tm.GetTypeByName("UInt64"));
+        Assert.Equal(typeof(float), tm.GetTypeByName("Single"));
+        Assert.Equal(typeof(double), tm.GetTypeByName("Double"));
+        Assert.Equal(typeof(decimal), tm.GetTypeByName("Decimal"));
+        Assert.Equal(typeof(char), tm.GetTypeByName("Char"));
+        Assert.Equal(typeof(bool), tm.GetTypeByName("Boolean"));
+        Assert.Equal(typeof(string), tm.GetTypeByName("String"));
+
+        // Verify all array types are registered
+        Assert.Equal(typeof(byte[]), tm.GetTypeByName("ArrayByte"));
+        Assert.Equal(typeof(sbyte[]), tm.GetTypeByName("ArraySByte"));
+        Assert.Equal(typeof(short[]), tm.GetTypeByName("ArrayInt16"));
+        Assert.Equal(typeof(ushort[]), tm.GetTypeByName("ArrayUInt16"));
+        Assert.Equal(typeof(int[]), tm.GetTypeByName("ArrayInt32"));
+        Assert.Equal(typeof(uint[]), tm.GetTypeByName("ArrayUInt32"));
+        Assert.Equal(typeof(long[]), tm.GetTypeByName("ArrayInt64"));
+        Assert.Equal(typeof(ulong[]), tm.GetTypeByName("ArrayUInt64"));
+        Assert.Equal(typeof(float[]), tm.GetTypeByName("ArraySingle"));
+        Assert.Equal(typeof(double[]), tm.GetTypeByName("ArrayDouble"));
+        Assert.Equal(typeof(decimal[]), tm.GetTypeByName("ArrayDecimal"));
+        Assert.Equal(typeof(bool[]), tm.GetTypeByName("ArrayBoolean"));
+        Assert.Equal(typeof(char[]), tm.GetTypeByName("ArrayChar"));
+        Assert.Equal(typeof(string[]), tm.GetTypeByName("ArrayString"));
+    }
+
+    // ── Lazy expansion failure recovery ──
+
+    [Fact]
+    public void LazyNode_WhenExpanderThrows_NodeStaysLazy_AndCanRetrySuccessfully()
+    {
+        var callCount = 0;
+        DataSourceNode expander(string raw)
+        {
+            callCount++;
+            if (callCount == 1)
+                throw new InvalidOperationException("Simulated first-time expansion failure.");
+            return DataSourceNode.CreateString("hello");
+        }
+
+        var lazyNode = DataSourceNode.CreateLazy("{}", expander);
+
+        // First access should throw
+        Assert.Throws<InvalidOperationException>(() => lazyNode.Kind);
+
+        // Second access should succeed because node stayed in lazy state
+        Assert.Equal(DataSourceNodeKind.String, lazyNode.Kind);
+        Assert.Equal("hello", lazyNode.AsString());
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public void LazyNode_WhenExpanderThrows_NodeCanStillBeDisposed()
+    {
+        DataSourceNode expander(string raw) => throw new InvalidOperationException("Always fails.");
+
+        var lazyNode = DataSourceNode.CreateLazy("{}", expander);
+
+        Assert.Throws<InvalidOperationException>(() => lazyNode.Kind);
+
+        // Dispose should succeed even though expansion failed
+        lazyNode.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => lazyNode.Kind);
+    }
+
+    // ── MapDataSourceCodec edge cases ──
+
+    [Fact]
+    public void MapCodec_Decode_LineWithoutColon_SkipsLine()
+    {
+        var codec = DataSourceFactory.CreateMapCodec();
+        var text = "validkey: value\nno_colon_here\nanotherkey: value2";
+        var node = codec.Decode(text);
+
+        Assert.True(node.ContainsKey("validkey"));
+        Assert.True(node.ContainsKey("anotherkey"));
+        Assert.Equal("value", node["validkey"].AsString());
+        Assert.Equal("value2", node["anotherkey"].AsString());
+    }
+
+    [Fact]
+    public void MapCodec_Decode_EmptyValueAfterColon_ReturnsEmptyString()
+    {
+        var codec = DataSourceFactory.CreateMapCodec();
+        var text = "emptyval:";
+        var node = codec.Decode(text);
+
+        Assert.True(node.ContainsKey("emptyval"));
+        Assert.Equal("", node["emptyval"].AsString());
+    }
+
+    [Fact]
+    public void MapCodec_Decode_OnlyCommentsAndEmptyLines_ReturnsEmptyObject()
+    {
+        var codec = DataSourceFactory.CreateMapCodec();
+        var text = "# comment\n\n  # another comment\n   ";
+        var node = codec.Decode(text);
+
+        Assert.Equal(DataSourceNodeKind.Object, node.Kind);
+        Assert.Empty(node.Keys);
     }
 }

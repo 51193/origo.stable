@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Snd;
+using Origo.Core.Snd.Scene;
 using Origo.Core.Snd.Strategy;
 
 namespace Origo.Core.Runtime;
@@ -151,7 +153,7 @@ public static class OrigoAutoInitializer
             throw ex;
         }
 
-        var root = snd.World.JsonCodec.Decode(json);
+        using var root = snd.World.JsonCodec.Decode(json);
         if (root.Kind != DataSourceNodeKind.Array)
         {
             var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");

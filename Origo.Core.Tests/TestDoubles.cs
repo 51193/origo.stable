@@ -7,6 +7,13 @@ using Origo.Core.DataSource;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
 using Origo.Core.Snd;
+using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.Node;
+using Origo.Core.Abstractions.Scene;
+using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 

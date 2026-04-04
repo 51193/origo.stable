@@ -1,61 +1,34 @@
 using System;
-using Origo.Core.Abstractions;
-using Origo.Core.Save;
+using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Runtime.StateMachine;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
-///     流程级运行时，持有流程黑板与当前关卡会话运行实例。
+///     流程级运行时的只读门面接口。
+///     外部代码（策略层）仅通过此接口访问流程状态；所有生命周期操作（创建会话、加载存档、持久化等）
+///     由具体实现 <see cref="ProgressRun" /> 封装，外部不得直接调用。
+///     <para>
+///         设计原则：对外仅暴露一个 Run 的引用即可——策略只需读取黑板、通过 SessionManager 访问会话和状态机容器。
+///         架构上不区分前台/后台会话；前台会话只是一个以 <see cref="ISessionManager.ForegroundKey" />
+///         为键挂载在 SessionManager 上的普通会话，唯一的特殊之处在于至多一个。
+///     </para>
 /// </summary>
 public interface IProgressRun : IDisposable
 {
-    RunStateScope ProgressScope { get; }
-
+    /// <summary>流程级黑板。</summary>
     IBlackboard ProgressBlackboard { get; }
 
-    ISessionRun? CurrentSession { get; }
+    /// <summary>
+    ///     会话管理器，以 KVP 形式统一管理所有挂载的 <see cref="ISessionRun" />。
+    ///     前台会话以 <see cref="ISessionManager.ForegroundKey" /> 为键挂载，与后台会话无架构区别。
+    /// </summary>
+    ISessionManager SessionManager { get; }
 
     string SaveId { get; }
 
-    string ActiveLevelId { get; }
-
     /// <summary>
-    ///     从当前 ActiveLevelId 创建 SessionRun。
+    ///     流程级字符串栈状态机容器。策略层可通过此方法创建/获取流程级状态机。
     /// </summary>
-    ISessionRun? CreateFromActiveLevel();
-
-    /// <summary>
-    ///     当场景已经加载完成时，创建并绑定 SessionRun，不重复清场和反序列化。
-    /// </summary>
-    ISessionRun? CreateFromAlreadyLoadedScene();
-
-    /// <summary>
-    ///     从完整 payload 恢复流程与关卡会话状态。
-    /// </summary>
-    void LoadFromPayload(SaveGamePayload payload);
-
-    /// <summary>
-    ///     更新当前激活关卡 ID。
-    /// </summary>
-    void UpdateActiveLevel(string newLevelId);
-
-    /// <summary>
-    ///     切换关卡。严格按顺序：
-    ///     PersistLevelState → UpdateActiveLevel → PersistProgress → Dispose → LoadSessionRunFromCurrent。
-    ///     <para>
-    ///         strict 语义：任一步失败均直接抛异常；调用方应将其视为致命（early stage let-it-crash），
-    ///         不保证保留旧会话或回滚磁盘状态。
-    ///     </para>
-    /// </summary>
-    void SwitchLevel(string newLevelId);
-
-    /// <summary>
-    ///     持久化流程黑板到 current 目录的 progress.json。
-    /// </summary>
-    void PersistProgress();
-
-    /// <summary>
-    ///     更新当前 saveId（例如 SaveGameAuto 生成新存档后）。
-    /// </summary>
-    void SetSaveId(string saveId);
+    StateMachineContainer GetProgressStateMachines();
 }

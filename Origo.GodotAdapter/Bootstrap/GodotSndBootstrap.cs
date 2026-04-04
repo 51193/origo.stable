@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.Snd;
 using Origo.GodotAdapter.Snd;
 
@@ -14,7 +14,7 @@ public static class GodotSndBootstrap
         GodotSndManager manager,
         SndWorld world,
         ILogger logger,
-        SndContext context)
+        ISndContext context)
     {
         ArgumentNullException.ThrowIfNull(manager);
         ArgumentNullException.ThrowIfNull(world);
