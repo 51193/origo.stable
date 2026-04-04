@@ -6,6 +6,113 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.0.4] - 2026-04-04
+
+### Added
+
+- **Full three-tier lifecycle runtime** — concrete interfaces and implementations for the `SystemRun` / `ProgressRun` / `SessionRun` hierarchy:
+  - `ISystemRun` — holds the system blackboard and loads/continues a save slot into a `ProgressRun`
+  - `IProgressRun` — holds the progress blackboard, `ISessionManager`, and process-level state machine container
+  - `ISessionRun` — holds the session blackboard, scene access, and session-level state machine container
+  - `SystemRun`, `ProgressRun`, `SessionRun` — concrete sealed implementations of the three lifecycle tiers
+  - `ISessionManager`, `SessionManager` — KVP-based session lifecycle manager; creates, holds, serializes/deserializes, and destroys sessions; no architectural distinction between foreground and background sessions
+  - `EmptySessionManager` — Null Object implementation used before any `ProgressRun` is active
+  - `RunFactory` — internal DI factory that constructs all three run tiers from `RunDependencies`
+  - `RunStateScope` — scoping container holding a run's `IBlackboard` and deferred scheduler reference
+- **`OrigoRuntime`** — unified runtime entry point aggregating the SND subsystem and the system blackboard; exposes dual `ActionScheduler` queues for business-deferred and system-deferred work; drives `FlushEndOfFrameDeferred` at end of each frame
+- **`OrigoAutoInitializer`** — reflection-based auto-initialization: scans loaded assemblies for `BaseStrategy` subclasses and registers them to the strategy pool; reads a JSON config array of `SndMetaData` to auto-spawn entities; skips system/Microsoft/Godot assembly prefixes
+- **`SndWorld`** — unified SND entry point encapsulating the strategy pool (`SndStrategyPool`), type string mapping, DataSource converter registry, and JSON/Map codecs; exposes entity creation, serialization, and template resolution
+- **`ISndContext`** — comprehensive facade interface for strategy hooks and game logic: three-tier blackboard access, session management, save/load/auto-save, level change, console registration, deferred action scheduling, and state machine access; does not expose internal framework details
+- **`SndContext`** — full `ISndContext` implementation; orchestrates `OrigoRuntime`, `SystemRun` / `ProgressRun` / `SessionRun` lifecycles, `SndWorld`, and all built-in console commands; handles `ContinueGame`, `LoadGame`, `SaveGame`, `ChangeLevel`, `ClearEntities`
+- **`SndRuntime`** — lightweight facade combining `SndWorld` and an `ISndSceneHost`; provides `Spawn`, `SpawnMany`, `SerializeMetaList`, `ClearAll`, and `FindByName` over the scene host
+- **`LevelBuilder`** — fluent API for offline level construction using `MemorySndSceneHost`; supports adding entities and session blackboard key-value pairs; produces a `LevelPayload` via `Build()` or commits directly to disk via `Commit()`; decoupled from concrete storage via `ISaveStorageService`
+- **`StateMachineContainer`** — manages multiple named `StackStateMachine` instances keyed by string; lifecycle aligned with strategy pool reference counts; uses `IStateMachineContext` to remain compatible with both foreground and background sessions
+- **`IStateMachineContext`** — minimal context interface exposing system/progress/session blackboards, scene access, and deferred schedulers for state machine strategy hooks; carries no foreground/background semantics
+- **`SessionStateMachineContext`** — session-level adapter that binds an `IStateMachineContext` global with a specific session's `IBlackboard` and `ISndSceneAccess`; ensures foreground and background sessions have identical state machine hook semantics
+- **In-memory scene infrastructure**:
+  - `MemorySndSceneHost` — pure in-memory `ISndSceneHost`; used by `LevelBuilder` and unit tests
+  - `FullMemorySndSceneHost` — full-featured in-memory scene host creating real `SndEntity` instances via `SndWorld`; complete strategy lifecycle, data subscription, and `Process` support; used for background sessions created via `SndContext.CreateBackgroundSession`
+  - `NullNodeFactory` — engine-free `INodeFactory` producing `NullNodeHandle` placeholders; used internally by `FullMemorySndSceneHost`
+- **`MemoryFileSystem`** — pure in-memory `IFileSystem` implementation with full directory and file emulation; used for background levels, `LevelBuilder`, and unit tests
+- **`INodeHost`** — internal abstraction for SND node container behavior: node recovery, query, release, and metadata export
+- **Save storage abstraction layer**:
+  - `ISaveStorageService` — abstract read/write service for save slots; decouples callers from concrete layout; supports current-directory writes, snapshot copies, progress JSON, level scenes, state machine snapshots, and metadata
+  - `DefaultSaveStorageService` — default `ISaveStorageService` implementation backed by `IFileSystem` and `ISavePathPolicy`
+  - `ISavePathPolicy` — pluggable path policy interface for all save-related directory and file paths
+  - `DefaultSavePathPolicy` — default `ISavePathPolicy` implementation using `SavePathLayout` rules
+  - `SavePathLayout` — internal static helper defining standard relative path constants and assembly rules (`current/`, `save_*`, `level_*`, `.write_in_progress`, etc.)
+  - `SavePathResolver` — resolves full paths by combining a root with `ISavePathPolicy` outputs
+  - `SavePayloadReader` — typed payload reader that deserializes progress, session blackboards, state machines, and SND scenes from a save directory
+  - `SavePayloadWriter` — typed payload writer that serializes a `SaveGamePayload` into the `current/` directory layout
+  - `SaveGamePayloadFactory` — assembles a `SaveGamePayload` from live scene and blackboard state
+- **Save metadata pipeline**:
+  - `SaveMetaBuildContext` — context object passed to `ISaveMetaContributor` implementations during meta-building
+  - `DelegateSaveMetaContributor` — delegate-based `ISaveMetaContributor` for inline registration
+  - `SaveMetaMerger` — merges contributions from multiple `ISaveMetaContributor` instances into a unified `meta.map` file
+- **`LogMessageBuilder`** — structured log message builder with prefix/suffix key-value context and optional elapsed-milliseconds annotation; used internally for consistent log formatting
+- **`ConcurrentActionQueue`** — thread-safe deferred execution queue; batches `Action` delegates and drains them in bulk; guards against infinite synchronous re-entrancy (internal)
+- **`ActionScheduler`** — `IScheduler` implementation backed by `ConcurrentActionQueue`; host calls `Tick()` to drain queued actions
+- **Strategy infrastructure**:
+  - `BaseStrategy` — root abstract base for all strategy types; enforces stateless constraint (no instance fields) detected at registration time by `OrigoAutoInitializer`
+  - `EntityStrategyBase` — entity strategy base class with full lifecycle hooks: `Process`, `AfterSpawn`, `AfterLoad`, `AfterAdd`, `BeforeRemove`, `BeforeSave`, `BeforeQuit`, `BeforeDead`
+  - `SndStrategyManager` — internal per-entity strategy set manager; drives all lifecycle callbacks
+- **Godot adapter — bootstrap infrastructure**:
+  - `OrigoAutoHost` — Godot `[GlobalClass]` node implementing `IOrigoRuntimeProvider`; creates a new `OrigoRuntime` or binds to an existing host via `HostPath`
+  - `OrigoDefaultEntry` — default entry-point node extending `OrigoAutoHost`; delegates full initialization to `OrigoAutoInitializer` with Godot-specific skip prefixes; exports `ConfigPath`, `SceneAliasMapPath`, `SndTemplateMapPath`, `SaveRootPath`, `InitialSaveRootPath`, and `AutoDiscoverStrategies`
+  - `OrigoConsolePump` — Godot node that pumps console input from a UI source into `OrigoConsole` on each frame
+  - `GodotSndBootstrap` — static helper binding `GodotSndManager` runtime dependencies and context in a single call
+  - `GodotSndManager` — Godot `Node`-backed `ISndSceneHost` that manages `GodotSndEntity` nodes in the scene tree
+  - `GodotSndEntity` — Godot `[GlobalClass]` node wrapping Core's `SndEntity`; binds Core strategy lifecycle to Godot's `_Process` / `_Ready` / `_ExitTree` callbacks
+  - `GodotPackedSceneNodeFactory` — `INodeFactory` that instantiates a Godot `PackedScene` and mounts it under a parent node
+  - `GodotJsonConverterRegistry` — one-stop registration of all Godot built-in type mappings (`Vector2`, `Vector3`, `Transform2D`, `Transform3D`, `Color`, `Rect2`, `Quaternion`, `Basis`, etc.) and DataSource converters
+  - `GodotFileSystem` refactored into three focused classes: `GodotFileOperations`, `GodotDirectoryOperations`, `GodotPathHelper`
+- **Extensive new test coverage** (40+ test classes):
+  - `AutoInitializerGuardTests` — strategy registration guard and stateless enforcement
+  - `BackgroundSessionTests` — full lifecycle of background sessions (create, process, save, load, dispose)
+  - `ConsoleTests` — console command parsing, routing, and output channel
+  - `EmptySessionManagerTests` — Null Object session manager contract
+  - `EntityAndSerializationExtendedTests` — extended entity data, node, and strategy serialization
+  - `ForegroundBackgroundContractTests` — contract parity between foreground and background sessions
+  - `JsonAndMappingsTests` — JSON codec and `TypeStringMapping` round-trips
+  - `LevelBuilderTests` — `LevelBuilder` fluent API, `Commit`, and `Build`
+  - `LifecycleRunsTests` — `SystemRun` / `ProgressRun` / `SessionRun` lifecycle state transitions
+  - `MemoryFileSystemTests` — `MemoryFileSystem` read/write/rename/delete contract
+  - `NullNodeFactoryTests` — `NullNodeFactory` and `NullNodeHandle` contract
+  - `PersistentBlackboardTests` — `PersistentBlackboard` read/write/persist contract
+  - `RandomAndStateMachine.ContainerTests` — `StateMachineContainer` create/get/persistence
+  - `RandomAndStateMachine.SessionAndAdapterTests` — session-level state machine adapter
+  - `RandomAndStateMachine.StringStackTests` — `StackStateMachine` string-key push/pop/peek
+  - `RandomNumberGeneratorTests` — XorShift128+ determinism and distribution
+  - `SaveMetaMergerTests` — multi-contributor metadata merge
+  - `SavePathPolicyContractTests` — `ISavePathPolicy` path composition contracts
+  - `SaveSystemExtendedTests` — extended save/load round-trips across all payload components
+  - `SchedulingAndTypeMappingTests` — `ActionScheduler` tick behaviour and type mapping
+  - `SessionDecouplingTests` — session isolation (independent blackboards, entity sets, state machines)
+  - `SessionManagerTests` — session manager create/get/destroy/serialize lifecycle
+  - `SndContextChangeLevelContractTests` — `ChangeLevel` contract and scene transition
+  - `SndContextContinueContractTests` — `ContinueGame` contract
+  - `SndContextDeferredExecutionTests` — deferred action scheduling and flush
+  - `SndContextFlowTests` — full new-game and load-game flow through `SndContext`
+  - `SndContextListSavesContractTests` — `ListSaves` enumeration contract
+  - `SndContextLoadGameContractTests` — `LoadGame` contract
+  - `SndContextSaveGameContractTests` — `SaveGame` contract
+  - `SndEntityAfterLoadTests` — `AfterLoad` hook invocation on deserialized entities
+  - `SndEntityAndAutoInitializerTests` — entity creation via `OrigoAutoInitializer`
+  - `SndWorldAndDiscoveryCoverageTests` — strategy discovery and `SndWorld` coverage
+  - `SpawnTemplateCommandHandlerTests` — `SpawnTemplateCommandHandler` integration
+  - `StrategyPoolAndRuntimeTests` — strategy pool reference counting and runtime integration
+  - `SystemBlackboardPersistenceTests` — system blackboard persist/restore across runs
+  - `UtilityTests` — `ConcurrentActionQueue`, `KeyValueFileParser`, and other utilities
+
+### Changed
+
+- `GodotFileSystem` decomposed into `GodotFileOperations`, `GodotDirectoryOperations`, and `GodotPathHelper` for improved separation of concerns
+- Save storage responsibility separated: `SaveStorageFacade` now coexists with the new `ISaveStorageService` / `DefaultSaveStorageService` abstraction used by the lifecycle runtime, enabling pluggable storage backends for testing and non-Godot environments
+- `SndStrategyPool` integrated with `SndStrategyManager` for per-entity lifecycle dispatch
+- `StackStateMachine` wired through `StateMachineContainer` for keyed multi-machine management
+
+---
+
 ## [0.0.3] - 2026-03-31
 
 ### Added
