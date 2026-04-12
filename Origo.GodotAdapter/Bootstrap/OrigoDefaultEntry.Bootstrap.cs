@@ -20,7 +20,8 @@ public partial class OrigoDefaultEntry
             InitialSaveRootPath,
             ConfigPath);
 
-        GodotSndBootstrap.BindRuntimeAndContext(SndManager, Runtime.SndWorld, Runtime.Logger, _sndContext);
+        // Runtime dependencies are already bound in OrigoAutoHost.CreateRuntime(); only bind lifecycle context here.
+        SndManager.BindContext(_sndContext);
 
         ConfigureSaveMetadataContributors(_sndContext);
 

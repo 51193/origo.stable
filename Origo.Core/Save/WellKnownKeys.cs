@@ -4,6 +4,7 @@ public static class WellKnownKeys
 {
     public const string ActiveSaveId = "origo.active_save_id";
     public const string ActiveLevelId = "origo.active_level_id";
+    public const string SessionTopology = "origo.session_topology";
 
     /// <summary>
     ///     进度黑板键：已挂载的后台会话信息（逗号分隔）。

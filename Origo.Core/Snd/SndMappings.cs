@@ -19,6 +19,12 @@ internal sealed class SndMappings
     /// <summary>Detects Godot-style schemes (<c>res://</c>, <c>user://</c>) and other URI-like resource ids.</summary>
     private const string UriLikeSchemeSeparator = "://";
 
+    /// <summary>JSON key for template reference in meta list shorthand entries.</summary>
+    private const string TemplateKeyField = "templateKey";
+
+    /// <summary>JSON key for entity display name in meta list shorthand entries.</summary>
+    private const string SndNameField = "sndName";
+
     private readonly Dictionary<string, string> _sceneAliases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _templatePaths = new(StringComparer.Ordinal);
     private SndTemplateResolver? _templateResolver;
@@ -130,19 +136,19 @@ internal sealed class SndMappings
         var sndMetaConverter = registry.Get<SndMetaData>();
 
         foreach (var item in root.Elements)
-            if (item.Kind == DataSourceNodeKind.Object && item.ContainsKey("templateKey"))
+            if (item.Kind == DataSourceNodeKind.Object && item.ContainsKey(TemplateKeyField))
             {
-                var templateKey = item["templateKey"].AsString();
+                var templateKey = item[TemplateKeyField].AsString();
                 if (string.IsNullOrWhiteSpace(templateKey))
-                    throw new InvalidOperationException("Config entry has an empty 'templateKey'.");
+                    throw new InvalidOperationException($"Config entry has an empty '{TemplateKeyField}'.");
 
-                var sndName = item.TryGetValue("sndName", out var sndNameNode) && sndNameNode is not null
+                var sndName = item.TryGetValue(SndNameField, out var sndNameNode) && sndNameNode is not null
                     ? sndNameNode.AsString()
                     : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(sndName))
                     throw new InvalidOperationException(
-                        $"Config entry referencing template '{templateKey}' has an empty 'sndName'.");
+                        $"Config entry referencing template '{templateKey}' has an empty '{SndNameField}'.");
 
                 var template = ResolveTemplate(templateKey);
 

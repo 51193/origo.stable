@@ -3,28 +3,23 @@ using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
+using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
 using Origo.Core.Save.Serialization;
 using Origo.Core.Save.Storage;
+using Origo.Core.Snd;
+using Origo.Core.Snd.Scene;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
 ///     关卡会话级运行时实现，持有关卡会话黑板与 SND 场景访问。
-///     前台和后台关卡均为同一类型，区别仅在于注入的 <see cref="ISndSceneHost" /> 实现：
-///     前台注入引擎适配层宿主，后台注入 <see cref="Snd.Scene.FullMemorySndSceneHost" />。
-///     两者返回同一接口 <see cref="ISndSceneHost" />，业务层无需按宿主类型分叉逻辑。
-///     通过注入 <see cref="ISaveStorageService" /> 与外围存储系统解耦，
-///     确保可在不同运行模式间平滑替换。
+///     构造时接收 <see cref="SessionManagerRuntime" /> 与 <see cref="SessionParameters" />。
 ///     <para>
 ///         能力边界：SessionRun 拥有对自身内部的完全支配权（黑板读写、场景操作、状态机），
 ///         但生命周期（创建 / 销毁 / 序列化）由 <see cref="SessionManager" /> 管理。
 ///         资源回收遵循 RAII 原则：SessionRun 在 Dispose 中回收自己的所有资源。
-///     </para>
-///     <para>
-///         <see cref="Dispose" /> 边界：逻辑卸载（SessionBlackboard.Clear、SceneHost.ClearAll）在 Dispose 内同步执行；
-///         与 Godot 节点释放的时序由调用方保证（先 Dispose 完成逻辑卸载，再 Free 节点）。
 ///     </para>
 /// </summary>
 public sealed class SessionRun : ISessionRun
@@ -33,35 +28,44 @@ public sealed class SessionRun : ISessionRun
     private readonly ILogger _logger;
     private readonly SaveContext _saveContext;
     private readonly ISndSceneHost _sceneHost;
+    private readonly SessionSndContext _sessionContext;
     private readonly RunStateScope _sessionScope;
     private readonly ISaveStorageService _storageService;
     private bool _disposed;
 
-    internal SessionRun(
-        SaveContext saveContext,
-        string levelId,
-        IBlackboard sessionBlackboard,
-        ISndSceneHost sceneHost,
-        StateMachineContainer sessionStateMachines,
-        ISaveStorageService storageService,
-        ILogger? logger = null)
+    internal SessionRun(SessionManagerRuntime managerRuntime, SessionParameters sessionParams)
     {
-        ArgumentNullException.ThrowIfNull(saveContext);
-        ArgumentNullException.ThrowIfNull(levelId);
-        ArgumentNullException.ThrowIfNull(sceneHost);
-        ArgumentNullException.ThrowIfNull(storageService);
-        _saveContext = saveContext;
-        LevelId = levelId;
-        _sceneHost = sceneHost;
-        _storageService = storageService;
-        _logger = logger ?? NullLogger.Instance;
-        _sessionScope = new RunStateScope(sessionBlackboard, sessionStateMachines);
-        _logger.Log(LogLevel.Info, LogTag, $"Created SessionRun for level '{levelId}'.");
+        ArgumentNullException.ThrowIfNull(managerRuntime);
+        if (string.IsNullOrWhiteSpace(sessionParams.LevelId))
+            throw new ArgumentException("Level id cannot be null or whitespace.");
+        ArgumentNullException.ThrowIfNull(sessionParams.SceneHost);
+
+        LevelId = sessionParams.LevelId;
+        IsFrontSession = sessionParams.IsFrontSession;
+        _sceneHost = sessionParams.SceneHost;
+        _storageService = managerRuntime.StorageService;
+        _logger = managerRuntime.Logger;
+
+        var progressBb = managerRuntime.ProgressBlackboard;
+        _saveContext = new SaveContext(progressBb, sessionParams.SessionBlackboard, managerRuntime.SndWorld);
+
+        var sessionSmCtx = new SessionStateMachineContext(
+            managerRuntime.StateMachineContext,
+            sessionParams.SessionBlackboard,
+            sessionParams.SceneHost);
+        var sessionMachines = new StateMachineContainer(managerRuntime.SndWorld.StrategyPool, sessionSmCtx);
+        _sessionScope = new RunStateScope(sessionParams.SessionBlackboard, sessionMachines);
+
+        var effectiveContext = managerRuntime.SndContext;
+        _sessionContext = new SessionSndContext(effectiveContext, this);
+        if (_sceneHost is ISndContextAttachableSceneHost contextAttachable)
+            contextAttachable.BindContext(_sessionContext);
+        _logger.Log(LogLevel.Info, LogTag, $"Created SessionRun for level '{sessionParams.LevelId}'.");
     }
 
     /// <summary>
     ///     内部使用的完整 RunStateScope，包含黑板与状态机。
-    ///     不在 <see cref="ISessionRun" /> 接口上暴露，仅供 ProgressRun / RunFactory 等内部代码使用。
+    ///     不在 <see cref="ISessionRun" /> 接口上暴露，仅供 ProgressRun / SessionManager 等内部代码使用。
     /// </summary>
     internal RunStateScope SessionScope
     {
@@ -103,6 +107,9 @@ public sealed class SessionRun : ISessionRun
     }
 
     public string LevelId { get; }
+
+    /// <inheritdoc />
+    public bool IsFrontSession { get; }
 
     /// <inheritdoc />
     public StateMachineContainer GetSessionStateMachines()

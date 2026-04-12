@@ -111,11 +111,10 @@ internal static class SaveStorageFacade
         IFileSystem fileSystem,
         string saveRootPath,
         SaveGamePayload payload,
-        string baseSaveId,
         string newSaveId,
         ILogger logger) =>
         WriteSavePayloadToCurrentThenSnapshot(
-            fileSystem, saveRootPath, payload, baseSaveId, newSaveId, logger, new DefaultSavePathPolicy());
+            fileSystem, saveRootPath, payload, newSaveId, logger, new DefaultSavePathPolicy());
 
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 后，再将 <c>current/</c> 快照复制到 <c>save_{newSaveId}/</c>（策略感知）。
@@ -124,7 +123,6 @@ internal static class SaveStorageFacade
         IFileSystem fileSystem,
         string saveRootPath,
         SaveGamePayload payload,
-        string baseSaveId,
         string newSaveId,
         ILogger logger,
         ISavePathPolicy pathPolicy)
@@ -146,14 +144,13 @@ internal static class SaveStorageFacade
 
         try
         {
-            SnapshotCurrentToSave(fileSystem, saveRootPath, baseSaveId, newSaveId, pathPolicy);
+            SnapshotCurrentToSave(fileSystem, saveRootPath, newSaveId, pathPolicy);
         }
         catch (InvalidOperationException ex)
         {
             logger.Log(LogLevel.Error, nameof(SaveStorageFacade),
                 new LogMessageBuilder()
                     .AddSuffix("saveRootPath", saveRootPath)
-                    .AddSuffix("baseSaveId", baseSaveId)
                     .AddSuffix("newSaveId", newSaveId)
                     .Build(
                         $"Snapshot failed after current/ was written; save index and disk may be inconsistent. {ex.Message}"));
@@ -250,9 +247,8 @@ internal static class SaveStorageFacade
     public static void SnapshotCurrentToSave(
         IFileSystem fileSystem,
         string saveRootPath,
-        string baseSaveId,
         string newSaveId) =>
-        SnapshotCurrentToSave(fileSystem, saveRootPath, baseSaveId, newSaveId, new DefaultSavePathPolicy());
+        SnapshotCurrentToSave(fileSystem, saveRootPath, newSaveId, new DefaultSavePathPolicy());
 
     /// <summary>
     ///     将 <c>current/</c> 目录完整复制为指定存档槽的快照（策略感知）。
@@ -260,7 +256,6 @@ internal static class SaveStorageFacade
     public static void SnapshotCurrentToSave(
         IFileSystem fileSystem,
         string saveRootPath,
-        string baseSaveId,
         string newSaveId,
         ISavePathPolicy pathPolicy)
     {
@@ -268,13 +263,10 @@ internal static class SaveStorageFacade
         ArgumentNullException.ThrowIfNull(pathPolicy);
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
-        if (string.IsNullOrWhiteSpace(baseSaveId))
-            throw new ArgumentException("Base save id cannot be null or whitespace.", nameof(baseSaveId));
         if (string.IsNullOrWhiteSpace(newSaveId))
             throw new ArgumentException("New save id cannot be null or whitespace.", nameof(newSaveId));
 
-        // Early stage strict mode: snapshot is a full copy of current.
-        // baseSaveId is kept for API shape and future evolution; no fallback/merge is performed.
+        // Snapshot is a full copy of current/.
         var currentRel = pathPolicy.GetCurrentDirectory();
         var currentAbs = fileSystem.CombinePath(saveRootPath, currentRel);
         if (!fileSystem.DirectoryExists(currentAbs))

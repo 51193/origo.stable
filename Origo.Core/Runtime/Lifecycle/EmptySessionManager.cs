@@ -28,17 +28,12 @@ internal sealed class EmptySessionManager : ISessionManager
         throw new InvalidOperationException(
             "No active ProgressRun. Cannot create sessions before loading a save or starting a new game.");
 
-    public ISessionRun CreateBackgroundSessionFromPayload(string key, string levelId, LevelPayload payload,
-        bool syncProcess = false) =>
-        throw new InvalidOperationException(
-            "No active ProgressRun. Cannot create sessions before loading a save or starting a new game.");
-
     public void DestroySession(string key)
     {
         // No-op: no sessions to destroy.
     }
 
-    public void ProcessBackgroundSessions(double delta)
+    public void ProcessAllSessions(double delta, bool includeForeground = false)
     {
         // No-op: no sessions to process.
     }

@@ -39,11 +39,10 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
 
     public void WriteSavePayloadToCurrentThenSnapshot(
         SaveGamePayload payload,
-        string baseSaveId,
         string newSaveId,
         ILogger logger) =>
         SaveStorageFacade.WriteSavePayloadToCurrentThenSnapshot(
-            _fileSystem, _saveRootPath, payload, baseSaveId, newSaveId, logger, _pathPolicy);
+            _fileSystem, _saveRootPath, payload, newSaveId, logger, _pathPolicy);
 
     public void WriteLevelPayloadOnly(
         string baseDirectoryRel,
@@ -94,8 +93,8 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
         return TryReadLevelPayloadFromSnapshot(saveId, levelId);
     }
 
-    public void SnapshotCurrentToSave(string baseSaveId, string newSaveId) =>
-        SaveStorageFacade.SnapshotCurrentToSave(_fileSystem, _saveRootPath, baseSaveId, newSaveId, _pathPolicy);
+    public void SnapshotCurrentToSave(string newSaveId) =>
+        SaveStorageFacade.SnapshotCurrentToSave(_fileSystem, _saveRootPath, newSaveId, _pathPolicy);
 
     public void DeleteCurrentDirectory()
     {

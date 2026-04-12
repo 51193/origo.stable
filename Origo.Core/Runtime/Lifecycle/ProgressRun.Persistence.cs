@@ -1,11 +1,9 @@
+using Origo.Core.Save.Serialization;
+
 namespace Origo.Core.Runtime.Lifecycle;
 
 public sealed partial class ProgressRun
 {
-    /// <summary>
-    ///     持久化流程级状态（流程黑板 + 状态机）到 current/ 目录。
-    ///     不依赖前台会话——仅序列化流程级数据。
-    /// </summary>
     internal void PersistProgress()
     {
         var fgSession = ForegroundSession;
@@ -14,12 +12,11 @@ public sealed partial class ProgressRun
 
         var sessionBb = fgSession?.SessionBlackboard ?? new Blackboard.Blackboard();
 
-        var serializer = _factory.CreateSaveContext(ProgressBlackboard, sessionBb);
+        var serializer = new SaveContext(ProgressBlackboard, sessionBb, _progressRuntime.SndWorld);
         var progressJson = serializer.SerializeProgress();
         var smJson = ProgressScope.StateMachines.SerializeToDataSource(
-            _factory.Runtime.SndWorld.JsonCodec,
-            _factory.Runtime.SndWorld.ConverterRegistry);
+            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
 
-        _factory.StorageService.WriteProgressOnlyToCurrent(progressJson, smJson);
+        _progressRuntime.StorageService.WriteProgressOnlyToCurrent(progressJson, smJson);
     }
 }

@@ -3,59 +3,65 @@ using System.Collections.Generic;
 using System.Linq;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Save;
 using Origo.Core.Save.Meta;
+using Origo.Core.Save.Serialization;
+using Origo.Core.Snd;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
-///     流程级运行时实现，持有流程黑板与 SessionManager。
-///     负责会话生命周期编排与进度持久化。
-///     架构上不区分前台/后台会话：前台只是以 <see cref="ISessionManager.ForegroundKey" /> 为键挂载的普通会话。
-///     所有会话操作均委托给 <see cref="SessionManager" />，不直接操作 SessionRun 实例。
+///     流程级运行时实现。
+///     构造时接收 <see cref="SystemRuntime" /> 与 <see cref="ProgressParameters" />，
+///     内部基于 SystemRuntime 构建 <see cref="ProgressRuntime" /> 作为本层唯一运行时容器。
+///     <para>
+///         SessionManager 作为独立的运行时构造层，由 ProgressRun 创建并持有。
+///         所有会话操作均委托给 <see cref="SessionManager" />。
+///     </para>
 /// </summary>
-public sealed partial class ProgressRun : IProgressRun
+public sealed partial class ProgressRun : IDisposable
 {
-    private readonly RunFactory _factory;
+    private readonly ProgressRuntime _progressRuntime;
     private readonly SessionManager _sessionManager;
     private bool _disposed;
 
     internal ProgressRun(
-        RunFactory factory,
-        RunStateScope progressScope,
-        string saveId)
+        SystemRuntime systemRuntime,
+        ProgressParameters progressParams,
+        IStateMachineContext stateMachineContext,
+        ISndContext sndContext)
     {
-        ArgumentNullException.ThrowIfNull(factory);
-        ArgumentNullException.ThrowIfNull(progressScope);
-        ArgumentNullException.ThrowIfNull(saveId);
-        _factory = factory;
-        ProgressScope = progressScope;
-        SaveId = saveId;
-        _sessionManager = new SessionManager(factory, progressScope.Blackboard);
-        _sessionManager.SetLogger(factory.Logger);
-        factory.Logger.Log(LogLevel.Info, "ProgressRun", $"Created ProgressRun (saveId: '{saveId}').");
+        ArgumentNullException.ThrowIfNull(systemRuntime);
+        ArgumentNullException.ThrowIfNull(stateMachineContext);
+        ArgumentNullException.ThrowIfNull(sndContext);
+        if (string.IsNullOrWhiteSpace(progressParams.SaveId))
+            throw new ArgumentException("Save id cannot be null or whitespace.");
+
+        _progressRuntime = new ProgressRuntime(systemRuntime, stateMachineContext, sndContext);
+
+        var progressBlackboard = new Blackboard.Blackboard();
+        var progressMachines = new StateMachineContainer(
+            _progressRuntime.SndWorld.StrategyPool, stateMachineContext);
+        ProgressScope = new RunStateScope(progressBlackboard, progressMachines);
+        SaveId = progressParams.SaveId;
+
+        _sessionManager = new SessionManager(
+            _progressRuntime,
+            new SessionManagerParameters(),
+            ProgressScope.Blackboard);
+
+        _progressRuntime.Logger.Log(LogLevel.Info, "ProgressRun",
+            $"Created ProgressRun (saveId: '{progressParams.SaveId}').");
     }
 
-    /// <summary>
-    ///     流程级状态机容器。
-    ///     内部使用，仅通过 ISndContext.GetProgressStateMachines() 暴露给策略层。
-    /// </summary>
     internal RunStateScope ProgressScope { get; }
 
-    /// <summary>
-    ///     当前前台会话的快捷访问。等价于 <c>SessionManager.ForegroundSession</c>。
-    /// </summary>
     internal ISessionRun? ForegroundSession => _sessionManager.ForegroundSession;
 
-    /// <summary>
-    ///     流程级黑板。
-    /// </summary>
     public IBlackboard ProgressBlackboard => ProgressScope.Blackboard;
 
-    /// <summary>
-    ///     会话管理器，统一管理所有挂载的会话。
-    /// </summary>
     public ISessionManager SessionManager => _sessionManager;
 
     public string SaveId { get; private set; }
@@ -66,34 +72,28 @@ public sealed partial class ProgressRun : IProgressRun
     public void Dispose()
     {
         if (_disposed) return;
-        _factory.Logger.Log(LogLevel.Info, "ProgressRun", $"Disposing ProgressRun (saveId: '{SaveId}').");
+        // Set flag first to prevent recursive Dispose calls (e.g. from cleanup callbacks).
+        _disposed = true;
+        _progressRuntime.Logger.Log(LogLevel.Info, "ProgressRun",
+            $"Disposing ProgressRun (saveId: '{SaveId}').");
 
-        // Auto-persist progress state before cleanup.
         try
         {
             PersistProgress();
         }
         catch (Exception ex)
         {
-            // Best-effort: if persistence fails, log warning and continue with cleanup.
-            _factory.Logger.Log(LogLevel.Warning, "ProgressRun",
+            _progressRuntime.Logger.Log(LogLevel.Warning, "ProgressRun",
                 $"Auto-persist failed during Dispose (saveId: '{SaveId}'): {ex.Message}");
         }
 
-        // Destroy all mounted sessions (each session auto-persists on Dispose via SessionManager).
         _sessionManager.Clear();
-
-        // ProgressRun 生命周期结束时清理 current/ 临时目录，避免残留的临时存档被后续流程误用。
-        _factory.StorageService.DeleteCurrentDirectory();
+        _progressRuntime.StorageService.DeleteCurrentDirectory();
 
         ProgressScope.StateMachines.PopAllOnQuit();
         ProgressScope.StateMachines.Clear();
         ProgressBlackboard.Clear();
-
-        _disposed = true;
     }
-
-    // Session creation / loading methods moved to ProgressRun.SessionLoading.cs
 
     internal void SetSaveId(string saveId)
     {
@@ -120,30 +120,25 @@ public sealed partial class ProgressRun : IProgressRun
         var fgSession = ForegroundSession ?? throw new InvalidOperationException("No active foreground session.");
         EnsureActiveLevelInvariant(fgSession);
 
-        // Record background session mount info in progress blackboard BEFORE serialization,
-        // so it survives the round-trip and can be used to restore sessions on load.
-        // Format: "mountKey=levelId=syncProcess,mountKey=levelId=syncProcess,..."
         var bgSessions = _sessionManager.GetBackgroundSessions();
-        if (bgSessions.Count > 0)
+        var topologyItems = new List<string>
         {
-            var bgIds = string.Join(",", bgSessions.Select(kvp =>
-            {
-                var syncProcess = _sessionManager.GetSyncProcess(kvp.Key);
-                return $"{kvp.Key}={kvp.Value.LevelId}={syncProcess.ToString().ToLowerInvariant()}";
-            }));
-            ProgressBlackboard.Set(WellKnownKeys.BackgroundLevelIds, bgIds);
-        }
-        else
+            SessionTopologyCodec.Serialize(ISessionManager.ForegroundKey, fgSession.LevelId, false)
+        };
+        topologyItems.AddRange(bgSessions.Select(kvp =>
         {
-            ProgressBlackboard.Set(WellKnownKeys.BackgroundLevelIds, string.Empty);
-        }
+            var syncProcess = _sessionManager.GetSyncProcess(kvp.Key);
+            return SessionTopologyCodec.Serialize(kvp.Key, kvp.Value.LevelId, syncProcess);
+        }));
+        ProgressBlackboard.Set(WellKnownKeys.SessionTopology, SessionTopologyCodec.Join(topologyItems));
 
-        var saveContext = _factory.CreateSaveContext(ProgressBlackboard, fgSession.SessionBlackboard);
+        var saveContext = new SaveContext(
+            ProgressBlackboard, fgSession.SessionBlackboard, _progressRuntime.SndWorld);
 
-        var jsonCodec = _factory.Runtime.SndWorld.JsonCodec;
-        var converterRegistry = _factory.Runtime.SndWorld.ConverterRegistry;
-        var progressSmJson = ProgressScope.StateMachines.SerializeToDataSource(jsonCodec, converterRegistry);
-        var sessionSmJson = fgSession.GetSessionStateMachines().SerializeToDataSource(jsonCodec, converterRegistry);
+        var progressSmJson = ProgressScope.StateMachines.SerializeToDataSource(
+            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
+        var sessionSmJson = fgSession.GetSessionStateMachines().SerializeToDataSource(
+            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
 
         var payload = saveContext.SaveGame(
             fgSession.SceneHost,
@@ -153,7 +148,6 @@ public sealed partial class ProgressRun : IProgressRun
             progressSmJson,
             sessionSmJson);
 
-        // Serialize each background session via SessionManager and include in the payload.
         var bgPayloads = _sessionManager.SerializeBackgroundSessions();
         foreach (var kvp in bgSessions)
             if (bgPayloads.TryGetValue(kvp.Key, out var bgPayload))
@@ -162,9 +156,6 @@ public sealed partial class ProgressRun : IProgressRun
         return payload;
     }
 
-    /// <summary>
-    ///     保存前校验：流程黑板必须包含与前台会话一致的 <see cref="WellKnownKeys.ActiveLevelId" />。
-    /// </summary>
     private void EnsureActiveLevelInvariant(ISessionRun fgSession)
     {
         var (found, id) = ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
@@ -176,8 +167,4 @@ public sealed partial class ProgressRun : IProgressRun
             throw new InvalidOperationException(
                 $"Progress '{WellKnownKeys.ActiveLevelId}' ('{id}') does not match foreground level '{fgSession.LevelId}' (save id: '{SaveId}').");
     }
-
-    // PersistProgress moved to ProgressRun.Persistence.cs
-
-    // SwitchForeground moved to ProgressRun.SessionLoading.cs
 }

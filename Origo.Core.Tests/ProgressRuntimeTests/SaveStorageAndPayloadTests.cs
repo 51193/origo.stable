@@ -1,0 +1,378 @@
+using System;
+using System.Collections.Generic;
+using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.Save;
+using Xunit;
+using Origo.Core.Save.Storage;
+
+namespace Origo.Core.Tests;
+
+public class SaveStorageAndPayloadTests
+{
+    [Fact]
+    public void SaveStorageFacade_WriteAndReadCurrent_RoundTrip()
+    {
+        var fs = new TestFileSystem();
+        var progressSm = """{"machines":[]}""";
+        var sessionSm = """{"machines":[]}""";
+        var payload = new SaveGamePayload
+        {
+            SaveId = "001",
+            ActiveLevelId = "default",
+            ProgressJson = """{"k":{"type":"Int32","data":1}}""",
+            ProgressStateMachinesJson = progressSm,
+            Levels = new Dictionary<string, LevelPayload>
+            {
+                ["default"] = new()
+                {
+                    LevelId = "default",
+                    SndSceneJson = "[]",
+                    SessionJson = """{"s":{"type":"String","data":"ok"}}""",
+                    SessionStateMachinesJson = sessionSm
+                }
+            }
+        };
+
+        SaveStorageFacade.WriteSavePayloadToCurrent(fs, "user://origo_saves", payload);
+        var loaded = SaveStorageFacade.ReadSavePayloadFromCurrent(fs, "user://origo_saves", "001", "default");
+
+        Assert.Equal("001", loaded.SaveId);
+        Assert.Equal("default", loaded.ActiveLevelId);
+        Assert.Contains("\"k\"", loaded.ProgressJson);
+        Assert.Equal("[]", loaded.Levels["default"].SndSceneJson);
+        Assert.Equal(progressSm, loaded.ProgressStateMachinesJson);
+        Assert.Equal(sessionSm, loaded.Levels["default"].SessionStateMachinesJson);
+    }
+
+    [Fact]
+    public void SaveStorageFacade_EnumerateSaveIds_NullFileSystem_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => SaveStorageFacade.EnumerateSaveIds(null!, "root"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_SnapshotCurrentToSave_WhitespaceSaveRoot_Throws()
+    {
+        var fs = new TestFileSystem();
+        Assert.Throws<ArgumentException>(() => SaveStorageFacade.SnapshotCurrentToSave(fs, "  ", "b"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_SnapshotCurrentToSave_WhitespaceNewSaveId_Throws()
+    {
+        var fs = new TestFileSystem();
+        Assert.Throws<ArgumentException>(() => SaveStorageFacade.SnapshotCurrentToSave(fs, "root", "  "));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadSavePayloadFromSnapshot_WhitespaceSaveRoot_Throws()
+    {
+        var fs = new TestFileSystem();
+        Assert.Throws<ArgumentException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromSnapshot(fs, " ", "1", "level"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadProgressJsonFromSnapshot_Missing_ReturnsNull()
+    {
+        var fs = new TestFileSystem();
+        Assert.Null(SaveStorageFacade.ReadProgressJsonFromSnapshot(fs, "root", "missing"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadProgressJsonFromSnapshot_WhenPresent_ReturnsContent()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("root/save_042/progress.json", """{"k":1}""");
+        var json = SaveStorageFacade.ReadProgressJsonFromSnapshot(fs, "root", "042");
+        Assert.Contains("\"k\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveStorageFacade_EnumerateSavesWithMetaData_SlotWithoutMetaMap_StillListed()
+    {
+        var fs = new TestFileSystem();
+        fs.CreateDirectory("root/save_007");
+        var entries = SaveStorageFacade.EnumerateSavesWithMetaData(fs, "root");
+        Assert.Single(entries);
+        Assert.Equal("007", entries[0].SaveId);
+        Assert.Empty(entries[0].MetaData);
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadCurrent_MissingProgressStateMachines_Throws()
+    {
+        var fs = new TestFileSystem();
+        var root = "root";
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        var progressAbs = fs.CombinePath(root, SavePathLayout.GetProgressFile(currentRel));
+        var sndSceneAbs = fs.CombinePath(root,
+            SavePathLayout.GetLevelSndSceneFile(SavePathLayout.GetLevelDirectory(currentRel, "default")));
+        var sessionAbs = fs.CombinePath(root,
+            SavePathLayout.GetLevelSessionFile(SavePathLayout.GetLevelDirectory(currentRel, "default")));
+        var sessionSmAbs = fs.CombinePath(root,
+            SavePathLayout.GetLevelSessionStateMachinesFile(SavePathLayout.GetLevelDirectory(currentRel, "default")));
+
+        fs.SeedFile(progressAbs, "{}");
+        fs.SeedFile(sndSceneAbs, "[]");
+        fs.SeedFile(sessionAbs, "{}");
+        fs.SeedFile(sessionSmAbs, """{"machines":[]}""");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromCurrent(fs, root, "001", "default"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadCurrent_MissingSessionStateMachines_Throws()
+    {
+        var fs = new TestFileSystem();
+        var root = "root";
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        var progressAbs = fs.CombinePath(root, SavePathLayout.GetProgressFile(currentRel));
+        var progressSmAbs = fs.CombinePath(root, SavePathLayout.GetProgressStateMachinesFile(currentRel));
+        var sndSceneAbs = fs.CombinePath(root,
+            SavePathLayout.GetLevelSndSceneFile(SavePathLayout.GetLevelDirectory(currentRel, "default")));
+        var sessionAbs = fs.CombinePath(root,
+            SavePathLayout.GetLevelSessionFile(SavePathLayout.GetLevelDirectory(currentRel, "default")));
+
+        fs.SeedFile(progressAbs, "{}");
+        fs.SeedFile(progressSmAbs, """{"machines":[]}""");
+        fs.SeedFile(sndSceneAbs, "[]");
+        fs.SeedFile(sessionAbs, "{}");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromCurrent(fs, root, "001", "default"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_SnapshotCurrentToSave_AndEnumerateSaveIds_Works()
+    {
+        var fs = new TestFileSystem();
+        var payload = new SaveGamePayload
+        {
+            SaveId = "001",
+            ActiveLevelId = "default",
+            ProgressJson = "{}",
+            ProgressStateMachinesJson = """{"machines":[]}""",
+            Levels = new Dictionary<string, LevelPayload>
+            {
+                ["default"] = new()
+                {
+                    LevelId = "default",
+                    SndSceneJson = "[]",
+                    SessionJson = "{}",
+                    SessionStateMachinesJson = """{"machines":[]}"""
+                }
+            }
+        };
+        SaveStorageFacade.WriteSavePayloadToCurrent(fs, "root", payload);
+
+        SaveStorageFacade.SnapshotCurrentToSave(fs, "root", "001");
+        var ids = SaveStorageFacade.EnumerateSaveIds(fs, "root");
+
+        Assert.Contains("001", ids);
+    }
+
+    [Fact]
+    public void SaveStorageFacade_SnapshotCurrentToSave_UsesTempDirectoryThenRename()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("root/current/progress.json", "{}");
+        fs.SeedFile("root/current/progress_state_machines.json", """{"machines":[]}""");
+        fs.SeedFile("root/current/level_default/snd_scene.json", "[]");
+        fs.SeedFile("root/current/level_default/session.json", """{"k":"v"}""");
+
+        SaveStorageFacade.SnapshotCurrentToSave(fs, "root", "001");
+
+        // No leftover .tmp directory.
+        Assert.False(fs.DirectoryExists("root/save_001.tmp"));
+
+        // Final save directory has all four files.
+        Assert.True(fs.Exists("root/save_001/progress.json"));
+        Assert.True(fs.Exists("root/save_001/progress_state_machines.json"));
+        Assert.True(fs.Exists("root/save_001/level_default/snd_scene.json"));
+        Assert.True(fs.Exists("root/save_001/level_default/session.json"));
+
+        // Content must match the originals.
+        Assert.Equal("{}", fs.ReadAllText("root/save_001/progress.json"));
+        Assert.Equal("""{"k":"v"}""", fs.ReadAllText("root/save_001/level_default/session.json"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadCurrent_ActiveLevelPartial_MissingSession_Throws()
+    {
+        var fs = new TestFileSystem();
+        var root = "root";
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressFile(currentRel)), "{}");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressStateMachinesFile(currentRel)),
+            """{"machines":[]}""");
+        var levelDir = SavePathLayout.GetLevelDirectory(currentRel, "default");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSndSceneFile(levelDir)), "[]");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromCurrent(fs, root, "001", "default"));
+        Assert.Contains("session.json", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaveStorageFacade_ReadCurrent_BackgroundLevelPartial_MissingStateMachines_Throws()
+    {
+        var fs = new TestFileSystem();
+        var root = "root";
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressFile(currentRel)), "{}");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressStateMachinesFile(currentRel)),
+            """{"machines":[]}""");
+        var defDir = SavePathLayout.GetLevelDirectory(currentRel, "default");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSndSceneFile(defDir)), "[]");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSessionFile(defDir)), "{}");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSessionStateMachinesFile(defDir)),
+            """{"machines":[]}""");
+
+        var bgDir = SavePathLayout.GetLevelDirectory(currentRel, "bg");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSndSceneFile(bgDir)), "[]");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSessionFile(bgDir)), "{}");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromCurrent(fs, root, "001", "default"));
+        Assert.Contains("session_state_machines.json", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("bg", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SavePayloadReader_TryReadLevelPayloadFromCurrent_AllFilesAbsent_ReturnsNull()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("root/current/progress.json", "{}");
+        fs.SeedFile("root/current/progress_state_machines.json", """{"machines":[]}""");
+
+        Assert.Null(SavePayloadReader.TryReadLevelPayloadFromCurrent(fs, "root", "no_such_level"));
+    }
+
+    [Fact]
+    public void WriteSavePayloadToCurrentThenSnapshot_NullLogger_Throws()
+    {
+        var fs = new TestFileSystem();
+        var payload = new SaveGamePayload
+        {
+            SaveId = "1",
+            ActiveLevelId = "d",
+            ProgressJson = "{}",
+            ProgressStateMachinesJson = """{"machines":[]}""",
+            Levels = new Dictionary<string, LevelPayload>
+            {
+                ["d"] = new()
+                {
+                    LevelId = "d",
+                    SndSceneJson = "[]",
+                    SessionJson = "{}",
+                    SessionStateMachinesJson = """{"machines":[]}"""
+                }
+            }
+        };
+        Assert.Throws<ArgumentNullException>(() =>
+            SaveStorageFacade.WriteSavePayloadToCurrentThenSnapshot(fs, "root", payload, "1", null!));
+    }
+
+    [Fact]
+    public void WriteSavePayloadToCurrentThenSnapshot_WhenSnapshotFails_LogsError_LeavesMarkerAndUpdatedCurrent()
+    {
+        var fs = new FailOnCopyFileSystem("save_new.tmp");
+        var logger = new TestLogger();
+        var progressSm = """{"machines":[]}""";
+        var payload = new SaveGamePayload
+        {
+            SaveId = "001",
+            ActiveLevelId = "default",
+            ProgressJson = """{"marker":"after_write"}""",
+            ProgressStateMachinesJson = progressSm,
+            Levels = new Dictionary<string, LevelPayload>
+            {
+                ["default"] = new()
+                {
+                    LevelId = "default",
+                    SndSceneJson = "[]",
+                    SessionJson = "{}",
+                    SessionStateMachinesJson = progressSm
+                }
+            }
+        };
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.WriteSavePayloadToCurrentThenSnapshot(fs, "root", payload, "new", logger));
+
+        Assert.NotNull(logger.Errors.Find(e => e.Contains("Snapshot failed", StringComparison.Ordinal)));
+        Assert.True(fs.Exists("root/current/progress.json"));
+        Assert.Contains("marker", fs.ReadAllText("root/current/progress.json"), StringComparison.Ordinal);
+        var markerRel = SavePathLayout.GetWriteInProgressMarker(SavePathLayout.GetCurrentDirectory());
+        Assert.True(fs.Exists(fs.CombinePath("root", markerRel)));
+        Assert.False(fs.DirectoryExists("root/save_new"));
+    }
+
+    [Fact]
+    public void SaveStorageFacade_SnapshotCurrentToSave_CleansUpTempOnFailure()
+    {
+        var fs = new FailOnCopyFileSystem("save_001.tmp");
+        fs.SeedFile("root/current/progress.json", "{}");
+        fs.SeedFile("root/current/level_default/snd_scene.json", "[]");
+
+        Assert.ThrowsAny<Exception>(() =>
+            SaveStorageFacade.SnapshotCurrentToSave(fs, "root", "001"));
+
+        // The incomplete .tmp directory must be cleaned up.
+        Assert.False(fs.DirectoryExists("root/save_001.tmp"));
+    }
+
+    /// <summary>
+    ///     A file system that delegates to <see cref="TestFileSystem" /> but throws on
+    ///     <see cref="IFileSystem.Copy" /> when the destination path contains the configured substring.
+    ///     Used to simulate snapshot copy failures.
+    /// </summary>
+    private sealed class FailOnCopyFileSystem : IFileSystem
+    {
+        private readonly string _failTargetSubstring;
+        private readonly TestFileSystem _inner = new();
+
+        public FailOnCopyFileSystem(string failTargetSubstring)
+        {
+            _failTargetSubstring = failTargetSubstring;
+        }
+
+        public bool Exists(string path) => _inner.Exists(path);
+        public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
+        public string ReadAllText(string path) => _inner.ReadAllText(path);
+
+        public void WriteAllText(string path, string content, bool overwrite)
+            => _inner.WriteAllText(path, content, overwrite);
+
+        public void Copy(string sourcePath, string destinationPath, bool overwrite)
+        {
+            if (destinationPath.Replace('\\', '/').Contains(_failTargetSubstring, StringComparison.Ordinal))
+                throw new InvalidOperationException($"Simulated copy failure for '{destinationPath}'.");
+            _inner.Copy(sourcePath, destinationPath, overwrite);
+        }
+
+        public IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
+            => _inner.EnumerateFiles(directoryPath, searchPattern, recursive);
+
+        public void CreateDirectory(string directoryPath) => _inner.CreateDirectory(directoryPath);
+        public void Delete(string path) => _inner.Delete(path);
+
+        public string CombinePath(string basePath, string relativePath)
+            => _inner.CombinePath(basePath, relativePath);
+
+        public string GetParentDirectory(string path) => _inner.GetParentDirectory(path);
+
+        public IEnumerable<string> EnumerateDirectories(string directoryPath)
+            => _inner.EnumerateDirectories(directoryPath);
+
+        public void Rename(string sourcePath, string destinationPath)
+            => _inner.Rename(sourcePath, destinationPath);
+
+        public void DeleteDirectory(string directoryPath)
+            => _inner.DeleteDirectory(directoryPath);
+
+        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
+    }
+}

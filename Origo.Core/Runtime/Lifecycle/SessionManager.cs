@@ -6,34 +6,35 @@ using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Save;
+using Origo.Core.Save.Serialization;
 using Origo.Core.Snd.Scene;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
 /// <summary>
 ///     <see cref="ISessionManager" /> 的默认实现。
+///     构造时接收 <see cref="ProgressRuntime" /> 与 <see cref="SessionManagerParameters" />，
+///     内部构建 <see cref="SessionManagerRuntime" /> 作为本层唯一运行时容器。
 ///     全权管理所有 <see cref="ISessionRun" /> 的生命周期：创建、持有、序列化/反序列化、销毁。
-///     前台和后台会话均通过统一的内部 KVP 存储管理，
-///     前台会话以 <see cref="ISessionManager.ForegroundKey" /> 为键挂载，无架构区别。
-///     <para>
-///         能力边界：SessionManager 负责 Session 的生命周期管理（创建/销毁/序列化），
-///         Session 自身负责内部状态管理（黑板读写、场景操作、状态机）。
-///         Session 的资源回收遵循 RAII 原则，由 Session 自身在 Dispose 中完成。
-///     </para>
 /// </summary>
 internal sealed class SessionManager : ISessionManager
 {
     private const string LogTag = "SessionManager";
-    private readonly RunFactory _factory;
+    private readonly SessionManagerRuntime _managerRuntime;
     private readonly IBlackboard _progressBlackboard;
     private readonly Dictionary<string, MountedSession> _sessions = new(StringComparer.Ordinal);
-    private ILogger _logger = NullLogger.Instance;
 
-    internal SessionManager(RunFactory factory, IBlackboard progressBlackboard)
+    // NOTE: MountedSession stores SessionRun (concrete) rather than ISessionRun (interface)
+    // because SessionManager is internal and always creates SessionRun instances.
+    // This avoids repeated casts from ISessionRun to SessionRun for internal operations
+    // (serialize, load, persist), while public-facing members still return ISessionRun.
+
+    internal SessionManager(ProgressRuntime progressRuntime, SessionManagerParameters managerParams,
+        IBlackboard progressBlackboard)
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(progressRuntime);
         ArgumentNullException.ThrowIfNull(progressBlackboard);
-        _factory = factory;
+        _managerRuntime = new SessionManagerRuntime(progressRuntime, progressBlackboard);
         _progressBlackboard = progressBlackboard;
     }
 
@@ -69,17 +70,8 @@ internal sealed class SessionManager : ISessionManager
     public ISessionRun CreateBackgroundSession(string key, string levelId, bool syncProcess = false)
     {
         ValidateKey(key);
-        var session = _factory.CreateBackgroundSession(levelId);
-        MountInternal(key, session, syncProcess);
-        return session;
-    }
-
-    /// <inheritdoc />
-    public ISessionRun CreateBackgroundSessionFromPayload(string key, string levelId, LevelPayload payload,
-        bool syncProcess = false)
-    {
-        ValidateKey(key);
-        var session = _factory.CreateBackgroundSessionFromPayload(levelId, payload);
+        var session = CreateBackgroundSessionCore(levelId);
+        session.GetSessionStateMachines().FlushAllAfterLoad();
         MountInternal(key, session, syncProcess);
         return session;
     }
@@ -93,42 +85,34 @@ internal sealed class SessionManager : ISessionManager
         if (!_sessions.Remove(key, out var mounted))
             return;
 
-        _logger.Log(LogLevel.Info, LogTag,
+        _managerRuntime.Logger.Log(LogLevel.Info, LogTag,
             $"Destroying session '{key}' (level: {mounted.Session.LevelId}).");
 
         // Clear mount tracking before Dispose to avoid re-entrant remove.
-        if (mounted.Session is SessionRun sr)
-        {
-            sr.MountKey = null;
-            sr.UnmountCallback = null;
-        }
+        mounted.Session.MountKey = null;
+        mounted.Session.UnmountCallback = null;
 
         mounted.Session.Dispose();
     }
 
     /// <inheritdoc />
-    public void ProcessBackgroundSessions(double delta)
+    public void ProcessAllSessions(double delta, bool includeForeground = false)
     {
         // Snapshot keys to allow modifications during iteration.
         var keys = _sessions.Keys.ToArray();
         foreach (var key in keys)
         {
-            // Skip foreground session — it is driven by the engine adapter.
-            if (string.Equals(key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
+            if (!includeForeground && string.Equals(key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
                 continue;
             if (!_sessions.TryGetValue(key, out var mounted) || !mounted.SyncProcess)
                 continue;
 
-            // FullMemorySndSceneHost supports ProcessAll for background sessions.
+            // FullMemorySndSceneHost.ProcessAll is a host-specific capability (not on ISndSceneHost)
+            // for background sessions. This type check is intentional — see README API reference.
             if (mounted.Session.SceneHost is FullMemorySndSceneHost memHost)
                 memHost.ProcessAll(delta);
         }
     }
-
-    /// <summary>
-    ///     注入日志实例，供生命周期事件输出。
-    /// </summary>
-    internal void SetLogger(ILogger logger) => _logger = logger;
 
     // ── Internal methods for ProgressRun ──────────────────────────────
 
@@ -141,9 +125,8 @@ internal sealed class SessionManager : ISessionManager
             throw new ArgumentException("Level id cannot be null or whitespace.", nameof(levelId));
         ArgumentNullException.ThrowIfNull(sceneHost);
 
-        var sessionBlackboard = new Blackboard.Blackboard();
-        var saveContext = _factory.CreateSaveContext(_progressBlackboard, sessionBlackboard);
-        var session = _factory.CreateSessionRun(saveContext, levelId, sessionBlackboard, sceneHost);
+        var sessionParams = new SessionParameters(levelId, new Blackboard.Blackboard(), sceneHost, true);
+        var session = new SessionRun(_managerRuntime, sessionParams);
         MountInternal(ISessionManager.ForegroundKey, session, false);
         return session;
     }
@@ -155,7 +138,9 @@ internal sealed class SessionManager : ISessionManager
     {
         ArgumentNullException.ThrowIfNull(payload);
         var session = CreateForegroundSession(levelId, sceneHost);
-        ((SessionRun)session).LoadFromPayload(payload);
+        // session is always SessionRun (created by CreateForegroundSession → MountInternal),
+        // so we can directly access it through the MountedSession.
+        _sessions[ISessionManager.ForegroundKey].Session.LoadFromPayload(payload);
         return session;
     }
 
@@ -171,7 +156,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (!_sessions.TryGetValue(key, out var mounted))
             throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        return ((SessionRun)mounted.Session).SerializeToPayload();
+        return mounted.Session.SerializeToPayload();
     }
 
     /// <summary>
@@ -181,7 +166,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (!_sessions.TryGetValue(key, out var mounted))
             throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        ((SessionRun)mounted.Session).PersistLevelState();
+        mounted.Session.PersistLevelState();
     }
 
     /// <summary>
@@ -191,7 +176,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (!_sessions.TryGetValue(key, out var mounted))
             throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        ((SessionRun)mounted.Session).LoadFromPayload(payload);
+        mounted.Session.LoadFromPayload(payload);
     }
 
     /// <summary>
@@ -237,16 +222,30 @@ internal sealed class SessionManager : ISessionManager
     internal IReadOnlyDictionary<string, LevelPayload> SerializeBackgroundSessions()
     {
         var result = new Dictionary<string, LevelPayload>();
-        foreach (var kvp in GetBackgroundSessions())
+        foreach (var kvp in _sessions)
         {
-            var payload = ((SessionRun)kvp.Value).SerializeToPayload();
-            result[kvp.Key] = payload;
+            if (string.Equals(kvp.Key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
+                continue;
+            result[kvp.Key] = kvp.Value.Session.SerializeToPayload();
         }
 
         return result;
     }
 
     // ── Private helpers ──────────────────────────────────────────────
+
+    private SessionRun CreateBackgroundSessionCore(string levelId)
+    {
+        if (string.IsNullOrWhiteSpace(levelId))
+            throw new ArgumentException("Level id cannot be null or whitespace.", nameof(levelId));
+
+        var sceneHost = new FullMemorySndSceneHost(_managerRuntime.Logger);
+        sceneHost.BindWorld(_managerRuntime.SndWorld);
+        sceneHost.BindContext(_managerRuntime.SndContext);
+
+        var sessionParams = new SessionParameters(levelId, new Blackboard.Blackboard(), sceneHost, false);
+        return new SessionRun(_managerRuntime, sessionParams);
+    }
 
     private void ValidateKey(string key)
     {
@@ -256,7 +255,7 @@ internal sealed class SessionManager : ISessionManager
             throw new InvalidOperationException($"A session with key '{key}' is already mounted.");
     }
 
-    private void MountInternal(string key, ISessionRun session, bool syncProcess)
+    private void MountInternal(string key, SessionRun session, bool syncProcess)
     {
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Session key cannot be null or whitespace.", nameof(key));
@@ -270,20 +269,17 @@ internal sealed class SessionManager : ISessionManager
             throw new InvalidOperationException($"A session with key '{key}' is already mounted.");
 
         _sessions[key] = new MountedSession(session, syncProcess);
-        _logger.Log(LogLevel.Info, LogTag,
+        _managerRuntime.Logger.Log(LogLevel.Info, LogTag,
             $"Mounted session '{key}' (level: {session.LevelId}, syncProcess: {syncProcess}).");
 
         // Track mount key on the session for auto-unmount on Dispose.
-        if (session is SessionRun sr)
+        session.MountKey = key;
+        session.UnmountCallback = run =>
         {
-            sr.MountKey = key;
-            sr.UnmountCallback = run =>
-            {
-                if (run.MountKey is not null && _sessions.ContainsKey(run.MountKey))
-                    _sessions.Remove(run.MountKey);
-            };
-        }
+            if (run.MountKey is not null && _sessions.ContainsKey(run.MountKey))
+                _sessions.Remove(run.MountKey);
+        };
     }
 
-    private sealed record MountedSession(ISessionRun Session, bool SyncProcess);
+    private sealed record MountedSession(SessionRun Session, bool SyncProcess);
 }

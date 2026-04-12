@@ -6,6 +6,8 @@ using Origo.Core.Abstractions;
 using Origo.Core.DataSource;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
+using Origo.Core.Runtime.Lifecycle;
+using Origo.Core.Save.Storage;
 using Origo.Core.Snd;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Entity;
@@ -413,5 +415,39 @@ internal static class TestFactory
         return new OrigoRuntime(
             logger, sceneHost, tm, reg, CreateJsonCodec(), CreateMapCodec(),
             systemBb, consoleInput, consoleOutput);
+    }
+
+    // ── Lifecycle helpers for tests ────────────────────────────────────
+
+    public static SystemRuntime CreateSystemRuntime(
+        ILogger logger,
+        IFileSystem fileSystem,
+        string saveRootPath,
+        OrigoRuntime runtime,
+        ISaveStorageService? storageService = null,
+        ISavePathPolicy? savePathPolicy = null)
+    {
+        savePathPolicy ??= new DefaultSavePathPolicy();
+        storageService ??= new DefaultSaveStorageService(fileSystem, saveRootPath, savePathPolicy);
+        return new SystemRuntime(logger, fileSystem, saveRootPath, runtime, storageService, savePathPolicy);
+    }
+
+    public static ProgressRun CreateProgressRun(
+        string saveId,
+        ILogger logger,
+        IFileSystem fileSystem,
+        string saveRootPath,
+        OrigoRuntime runtime,
+        ISndContext sndContext,
+        ISaveStorageService? storageService = null,
+        ISavePathPolicy? savePathPolicy = null)
+    {
+        var systemRuntime = CreateSystemRuntime(
+            logger, fileSystem, saveRootPath, runtime, storageService, savePathPolicy);
+        return new ProgressRun(
+            systemRuntime,
+            new ProgressParameters(saveId),
+            (Abstractions.StateMachine.IStateMachineContext)sndContext,
+            sndContext);
     }
 }

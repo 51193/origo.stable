@@ -20,7 +20,7 @@ namespace Origo.Core.Snd.Scene;
 ///         即注入此宿主实例。
 ///     </para>
 /// </summary>
-public sealed class FullMemorySndSceneHost : ISndSceneHost
+public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachableSceneHost
 {
     private readonly List<MemoryEntityEntry> _entries = new();
     private readonly ILogger _logger;
@@ -103,7 +103,7 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost
     ///     绑定 <see cref="ISndContext" />，用于策略生命周期回调。
     ///     必须在首次 Spawn/Load 之前调用。
     /// </summary>
-    internal void BindContext(ISndContext context)
+    public void BindContext(ISndContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         _context = context;

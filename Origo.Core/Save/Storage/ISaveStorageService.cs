@@ -24,7 +24,6 @@ public interface ISaveStorageService
     /// <summary>将存档 payload 写入 current/ 后快照到 save_* 目录。</summary>
     void WriteSavePayloadToCurrentThenSnapshot(
         SaveGamePayload payload,
-        string baseSaveId,
         string newSaveId,
         ILogger logger);
 
@@ -74,7 +73,7 @@ public interface ISaveStorageService
     LevelPayload? ResolveLevelPayload(string saveId, string levelId);
 
     /// <summary>将 current/ 快照到 save_* 目录。</summary>
-    void SnapshotCurrentToSave(string baseSaveId, string newSaveId);
+    void SnapshotCurrentToSave(string newSaveId);
 
     /// <summary>
     ///     删除 current/ 临时活动目录及其全部内容。

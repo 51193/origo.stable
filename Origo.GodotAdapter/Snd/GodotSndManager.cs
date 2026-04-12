@@ -8,6 +8,7 @@ using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
+using Origo.Core.Snd.Scene;
 
 namespace Origo.GodotAdapter.Snd;
 
@@ -17,11 +18,10 @@ namespace Origo.GodotAdapter.Snd;
 ///     使用内部 List 维护实体集合，避免每帧通过 Group 查询造成 GC 压力。
 /// </summary>
 [GlobalClass]
-public partial class GodotSndManager : Node, ISndSceneHost
+public partial class GodotSndManager : Node, ISndSceneHost, ISndContextAttachableSceneHost
 {
     private readonly List<GodotSndEntity> _entities = new();
     private readonly List<GodotSndEntity> _processBuffer = new();
-    private bool _contextBound;
     private EntityView? _entityView;
     private bool _inProcess;
 
@@ -120,7 +120,8 @@ public partial class GodotSndManager : Node, ISndSceneHost
     }
 
     /// <summary>
-    ///     绑定存档/生命周期门面（由入口节点在创建 <see cref="ISndContext" /> 后调用一次）。
+    ///     绑定存档/生命周期门面。
+    ///     支持在生命周期切换时重新绑定会话上下文。
     /// </summary>
     public void BindContext(ISndContext context)
     {
@@ -128,10 +129,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
 
         if (!_runtimeDepsBound) throw new InvalidOperationException("Call BindRuntimeDependencies before BindContext.");
 
-        if (_contextBound) throw new InvalidOperationException("Context is already bound.");
-
         Context = context;
-        _contextBound = true;
     }
 
     public void QuitAll()
@@ -201,7 +199,7 @@ public partial class GodotSndManager : Node, ISndSceneHost
 
     private void EnsureReadyForSpawn()
     {
-        if (!_runtimeDepsBound || !_contextBound || Context is null)
+        if (!_runtimeDepsBound || Context is null)
             throw new InvalidOperationException(
                 "GodotSndManager is not ready: call BindRuntimeDependencies and BindContext before spawning entities.");
     }

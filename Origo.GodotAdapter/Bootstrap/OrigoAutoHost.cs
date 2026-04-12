@@ -4,7 +4,6 @@ using Godot;
 using Origo.Core.Abstractions.Console;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
-using Origo.Core.Abstractions.Runtime;
 using Origo.Core.Blackboard;
 using Origo.Core.DataSource;
 using Origo.Core.Logging;
@@ -20,15 +19,13 @@ using Origo.GodotAdapter.Snd;
 namespace Origo.GodotAdapter.Bootstrap;
 
 /// <summary>
-///     可自行创建运行时或绑定已有 Host 的节点。
+///     自建 Runtime 与 SndManager 的唯一启动入口节点。
 /// </summary>
 [GlobalClass]
-public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
+public partial class OrigoAutoHost : Node
 {
 	private const string LogTag = nameof(OrigoAutoHost);
 
-	[Export] public NodePath? HostPath { get; set; }
-	[Export] public NodePath? SndManagerPath { get; set; }
 	[Export] public string SystemBlackboardSaveRoot { get; set; } = "user://origo_saves";
 	public GodotSndManager SndManager { get; private set; } = null!;
 
@@ -56,12 +53,11 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 		bootstrapLogger.Log(LogLevel.Info, LogTag, new LogMessageBuilder().Build("_Ready begin."));
 		try
 		{
-			Runtime = ResolveOrCreateRuntime();
+			Runtime = CreateRuntime();
 			readyWatch.Stop();
 			Runtime.Logger.Log(LogLevel.Info, LogTag,
 				new LogMessageBuilder()
 					.SetElapsedMs(readyWatch.Elapsed.TotalMilliseconds)
-					.AddSuffix("hostPath", HostPath?.ToString())
 					.Build("_Ready completed."));
 		}
 		catch (Exception ex)
@@ -74,42 +70,17 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 		}
 	}
 
-	private OrigoRuntime ResolveOrCreateRuntime()
-	{
-		SharedFileSystem = new GodotFileSystem();
-		var watch = Stopwatch.StartNew();
-		if (HostPath is not null && !HostPath.IsEmpty)
-		{
-			var hostNode = GetNodeOrNull(HostPath);
-			if (hostNode is IOrigoRuntimeProvider { Runtime: not null } provider)
-			{
-				provider.Runtime.Logger.Log(LogLevel.Info, LogTag,
-					new LogMessageBuilder()
-						.SetElapsedMs(watch.Elapsed.TotalMilliseconds)
-						.AddSuffix("hostPath", HostPath.ToString())
-						.Build("Resolved runtime from existing host."));
-				return provider.Runtime;
-			}
-
-			throw new InvalidOperationException(
-				$"HostPath '{HostPath}' did not resolve to a ready IOrigoRuntimeProvider with non-null Runtime.");
-		}
-
-		return CreateRuntime();
-	}
-
 	private OrigoRuntime CreateRuntime()
 	{
 		var createWatch = Stopwatch.StartNew();
 		var logger = CreateBootstrapLogger();
 		logger.Log(LogLevel.Info, LogTag,
-			new LogMessageBuilder()
-				.AddSuffix("hostPath", HostPath?.ToString())
-				.Build("CreateRuntime begin."));
+			new LogMessageBuilder().Build("CreateRuntime begin."));
 
-		var sndManager = ResolveOrCreateSndManager();
+		SharedFileSystem = new GodotFileSystem();
+		var sndManager = new GodotSndManager();
+		AddChild(sndManager);
 		SndManager = sndManager;
-		sndManager.SetProcess(true);
 
 		var fileSystem = SharedFileSystem;
 		var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
@@ -139,6 +110,8 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 			consoleInput,
 			consoleOutputChannel
 		);
+		sndManager.BindRuntimeDependencies(runtime.SndWorld, runtime.Logger);
+		sndManager.SetProcess(true);
 
 		ConsoleInput = consoleInput;
 		ConsoleOutputChannel = consoleOutputChannel;
@@ -153,19 +126,6 @@ public partial class OrigoAutoHost : Node, IOrigoRuntimeProvider
 				.AddSuffix("filePath", systemBbPath)
 				.Build("CreateRuntime completed."));
 		return runtime;
-	}
-
-	private GodotSndManager ResolveOrCreateSndManager()
-	{
-		if (SndManagerPath is not null && !SndManagerPath.IsEmpty)
-		{
-			var node = GetNodeOrNull<GodotSndManager>(SndManagerPath);
-			if (node is not null) return node;
-		}
-
-		var manager = new GodotSndManager();
-		AddChild(manager);
-		return manager;
 	}
 
 	private static GodotLogger CreateBootstrapLogger()

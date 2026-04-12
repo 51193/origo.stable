@@ -51,18 +51,6 @@ public interface ISessionManager
     ISessionRun CreateBackgroundSession(string key, string levelId, bool syncProcess = false);
 
     /// <summary>
-    ///     创建后台关卡会话，从 <see cref="LevelPayload" /> 恢复状态，并自动挂载到管理器。
-    ///     等价于 <see cref="CreateBackgroundSession" /> + 内部 LoadFromPayload。
-    /// </summary>
-    /// <param name="key">会话标识键。</param>
-    /// <param name="levelId">后台关卡标识符。</param>
-    /// <param name="payload">要恢复的关卡数据。</param>
-    /// <param name="syncProcess">若为 true，该会话将参与 Process 帧更新。</param>
-    /// <returns>已创建、恢复并挂载的后台会话。</returns>
-    ISessionRun CreateBackgroundSessionFromPayload(string key, string levelId, LevelPayload payload,
-        bool syncProcess = false);
-
-    /// <summary>
     ///     销毁指定键的会话（Dispose 并从管理器移除）。
     ///     若键不存在则静默返回。
     /// </summary>
@@ -70,9 +58,10 @@ public interface ISessionManager
     void DestroySession(string key);
 
     /// <summary>
-    ///     对所有参与 Process 的后台会话执行帧更新。
-    ///     前台会话由引擎适配层驱动，不在此方法范围内。
+    ///     对所有配置为参与 Process 的会话执行帧更新。
+    ///     默认仅处理后台会话；<paramref name="includeForeground" /> 为 true 时会尝试处理前台会话。
     /// </summary>
     /// <param name="delta">帧间隔时间（秒）。</param>
-    void ProcessBackgroundSessions(double delta);
+    /// <param name="includeForeground">是否包含前台会话。</param>
+    void ProcessAllSessions(double delta, bool includeForeground = false);
 }

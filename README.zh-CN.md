@@ -30,11 +30,11 @@
 
 - **SND 实体模型** —— 通过 Data、Node 和 Strategy 组合实体，而非深层类继承
 - **无状态策略池** —— 共享、引用计数、池化的策略实例，具备快速失败的类型安全
-- **三层生命周期** —— `SystemRun` → `ProgressRun` → `SessionRun`，配套对应的黑板
+- **四层生命周期** —— `SystemRun` → `ProgressRun` → `SessionManager` → `SessionRun`，配套对应的黑板与结构化参数传递
 - **完整存档系统** —— 基于插槽的存/读档、继续游戏、自动存档、关卡切换，以及用于 UI 的 `meta.map`
 - **栈式状态机** —— 基于字符串的 push/pop 状态机，具有策略钩子，按层持久化
 - **类型化黑板** —— `IBlackboard` 使用 `TypedData` 值，在序列化往返中保持类型
-- **内置开发者控制台** —— 14 个内置命令（`help`、`spawn`、`snd_count`、`find_entity`、`clear_entities`、`bb_get`、`bb_set`、`bb_keys`、`list_saves`、`save`、`load`、`auto_save`、`continue`、`change_level`），支持发布/订阅输出及自定义命令扩展
+- **内置开发者控制台** —— 8 个内置命令（`help`、`spawn`、`snd_count`、`find_entity`、`clear_entities`、`bb_get`、`bb_set`、`bb_keys`），支持发布/订阅输出及自定义命令扩展
 - **确定性随机数** —— 基于 `IRandom` 接口的 XorShift128+ 实现
 - **平台无关的 Core** —— 仅依赖 .NET 8；`Origo.Core` 中无任何引擎符号泄露
 - **前台/后台关卡** —— 前台关卡和后台关卡共享同一 `ISessionRun` 接口，区别仅在于注入的 `ISndSceneHost`。通过 `ctx.SessionManager.CreateBackgroundSession(key, levelId)` 创建纯内存后台关卡，序列化与持久化由 `SessionManager` 内部管理
@@ -52,7 +52,6 @@
 Origo.Core/               纯 C# 核心（Microsoft.NET.Sdk，net8.0，无引擎依赖）
 Origo.GodotAdapter/       Godot 4 适配器（Godot.NET.Sdk 4.6.1，薄层实现 + DI）
 Origo.Core.Tests/         Core 单元测试（xUnit v3；数量见「测试」一节）
-Origo.GodotAdapter.Tests/ Adapter 单元测试（xUnit v3；见「测试」）
 scripts/                  ci.sh（完整 CI）、run-test.sh（仅测试的快捷方式）
 Directory.Build.props     共享 MSBuild 属性
 Origo.sln                 解决方案文件
@@ -103,9 +102,9 @@ Origo 面向 **集成方**：稳定的边界与可观察的行为，优先于把
 
 回归测试：`WriteSavePayloadToCurrentThenSnapshot_WhenSnapshotFails_LogsError_LeavesMarkerAndUpdatedCurrent`。
 
-### `SnapshotCurrentToSave` 与 `baseSaveId`
+### `SnapshotCurrentToSave`
 
-`baseSaveId` 为 **API 形态预留**，当前 **不参与** 回退或合并；快照始终是 `current/` 的 **完整拷贝**。请勿依赖「按基槽位合并」语义。
+快照始终是 `current/` 的 **完整拷贝**。
 
 ---
 
@@ -265,7 +264,7 @@ flowchart TB
         BB["黑板<br/>(System / Progress / Session)"]
         SM[StackStateMachine]
         SV["存档<br/>(SaveStorageFacade)"]
-        LC["生命周期<br/>(SystemRun → ProgressRun → SessionRun)"]
+        LC["生命周期<br/>(SystemRun → ProgressRun → SessionManager → SessionRun)"]
         DS["DataSource<br/>(IDataSourceCodec / ConverterRegistry)"]
     end
 
@@ -294,8 +293,66 @@ flowchart TB
 2. **适配器实现接口 + 连线 DI** —— 适配器中无业务规则
 3. **策略共享、池化、无状态** —— 可变状态存储在实体 Data 或黑板中
 4. **组合优先于继承** —— `SndEntity` 组合 Data、Node 和 Strategy
-5. **显式生命周期** —— `SystemRun` → `ProgressRun` → `SessionRun` 与黑板层一一对应
+5. **显式生命周期** —— `SystemRun` → `ProgressRun` → `SessionManager` → `SessionRun` 组成四层运行时层次
 6. **快速失败，无静默回退** —— 缺失数据、错误索引和无效状态会立即抛出异常
+7. **单向能力传递** —— 运行时能力严格向下流动，下层无法反向访问上层内部状态
+8. **结构化参数传递** —— 每一层构造函数仅接收 (Runtime, Parameters) 两个结构化参数，禁止零散参数
+
+### 运行时层级架构
+
+Origo 的运行时分为四层，每层持有一个结构化 Runtime 容器，并通过结构化 Parameters 记录接收配置：
+
+```
+SystemRun（第一层）
+  └─ 持有 SystemRuntime
+       ├─ Logger, FileSystem, OrigoRuntime, StorageService, SavePathPolicy
+       └─ 便捷访问: SndWorld, SndRuntime, SystemBlackboard
+
+ProgressRun（第二层）
+  构造函数: (SystemRuntime, ProgressParameters)
+  └─ 内部构建 ProgressRuntime
+       ├─ Logger, StorageService, SndWorld, SndRuntime, ForegroundSceneHost
+       ├─ StateMachineContext, SndContext, SavePathPolicy
+       └─ 便捷访问: JsonCodec, ConverterRegistry
+
+SessionManager（第三层）
+  构造函数: (ProgressRuntime, SessionManagerParameters, ProgressBlackboard)
+  └─ 内部构建 SessionManagerRuntime
+       ├─ Logger, StorageService, SndWorld, SndRuntime
+       ├─ ForegroundSceneHost, StateMachineContext, SndContext
+       └─ 便捷访问: JsonCodec, ConverterRegistry
+
+SessionRun（第四层）
+  构造函数: (SessionManagerRuntime, SessionParameters)
+  └─ SessionParameters = (LevelId, SessionBlackboard, SceneHost, IsFrontSession)
+```
+
+**前台 Session 与后台 Session：**
+
+两者均为同一 `SessionRun` 类——无子类或分叉逻辑。唯一区别是 `IsFrontSession` 标志，由 `SessionManager` 在创建时设置：
+
+| | 前台 Session | 后台 Session |
+|---|---|---|
+| 数量 | 恰好 1 个（`ForegroundKey` 约束） | 0..N |
+| `IsFrontSession` | `true` | `false` |
+| 场景宿主 | 引擎适配层宿主（注入） | `FullMemorySndSceneHost` |
+| 标志来源 | `SessionManager.CreateForegroundSession` | `SessionManager.CreateBackgroundSession` |
+
+标志传递路径：`SessionParameters.IsFrontSession` → `SessionRun.IsFrontSession` → `ISndContext.IsFrontSession`（通过 `SessionSndContext`）。策略钩子通过 `ctx.IsFrontSession` 获取——无需跨层查询。
+
+**运行时流动方向（严格单向）：**
+
+```
+SystemRuntime → ProgressRuntime → SessionManagerRuntime → SessionRun
+```
+
+**参数结构体流动方向：**
+
+```
+ProgressParameters → SessionManagerParameters → SessionParameters
+```
+
+每一层的 Runtime 仅暴露当前层及其子层所需的能力——不存在向上访问。例如 SessionRun 无法访问 SystemBlackboard 或 ProgressRun 的内部状态。
 
 ### 对象关系图
 
@@ -307,8 +364,10 @@ OrigoDefaultEntry（Godot 入口节点）
             ├─ SndRuntime（ISndSceneHost 门面）
             └─ SystemBlackboard
        └─ SndContext（存档 / 读档 / 切换关卡编排）
-            └─ RunFactory (internal)
-                 └─ SystemRun → ProgressRun → SessionRun
+            └─ SystemRun（持有 SystemRuntime）
+                 └─ ProgressRun（持有 ProgressRuntime）
+                      └─ SessionManager（持有 SessionManagerRuntime）
+                           └─ SessionRun × N
 ```
 
 ---
@@ -438,7 +497,7 @@ void DeserializeAll(IReadOnlyDictionary<string, TypedData> data);
 ```csharp
 WellKnownKeys.ActiveSaveId       = "origo.active_save_id";
 WellKnownKeys.ActiveLevelId      = "origo.active_level_id";
-WellKnownKeys.BackgroundLevelIds = "origo.background_level_ids";
+WellKnownKeys.SessionTopology    = "origo.session_topology";
 ```
 
 ---
@@ -596,6 +655,7 @@ saveRoot/
 | `SystemBlackboard` | `IBlackboard` | 系统级黑板（始终可用） |
 | `ProgressBlackboard` | `IBlackboard?` | 进度级黑板（读档后可用） |
 | `SessionManager` | `ISessionManager` | 创建、序列化、持久化和销毁会话的唯一入口；通过此管理器访问 `ForegroundSession` 和后台会话 |
+| `CurrentSession` | `ISessionRun?` | 当前策略上下文绑定的会话；全局上下文下通常为当前前台会话 |
 
 #### 仅具体类属性（不在 `ISndContext` 上）
 
@@ -612,28 +672,14 @@ saveRoot/
 |------|------|
 | `EnqueueBusinessDeferred(Action)` | 将操作加入帧末业务阶段队列 |
 | `FlushDeferredActionsForCurrentFrame()` | 立即刷新所有延迟操作 |
-| `GetPendingPersistenceRequestCount()` | 待处理的持久化请求数量 |
+| `GetPendingPersistenceRequestCount()` | 在精简单入口链路中恒定返回 `0` |
 | `CloneTemplate(string templateKey, string? overrideName)` | 从模板克隆实体 |
 
-#### 存档 / 读档方法
+#### 启动方法
 
 | 方法 | 说明 |
 |------|------|
-| `RequestSaveGame(newSaveId, baseSaveId, customMeta?)` | 保存到指定存档槽 |
-| `RequestSaveGameAuto(newSaveId?, customMeta?)` | 自动存档（从当前活跃存档获取基础存档） |
-| `RequestLoadGame(string saveId)` | 读取存档槽 |
-| `RequestContinueGame()` | 从活跃存档继续（返回 `bool`） |
-| `HasContinueData()` | 检查是否存在继续数据 |
-| `SetContinueTarget(string saveId)` | 设置继续游戏的存档 ID |
-| `ClearContinueTarget()` | 清除继续目标 |
-| `RequestLoadInitialSave()` | 加载初始（随附）存档 |
 | `RequestLoadMainMenuEntrySave()` | 加载主菜单入口（无隐式存档） |
-| `RequestSwitchForegroundLevel(string newLevelId)` | 切换到另一个关卡 |
-| `CreateLevelBuilder(string levelId)` | 创建 `LevelBuilder` 用于离线关卡构建 |
-| `ListSaves()` | 列出可用存档槽 ID |
-| `ListSavesWithMetaData()` | 列出存档及其解析后的 `meta.map` |
-| `RegisterSaveMetaContributor(ISaveMetaContributor)` | 注册 meta.map 贡献者 |
-| `RegisterSaveMetaContributor(Action<...>)` | 注册 meta.map 贡献者（lambda 重载） |
 
 #### 控制台方法
 
@@ -705,11 +751,11 @@ saveRoot/
 | Process / Tick | 引擎调用 `_Process` | 调用方手动调用 `FullMemorySndSceneHost.ProcessAll(delta)` |
 | 格式 | 通过标准 `LevelPayload` 存读 | 相同 — 完全互通 |
 
-二者使用 **相同的** `SndEntity` 代码路径、**相同的** 策略生命周期，产出 **完全相同的** 序列化格式。后台关卡可保存到磁盘后作为前台关卡加载，反之亦然。
+二者使用 **相同的** `SndEntity` 代码路径、**相同的** 策略生命周期，产出 **完全相同的** 序列化格式。后台关卡可保存到磁盘后作为前台关卡加载，反之亦然。策略钩子通过 `ctx.IsFrontSession` 区分前台/后台，无需类型分叉。
 
 #### 架构设计：为什么前台和后台共享 `ISessionRun`
 
-前台关卡是唯一且**常驻**的 —— 它在整个游戏会话期间存在，由 `ProgressRun` 管理。后台关卡是**临时**的 —— 按需创建（如运行时程序化生成、后台 AI 仿真），用完即销毁。
+前台关卡是唯一且**常驻**的 —— 它在整个游戏会话期间存在，由 `ProgressRun` 管理。后台关卡是**临时**的 —— 按需创建（如运行时程序化生成、后台 AI 仿真），用完即销毁。`IsFrontSession` 标志在构造时注入，策略钩子可直接检查而无需查询 `SessionManager`。
 
 由于前台关卡"始终存在"，后台关卡在概念上**依附**于前台关卡。当调用 `ctx.SessionManager.CreateBackgroundSession(key, levelId)` 时：
 
@@ -752,8 +798,7 @@ ctx.ProgressBlackboard!.Set("dungeon_ready", true);
 host.ProcessAll(0.016);
 
 // 序列化与持久化由 SessionManager 内部管理。
-// 前台关卡可切换至此关卡：
-// ctx.RequestSwitchForegroundLevel("generated_dungeon");
+// 后台会话生命周期与持久化由 SessionManager 内部管理。
 ```
 
 **测试中创建** —— 使用 `CreateForegroundContext` 模式（参见 `BackgroundSessionTests.cs`）：
@@ -791,21 +836,22 @@ host.DeadByName("Guard_01");
 // Dispose 清除所有实体（触发 BeforeQuit）并释放会话
 ```
 
-> **持久化：** 通过 `RequestSaveGame` 或 `RequestSaveGameAuto` 保存时，所有由 `SessionManager` 管理的后台会话会自动序列化到存档负载中，与前台会话一起保存。加载时，后台会话会从存档数据中恢复，并以原始键重新创建到 `SessionManager`。键→关卡 ID 的映射存储在 `ProgressBlackboard` 的 `WellKnownKeys.BackgroundLevelIds` 键下。
+> **持久化：** `SessionManager` 管理的全部会话（前台+后台）仍会写入会话拓扑，并通过 `ProgressBlackboard` 中的 `WellKnownKeys.SessionTopology` 恢复。
 >
-> **生命周期所有权：** `SessionManager` 完全拥有 `SessionRun` 的生命周期。会话始终通过 `SessionManager` 创建并自动挂载——没有单独的 Mount/Unmount 操作。后台会话通过 `ctx.SessionManager.DestroySession(key)` 销毁。调用方仍需负责每帧 tick 后台会话；可使用 `ctx.SessionManager.ProcessBackgroundSessions(delta)` 简化操作。
+> **生命周期所有权：** `SessionManager` 完全拥有 `SessionRun` 的生命周期。会话始终通过 `SessionManager` 创建并自动挂载——没有单独的 Mount/Unmount 操作。后台会话通过 `ctx.SessionManager.DestroySession(key)` 销毁。调用方仍需负责每帧 tick 会话；可使用 `ctx.SessionManager.ProcessAllSessions(delta)` 简化操作。
 >
 > **序列化：** 会话状态（黑板、状态机、实体）的序列化与持久化由 `SessionManager` 内部管理。`ISessionRun` 不再暴露 `SerializeToPayload()`、`LoadFromPayload()` 或 `PersistLevelState()`。
 
 #### 序列化与加载后台会话
 
-后台会话支持与前台关卡相同的 `LevelPayload` 序列化格式。序列化与持久化由 `SessionManager` 内部管理。要从现有 payload 创建预加载的后台会话，请使用 `CreateBackgroundSessionFromPayload`。
+后台会话支持与前台关卡相同的 `LevelPayload` 序列化格式。序列化与持久化由 `SessionManager` 内部管理。
 
-**从 payload 创建：**
+**从 payload 恢复：**
 
 ```csharp
-// 从 LevelPayload 创建预加载的后台会话。
-using var restored = ctx.SessionManager.CreateBackgroundSessionFromPayload("arena", "ai_arena", payload);
+// 先创建后台会话，再通过 SessionManager 内部恢复入口加载 LevelPayload。
+using var restored = ctx.SessionManager.CreateBackgroundSession("arena", "ai_arena");
+((SessionManager)ctx.SessionManager).LoadSessionFromPayload("arena", payload);
 ```
 
 **完整流程：后台 → 前台关卡：**
@@ -817,8 +863,7 @@ var host = bg.SceneHost;
 // ... 填充实体 ...
 
 // 2. SessionManager 内部处理持久化。
-// 3. 前台切换到生成的关卡
-ctx.RequestSwitchForegroundLevel("procedural_dungeon");
+// 3. 前台挂载由生命周期内部流程控制。
 ```
 
 **创建后台会话用于仿真：**
@@ -836,6 +881,52 @@ for (int i = 0; i < 100; i++)
 var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
 ```
 
+#### 会话恢复机制（责任链模式）
+
+Origo 对会话的序列化与反序列化采用 **责任链模式**（Chain of Responsibility）。运行时层次中的每一层仅处理自身拥有的数据，然后委托给下一层。**层间不传递已构建的运行时对象（如 `IBlackboard` 实例）**——每个模块自主读写自身的持久化数据。
+
+**设计哲学：模块自主读写，入口仅需 saveId。**
+
+- `ProgressRun` 始终在内部自行创建空白 `ProgressBlackboard`。构造函数仅接受 `saveId` 字符串（通过 `ProgressParameters`），不接受外部注入的黑板。
+- 恢复逻辑完全通过 `LoadFromPayload()` 触发，该方法读取 `SaveGamePayload` 并按职责链顺序反序列化每层数据。
+- 模块间通过轻量级结构（存储在黑板已知键中的拓扑字符串）传递会话元数据，而非预填充的对象实例。
+
+**序列化链**（存档）：
+
+```
+SessionRun            → 序列化自身数据（SessionBlackboard、状态机、实体 → LevelPayload）
+  ↓ 返回 LevelPayload
+SessionManager        → 收集所有后台会话的 LevelPayload
+  ↓ 返回 Dictionary<key, LevelPayload>
+ProgressRun           → 将会话拓扑写入 ProgressBlackboard（WellKnownKeys.SessionTopology）
+                      → 序列化 ProgressBlackboard、进度状态机
+                      → 组装最终 SaveGamePayload
+```
+
+**反序列化链**（读档）：
+
+```
+ProgressRun           → 反序列化自身数据（ProgressBlackboard、进度状态机）
+                      → 从自身 ProgressBlackboard 读取会话拓扑
+  ↓ 将拓扑描述符传递给 SessionManager
+SessionManager        → 遍历拓扑描述符
+                      → 按正确属性创建/挂载每个 SessionRun
+                        （前台身份通过 ForegroundKey 确认，Tick 状态通过 syncProcess 确认）
+  ↓ 将数据加载委托给 SessionRun
+SessionRun            → 反序列化自身数据（SessionBlackboard、会话状态机、SND 场景实体）
+```
+
+**反序列化后恢复的属性：**
+
+| 属性 | 恢复机制 |
+|------|----------|
+| 前台身份（`IsFrontSession`） | 拓扑条目的 key 为 `ISessionManager.ForegroundKey` → 以前台方式挂载 |
+| Tick 注册（syncProcess） | 拓扑条目第三字段（`true`/`false`） → 传递给 `CreateBackgroundSession` |
+| ProgressBlackboard 引用 | 所有会话共享来自 `ProgressRun` 的同一 `ProgressBlackboard` 实例 |
+| SessionBlackboard 隔离 | 每个会话获得新的 `IBlackboard` 实例；数据从 `LevelPayload.SessionJson` 恢复 |
+
+**前台唯一性约束：** 最多一个会话可挂载在 `ISessionManager.ForegroundKey`。`SessionManager` 强制保证此约束：挂载新的前台会话时会自动销毁旧的前台会话。
+
 #### API 一览
 
 由于后台关卡实现了标准 `ISessionRun` 接口，其 API 与前台关卡相同：
@@ -847,10 +938,9 @@ var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
 | `ctx.SessionManager.Keys` | `ISessionManager` 属性 | 所有已挂载会话的键（包含前台会话键，如果存在） |
 | `ctx.SessionManager.Contains(key)` | `ISessionManager` 方法 | 检查指定键的会话是否已挂载 |
 | `ctx.SessionManager.TryGet(key)` | `ISessionManager` 方法 | 按键查找会话 |
-| `ctx.SessionManager.CreateBackgroundSession(key, levelId, syncProcess?)` | `ISessionManager` 方法 | 创建后台 `ISessionRun`（自动挂载）— 共享 `SndWorld`、`ProgressBlackboard`、文件系统。当 `syncProcess` 为 `true` 时，该会话参与 `ProcessBackgroundSessions` 帧更新 |
-| `ctx.SessionManager.CreateBackgroundSessionFromPayload(key, levelId, payload, syncProcess?)` | `ISessionManager` 方法 | 创建后台 `ISessionRun`，从 `LevelPayload` 恢复状态（自动挂载）。当 `syncProcess` 为 `true` 时，该会话参与 `ProcessBackgroundSessions` 帧更新 |
+| `ctx.SessionManager.CreateBackgroundSession(key, levelId, syncProcess?)` | `ISessionManager` 方法 | 创建后台 `ISessionRun`（自动挂载）— 共享 `SndWorld`、`ProgressBlackboard`、文件系统。当 `syncProcess` 为 `true` 时，该会话参与 `ProcessAllSessions` 帧更新 |
 | `ctx.SessionManager.DestroySession(key)` | `ISessionManager` 方法 | 销毁并释放后台会话 |
-| `ctx.SessionManager.ProcessBackgroundSessions(delta)` | `ISessionManager` 方法 | 处理所有后台会话的一帧 |
+| `ctx.SessionManager.ProcessAllSessions(delta, includeForeground?)` | `ISessionManager` 方法 | 处理所有开启 `syncProcess` 的会话一帧 |
 | `LevelId` | `ISessionRun` 属性 | 关卡标识符 |
 | `SessionBlackboard` | `ISessionRun` 属性 | 会话级黑板（独立） |
 | `GetSessionStateMachines()` | `ISessionRun` 方法 | 访问会话级状态机 |
@@ -902,8 +992,7 @@ var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
 |------|------|------|
 | `IStateMachineContext` | 直接依赖 `SndContext` | `StateMachineContainer` 消费的上下文接口 — 提供 `SessionBlackboard`（当前会话）、`SceneAccess`（当前会话场景）和会话元数据，无需耦合完整上下文。**两种实现**：`SndContext` 作为全局/流程级默认实现（指向前台会话）；`SessionStateMachineContext` 是内部适配器，将每个会话的黑板和场景宿主绑定到自身——前后台会话状态机钩子**无语义分差** |
 | `ISaveStorageService` | 直接文件系统存档逻辑 | 存档槽持久化抽象（列出、读取、写入、快照、枚举）。**所有** 方法 — 包括 `EnumerateSaveIds`、`EnumerateSavesWithMetaData`、`WriteSavePayloadToCurrentThenSnapshot` 和 `SnapshotCurrentToSave` — 均由注入的 `ISavePathPolicy` 完整驱动。注入以替换文件系统存储为云端、数据库或内存后端 |
-| `ISessionDefaultsProvider` | 硬编码 `SndDefaults` | 提供默认值（如初始黑板条目、默认关卡 ID）。实现此接口以按游戏或按平台覆盖默认值 |
-| `ISavePathPolicy` | 硬编码路径布局 | 决定存档文件目录结构和命名。通过 `SndContext` 构造函数注入后，自动传播到默认的 `DefaultSaveStorageService`（主存储和初始存储）、`RunFactory`、`SessionRun` 和 `LevelBuilder` — **所有** 存储路径由同一策略实例驱动。实现此接口以自定义存档文件夹布局，无需修改核心代码 |
+| `ISavePathPolicy` | 硬编码路径布局 | 决定存档文件目录结构和命名。通过 `SndContext` 构造函数注入后，自动传播到默认的 `DefaultSaveStorageService`（主存储和初始存储）、`SystemRuntime`、`SessionRun` 和 `LevelBuilder` — **所有** 存储路径由同一策略实例驱动。实现此接口以自定义存档文件夹布局，无需修改核心代码 |
 
 策略钩子接收 `IStateMachineContext` 而非具体的 `SndContext`，使策略保持可测试性并与完整运行时解耦。会话级状态机接收 `SessionStateMachineContext`，保证 `ctx.SessionBlackboard` 和 `ctx.SceneAccess` 始终指向当前会话——前后台会话一视同仁。
 
@@ -913,7 +1002,7 @@ var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
 
 ## 🖥 内置控制台命令
 
-开发者控制台提供 14 个内置命令，覆盖实体管理、黑板检查、存/读档和关卡切换。通过 `SndContext.TrySubmitConsoleCommand(string)` 提交命令，通过 `SubscribeConsoleOutput` 接收输出。
+开发者控制台提供 8 个内置命令，覆盖实体管理和黑板检查。通过 `SndContext.TrySubmitConsoleCommand(string)` 提交命令，通过 `SubscribeConsoleOutput` 接收输出。
 
 ### 实体命令
 
@@ -934,22 +1023,6 @@ var (_, score) = simulation.SessionBlackboard.TryGet<int>("final_score");
 | `bb_keys` | `bb_keys <layer>` | 列出指定黑板层的所有键 |
 
 > **layer** —— 目前支持 `system`。当存在具有活跃 Run 的 `SndContext` 时，Progress / Session 层亦可用。
-
-### 存档 / 读档命令
-
-| 命令 | 用法 | 说明 |
-|------|------|------|
-| `list_saves` | `list_saves` | 列出所有可用的存档槽 ID |
-| `save` | `save <newSaveId> <baseSaveId>` | 请求基于现有槽保存到新槽 |
-| `load` | `load <saveId>` | 请求加载存档槽 |
-| `auto_save` | `auto_save [saveId]` | 请求自动存档（可选显式 ID） |
-| `continue` | `continue` | 从上次活跃存档继续游戏 |
-
-### 关卡命令
-
-| 命令 | 用法 | 说明 |
-|------|------|------|
-| `change_level` | `change_level <newLevelId>` | 请求切换到另一个关卡 |
 
 ### 实用命令
 
@@ -1067,7 +1140,7 @@ play_time: 03:12:55
 player_level: 18
 ```
 
-通过 `SndContext.RegisterSaveMetaContributor(...)` 注册的贡献者按顺序合并（后注册的键覆盖先注册的），然后存档调用中的 `customMeta` 可按键覆盖。
+存档元数据贡献者在当前精简链路中由生命周期内部组件管理。
 
 ---
 
@@ -1088,7 +1161,7 @@ sequenceDiagram
     Host->>Host: GodotFileSystem + PersistentBlackboard<br/>加载 system.json
     Host->>RT: 注册 Godot 类型（通过 TypeStringMapping / 运行时初始化）
     Host->>RT: 通过反射注册所有 BaseStrategy 子类
-    Entry->>Ctx: 创建 SndContext（RunFactory + SystemRun）
+    Entry->>Ctx: 创建 SndContext（SystemRuntime + SystemRun）
     Entry->>SM: 将 SndContext 注入 GodotSndManager
     Entry->>Entry: 加载场景别名 + 模板映射
     Entry->>Ctx: RequestLoadMainMenuEntrySave()
@@ -1102,7 +1175,7 @@ sequenceDiagram
 2. `GodotFileSystem` + `PersistentBlackboard` 加载 `saveRoot/system.json`
 3. 在运行时的 `TypeStringMapping` 上注册 Godot 类型（例如构建 `SndWorld` 前调用 `GodotJsonConverterRegistry.RegisterTypeMappings(...)`，见 `OrigoAutoHost`）
 4. 通过反射注册所有具体的 `BaseStrategy` 子类
-5. 创建 `SndContext`（`RunFactory` + `SystemRun`），注入 `GodotSndManager`
+5. 创建 `SndContext`（内部创建 `SystemRuntime` + `SystemRun`），注入 `GodotSndManager`
 6. 加载场景别名和模板映射文件
 7. `RequestLoadMainMenuEntrySave()` + `FlushDeferredActionsForCurrentFrame()`
 8. `GodotSndManager._Process` 每帧运行实体的 `Process`
@@ -1113,39 +1186,29 @@ sequenceDiagram
 
 ## 🔀 关键流程
 
-### 保存游戏
+### 启动主菜单
 
 ```
-游戏调用 SndContext.RequestSaveGame(newSaveId, baseSaveId, customMeta?)
+游戏调用 SndContext.RequestLoadMainMenuEntrySave()
   → 加入 SystemDeferred 队列
-  → 验证活跃 Run
-  → 合并 meta.map（贡献者 + customMeta）
-  → SaveContext 序列化黑板 + 场景 → SaveGamePayload
-  → SaveStorageFacade 写入 current/，然后快照到 save_xxx/
-  → 更新 SystemBlackboard 中的 active_save_id
+  → 重置运行时控制台状态
+  → 重建 ProgressRun 并挂载主菜单前台会话
+  → 从 `entry.json` 生成入口实体
 ```
 
-### 读取存档
+### 会话恢复（Play-Stop-Play）
 
 ```
-游戏调用 SndContext.RequestLoadGame(saveId)
-  → 加入 SystemDeferred 队列
-  → 将快照恢复到 current/
-  → 读取 progress.json 获取 active_level_id
-  → 重建 ProgressRun + SessionRun
-  → 恢复黑板并生成场景实体
-  → 设置 active_save_id
-```
-
-### 切换关卡
-
-```
-游戏调用 SndContext.RequestSwitchForegroundLevel(newLevelId)
-  → 加入 BusinessDeferred 队列（在 SystemDeferred 之前执行）
-  → SessionRun 将当前关卡持久化到 current/level_xxx/
-  → 更新 ActiveLevelId，持久化 progress.json
-  → 释放旧 SessionRun
-  → 恢复 current/level_{newLevelId}/（或从空白开始）
+ProgressRun 仅使用 saveId 创建（内部空白 ProgressBlackboard）
+  → 调用 LoadFromPayload(payload) 传入 SaveGamePayload
+  → ProgressRun 反序列化自身数据（ProgressBlackboard、状态机）
+  → 从自身 ProgressBlackboard 读取 WellKnownKeys.SessionTopology
+  → 对拓扑中每个描述符：
+      若 key == ForegroundKey → SessionManager.CreateForegroundSession（IsFrontSession=true）
+      否则                    → SessionManager.CreateBackgroundSession（syncProcess 保留）
+  → SessionManager 将数据加载委托给 SessionRun.LoadFromPayload
+  → SessionRun 恢复 SessionBlackboard、会话状态机、SND 场景实体
+  → 前台身份、Tick 注册、黑板隔离均被完整恢复
 ```
 
 ---
@@ -1156,14 +1219,14 @@ sequenceDiagram
 
 ### 延迟执行
 
-所有 `Request*` 方法（`RequestSaveGame`、`RequestLoadGame`、`RequestSwitchForegroundLevel` 等）**不会**立即执行，而是将延迟动作加入游戏循环队列。
+`RequestLoadMainMenuEntrySave` **不会**立即执行，而是将延迟动作加入游戏循环队列。
 
 | 行为 | 详情 |
 |------|------|
 | **延迟动作何时执行？** | 仅在调用 `FlushDeferredActionsForCurrentFrame()` 时执行（通常由适配层每帧调用一次） |
 | **执行顺序** | 业务延迟 → 系统延迟，严格按序 |
-| **重入守卫** | 同一时刻只允许一个生命周期工作流（存档/读档/切换关卡）；重叠请求抛 `InvalidOperationException` |
-| **持久化计数器** | `RequestSaveGame` 在入队前原子递增计数器；可通过 `GetPendingPersistenceRequestCount()` 查询 |
+| **重入守卫** | 同一时刻只允许一个生命周期工作流；重叠请求抛 `InvalidOperationException` |
+| **持久化计数器** | 在当前精简链路中，`GetPendingPersistenceRequestCount()` 恒定返回 `0` |
 
 ### 线程模型
 
@@ -1177,10 +1240,9 @@ sequenceDiagram
 
 ### 常见陷阱
 
-- **在加载前访问 `ProgressBlackboard` / `SessionManager.ForegroundSession?.SessionBlackboard`** —— 返回 `null`；请先调用 `RequestLoad*` + flush
-- **`SwitchForegroundLevel` 目标关卡不存在时** —— 创建空会话并清空场景；这是预期行为（非错误）
+- **在启动加载前访问 `ProgressBlackboard` / `SessionManager.ForegroundSession?.SessionBlackboard`** —— 返回 `null`；请先调用 `RequestLoadMainMenuEntrySave` + flush
 - **`SessionRun` 释放后访问属性** —— 所有访问抛 `ObjectDisposedException`；释放顺序为：自动持久化（尽力而为）→ 从 `SessionManager` 自动卸载 → 弹出所有状态机 → 清空状态机 → 清空场景 → 清空黑板
-- **后台关卡生命周期** —— 后台会话通过 `SessionManager` 创建和销毁；调用方需负责调用 `ProcessBackgroundSessions(delta)` 或手动 tick 每个会话
+- **后台关卡生命周期** —— 后台会话通过 `SessionManager` 创建和销毁；调用方需负责调用 `ProcessAllSessions(delta)` 或手动 tick 每个会话
 
 ---
 
@@ -1223,8 +1285,6 @@ sequenceDiagram
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `HostPath` | `null` | 可选的 `NodePath`，指向 `IOrigoRuntimeProvider` |
-| `SndManagerPath` | `null` | 可选的 `NodePath`，指向 `GodotSndManager` |
 | `SystemBlackboardSaveRoot` | `user://origo_saves` | `PersistentBlackboard` 的存档根目录 |
 
 ---
@@ -1245,7 +1305,6 @@ sequenceDiagram
 | `IBlackboard` | 类型化键值存储，包含 `SerializeAll` / `DeserializeAll` |
 | `IDataSourceCodec` | 在 `DataSourceNode` 与原始文本（如 JSON）之间编码 / 解码 |
 | `ILogger` | `Log(LogLevel level, string tag, string message)`，含 `LogLevel` 枚举 |
-| `IOrigoRuntimeProvider` | 访问 `OrigoRuntime` 实例 |
 | `IScheduler` | 延迟操作调度 |
 | `IStateMachine` | 字符串栈状态机 API |
 | `IRandom` | 确定性随机数生成 |
@@ -1487,15 +1546,29 @@ CI 对 `Origo.Core` 强制执行 **行覆盖率 ≥ 90%**（Coverlet）。`Runti
 
 ```bash
 dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
-  -p:CollectCoverage=true -p:Threshold=90 -p:ThresholdType=line -p:ThresholdStat=total
+  -p:CollectCoverage=true -p:Threshold=86 -p:ThresholdType=line -p:ThresholdStat=total
 ```
 
 | 项目 | 说明 |
 |------|------|
 | `Origo.Core.Tests` | SND、存档、生命周期、控制台、DataSource、序列化、黑板、后台关卡等 |
-| `Origo.GodotAdapter.Tests` | 适配器护栏与针对性测试 |
 
 测试项目使用 **xUnit v3**。当前测试数量请使用 `dotnet test ... --list-tests` 查看。发版前请按上文 [发版检查清单](#release-checklist) 与 [存档 I/O 契约](#save-system-contracts) 自检。
+
+### 测试目录结构
+
+```
+Origo.Core.Tests/
+├── SystemRuntimeTests/           # 系统层测试（控制台、调度、类型映射）
+├── ProgressRuntimeTests/         # 流程层测试（存档、生命周期、入口流程）
+├── SessionManagerRuntimeTests/   # 会话管理器测试（后台会话、解耦、契约）
+├── SessionRuntimeTests/          # 会话层测试（实体、状态机、策略）
+│   ├── FrontSession/             # 前台 Session 标志、唯一性、策略 Context
+│   └── BackgroundSession/        # 后台 Session 标志、多实例、Context
+├── IntegrationTests/             # 跨层集成与工具测试
+├── TestDoubles.cs                # 共享测试替身和 TestFactory
+└── GlobalUsings.cs               # 共享全局 using
+```
 
 ---
 

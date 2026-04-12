@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
-using Origo.Core.Save;
-using Origo.Core.Save.Meta;
 using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Snd;
@@ -56,6 +54,18 @@ public interface ISndContext
     /// </summary>
     ISessionManager SessionManager { get; }
 
+    /// <summary>
+    ///     当前上下文绑定的会话。
+    ///     对于全局上下文通常返回前台会话；对于会话上下文返回该会话自身。
+    /// </summary>
+    ISessionRun? CurrentSession { get; }
+
+    /// <summary>
+    ///     当前上下文绑定的会话是否为前台会话。
+    ///     便捷属性，等价于 <c>CurrentSession?.IsFrontSession ?? false</c>。
+    /// </summary>
+    bool IsFrontSession { get; }
+
     // ── Deferred actions ───────────────────────────────────────────────
 
     /// <summary>将业务逻辑延迟动作加入队列，在当前帧末尾统一执行。策略钩子中推荐使用此方法排队副作用。</summary>
@@ -91,36 +101,33 @@ public interface ISndContext
     /// <summary>流程级字符串栈状态机容器；无活动流程时为 null。</summary>
     StateMachineContainer? GetProgressStateMachines();
 
-    // ── Save / Load ────────────────────────────────────────────────────
+    // ── Save / load / level ────────────────────────────────────────────
 
-    /// <summary>列出所有存档槽位 ID。</summary>
+    /// <summary>列出可用存档槽位。</summary>
     IReadOnlyList<string> ListSaves();
-
-    /// <summary>列出所有存档槽位及其元数据。</summary>
-    IReadOnlyList<SaveMetaDataEntry> ListSavesWithMetaData();
-
-    /// <summary>请求保存游戏到指定槽位。</summary>
-    void RequestSaveGame(string newSaveId, string baseSaveId, IReadOnlyDictionary<string, string>? customMeta = null);
 
     /// <summary>请求加载指定存档。</summary>
     void RequestLoadGame(string saveId);
 
-    /// <summary>请求继续游戏（加载 continue 槽位）。</summary>
-    bool RequestContinueGame();
+    /// <summary>请求保存到指定槽位。</summary>
+    void RequestSaveGame(string newSaveId);
 
-    /// <summary>自动保存：baseSaveId 取 active save id，newSaveId 未指定时使用时间戳。</summary>
-    string RequestSaveGameAuto(string? newSaveId = null, IReadOnlyDictionary<string, string>? customMeta = null);
+    /// <summary>自动保存，返回实际使用的 saveId。</summary>
+    string RequestSaveGameAuto(string? newSaveId = null);
 
-    /// <summary>查询是否存在 continue 数据。</summary>
-    bool HasContinueData();
-
-    /// <summary>设置 continue 目标存档 ID。</summary>
+    /// <summary>设置 continue 目标存档。</summary>
     void SetContinueTarget(string saveId);
 
-    /// <summary>清除 continue 目标。</summary>
-    void ClearContinueTarget();
+    /// <summary>请求切换前台关卡。</summary>
+    void RequestSwitchForegroundLevel(string newLevelId);
 
     // ── Session lifecycle ──────────────────────────────────────────────
+
+    /// <summary>是否存在可继续游戏的目标存档。</summary>
+    bool HasContinueData();
+
+    /// <summary>请求继续游戏（基于当前 continue 目标）。</summary>
+    bool RequestContinueGame();
 
     /// <summary>请求加载初始存档模板。</summary>
     void RequestLoadInitialSave();
@@ -128,21 +135,4 @@ public interface ISndContext
     /// <summary>按启动流程重新读取主菜单入口配置。</summary>
     void RequestLoadMainMenuEntrySave();
 
-    /// <summary>
-    ///     请求切换前台关卡。语法糖：等价于卸载当前前台会话 + 加载新关卡为前台会话。
-    /// </summary>
-    void RequestSwitchForegroundLevel(string newLevelId);
-
-    // ── Level builder & background sessions ────────────────────────────
-
-    /// <summary>创建离线关卡构建器。</summary>
-    LevelBuilder CreateLevelBuilder(string levelId);
-
-    // ── Save meta contributors ─────────────────────────────────────────
-
-    /// <summary>注册存档元数据贡献者。</summary>
-    void RegisterSaveMetaContributor(ISaveMetaContributor contributor);
-
-    /// <summary>注册存档元数据贡献者（委托形式）。</summary>
-    void RegisterSaveMetaContributor(Action<SaveMetaBuildContext, IDictionary<string, string>> contribute);
 }
