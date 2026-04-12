@@ -6,6 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.0.5] - 2026-04-12
+
+### Added
+
+- **Structured runtime containers** — three internal, single-responsibility holders replacing the old `RunDependencies` / `RunFactory` DI pattern:
+  - `SystemRuntime` — system-layer container; holds objects shared across the entire application lifetime: `ILogger`, `IFileSystem`, `OrigoRuntime`, `ISaveStorageService`, `ISavePathPolicy`, and `SaveRootPath`; convenience accessors expose `SndWorld`, `SndRuntime`, `ISndSceneHost`, and `SystemBlackboard`
+  - `ProgressRuntime` — progress-layer container built from `SystemRuntime`; narrows the exposed surface to only the dependencies `ProgressRun` and `SessionManager` need; carries `IStateMachineContext` and `ISndContext` in addition to the shared subset
+  - `SessionManagerRuntime` — session-manager-layer container built from `ProgressRuntime`; adds `ProgressBlackboard` passed directly to avoid ordering hazards; provides convenience `JsonCodec` and `ConverterRegistry` accessors
+- **`NullSndContext`** — Null Object implementation of `ISndContext` for pure unit-test scenarios; all members are safe no-ops; exposes a singleton `Instance`; used internally before any `ProgressRun` is active
+- **`SessionSndContext`** — session-level `ISndContext` decorator that wraps a global context but pins `CurrentSession` to a specific `ISessionRun`; ensures entity strategies executing within a session see the correct session binding via `IsFrontSession` and `CurrentSession`
+- **`ISndContextAttachableSceneHost`** — new interface allowing `SessionRun` to bind its `SessionSndContext` to the scene host after construction, so all strategy hooks on entities see the session-scoped context
+- **`SessionTopologyCodec`** — internal static codec for the session topology string stored under `WellKnownKeys.SessionTopology`; serializes / deserializes named session descriptors (`key`, `levelId`, `syncProcess`) with explicit failure on malformed entries; format: `key=levelId=syncProcess,...`
+- **Structured parameter records** for lifecycle construction — each run tier now receives an immutable record instead of a flat parameter list:
+  - `ProgressParameters(string SaveId)` — identifies the save slot to load for `ProgressRun`
+  - `SessionManagerParameters` — empty record reserved for the unified (Runtime, Parameters) construction pattern
+  - `SessionParameters(string LevelId, IBlackboard SessionBlackboard, ISndSceneHost SceneHost, bool IsFrontSession)` — full construction context for `SessionRun`, including the front-session flag set immutably by `SessionManager`
+- **`ISessionRun.IsFrontSession`** — new read-only boolean property indicating whether the session is the foreground session; value is determined by `SessionManager` at creation time and never changes
+- **`ISndContext.CurrentSession`** and **`ISndContext.IsFrontSession`** — new properties exposing the session binding and front-session flag to strategy hooks and game code; global context returns the foreground session; `SessionSndContext` returns its pinned session
+- **`ISessionManager.ProcessAllSessions(double delta, bool includeForeground = false)`** — unified session process API replacing `ProcessBackgroundSessions`; by default processes only background sessions; optionally includes the foreground session when `includeForeground` is `true`
+- **Expanded and reorganised test suite**:
+  - `IntegrationTests/ContextBoundaryTests` — verifies `SessionSndContext` delegation and `NullSndContext` safety
+  - `IntegrationTests/CoverageBoostTests` — broad integration coverage across runtime components
+  - `ProgressRuntimeTests/PlayStopPlayRoundTripTests` — full play-stop-play round-trip: `ProgressRun` serializes, disposes, rebuilds, and deserializes; asserts foreground identity preservation, per-session blackboard isolation, and tick-state retention
+  - `ProgressRuntimeTests/SndContextEntryFlowTests` — validates `RequestLoadMainMenuEntrySave` mounts a foreground session and spawns entities from the entry JSON config
+  - `SessionRuntimeTests/BackgroundSession/BackgroundSession_CreationWithCorrectFlagTests` — asserts `IsFrontSession == false` on background sessions
+  - `SessionRuntimeTests/BackgroundSession/BackgroundSession_MultipleInstancesAllowedTests` — asserts multiple background sessions may coexist
+  - `SessionRuntimeTests/BackgroundSession/BackgroundSession_StrategyContextReceivesBackgroundFlagTests` — asserts strategies in background sessions receive `IsFrontSession == false`
+  - `SessionRuntimeTests/FrontSession/FrontSession_CreationWithCorrectFlagTests` — asserts `IsFrontSession == true` on the foreground session
+  - `SessionRuntimeTests/FrontSession/FrontSession_StrategyContextReceivesFrontFlagTests` — asserts strategies in the foreground session receive `IsFrontSession == true`
+  - `SessionRuntimeTests/FrontSession/FrontSession_UniqueConstraintValidationTests` — asserts that creating a second foreground session is rejected
+  - Existing tests reorganised into `IntegrationTests/`, `ProgressRuntimeTests/`, `SessionManagerRuntimeTests/`, `SessionRuntimeTests/` subdirectories for clearer categorisation; `TestDoubles.cs` added as a shared test-double module
+
+### Changed
+
+- **`SndContext`** refactored constructor: builds `SystemRuntime` and `SystemRun` directly instead of delegating to `RunFactory`; `partial` modifier removed; no longer holds `EntryPointWorkflow`, `SaveGameWorkflow`, or a `_saveMetaContributors` list
+- **`SessionRun`** constructor simplified: accepts `(SessionManagerRuntime, SessionParameters)` instead of six individual parameters; creates and stores a `SessionSndContext` to bind itself as `CurrentSession` for all strategies executing within the session
+- **`ISndContext`** API simplified:
+  - `RequestSaveGame(string newSaveId)` — `baseSaveId` and optional `customMeta` parameters removed
+  - `RequestSaveGameAuto(string? newSaveId = null)` — optional `customMeta` parameter removed
+  - `ListSavesWithMetaData()` removed — save metadata retrieval is no longer part of the context interface
+  - `ClearContinueTarget()` removed
+  - `CreateLevelBuilder(string levelId)` removed from the interface (functionality remains internal)
+  - `RegisterSaveMetaContributor` overloads removed from the public interface
+- **`OrigoAutoHost`** and **`OrigoDefaultEntry.Bootstrap`** updated to match the refactored `SndContext` and `OrigoRuntime` initialization APIs
+
+### Removed
+
+- **`RunDependencies`** — superseded by the three structured runtime containers (`SystemRuntime`, `ProgressRuntime`, `SessionManagerRuntime`)
+- **`RunFactory`** — replaced by inline construction in `SndContext` and the individual run classes
+- **`IProgressRun`**, **`ISystemRun`** — public lifecycle interfaces removed; internal runtime state is no longer exposed via interfaces
+- **`IOrigoRuntimeProvider`** — abstraction removed
+- **`EntryPointWorkflow`**, **`SaveGameWorkflow`** — workflow orchestration helpers removed; logic consolidated into `SndContext`
+- **`DefaultSessionDefaultsProvider`**, **`ISessionDefaultsProvider`** — session-defaults abstraction removed
+- **`SndContext.SaveMeta.cs`** partial — save-meta-contributor registration removed from the `ISndContext` public API
+- **Console command handlers** removed from `Runtime/Console/CommandImpl/`: `AutoSaveCommandHandler`, `ChangeLevelCommandHandler`, `ContinueGameCommandHandler`, `ListSavesCommandHandler`, `LoadGameCommandHandler`, `SaveGameCommandHandler`
+- **`LevelBuilderTests`** (flat file) — replaced by tests reorganised into the new subdirectory structure
+
+---
+
 ## [0.0.4] - 2026-04-04
 
 ### Added
