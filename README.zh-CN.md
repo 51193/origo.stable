@@ -35,10 +35,19 @@
 - **栈式状态机** —— 基于字符串的 push/pop 状态机，具有策略钩子，按层持久化
 - **类型化黑板** —— `IBlackboard` 使用 `TypedData` 值，在序列化往返中保持类型
 - **内置开发者控制台** —— 8 个内置命令（`help`、`spawn`、`snd_count`、`find_entity`、`clear_entities`、`bb_get`、`bb_set`、`bb_keys`），支持发布/订阅输出及自定义命令扩展
-- **确定性随机数** —— 基于 `IRandom` 接口的 XorShift128+ 实现
+- **确定性无状态随机数** —— XorShift128+ 工具方法，调用方自行维护 `(s0,s1)` 状态推进
 - **平台无关的 Core** —— 仅依赖 .NET 8；`Origo.Core` 中无任何引擎符号泄露
 - **前台/后台关卡** —— 前台关卡和后台关卡共享同一 `ISessionRun` 接口，区别仅在于注入的 `ISndSceneHost`。通过 `ctx.SessionManager.CreateBackgroundSession(key, levelId)` 创建纯内存后台关卡，序列化与持久化由 `SessionManager` 内部管理
 - **Godot 4 适配器** —— 薄层实现 + DI 连线；可替换为 Unity、MonoGame 等自定义适配器
+
+无状态随机数快速示例：
+
+```csharp
+var (s0, s1) = RandomNumberGenerator.CreateStateFromSeed("battle-seed");
+var (roll, nextS0, nextS1) = RandomNumberGenerator.NextUInt64(s0, s1);
+// 由业务侧自行保存 nextS0/nextS1，然后继续生成：
+var (nextRoll, s2, s3) = RandomNumberGenerator.NextUInt64(nextS0, nextS1);
+```
 
 ---
 
@@ -1307,7 +1316,6 @@ ProgressRun 仅使用 saveId 创建（内部空白 ProgressBlackboard）
 | `ILogger` | `Log(LogLevel level, string tag, string message)`，含 `LogLevel` 枚举 |
 | `IScheduler` | 延迟操作调度 |
 | `IStateMachine` | 字符串栈状态机 API |
-| `IRandom` | 确定性随机数生成 |
 | `IConsoleInputSource` | 控制台命令输入（`TryDequeueCommand`） |
 | `IConsoleOutputChannel` | 控制台输出发布/订阅（`Publish` / `Subscribe`） |
 

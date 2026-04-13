@@ -9,28 +9,35 @@ public class RandomNumberGeneratorTests
     [Fact]
     public void SameSeed_ProducesSameSequence()
     {
-        var left = new RandomNumberGenerator();
-        var right = new RandomNumberGenerator();
-        left.Initialize("same-seed");
-        right.Initialize("same-seed");
+        var left = ProduceSequence(RandomNumberGenerator.CreateStateFromSeed("same-seed"), 8);
+        var right = ProduceSequence(RandomNumberGenerator.CreateStateFromSeed("same-seed"), 8);
 
-        var a = Enumerable.Range(0, 8).Select(_ => left.NextUInt64()).ToArray();
-        var b = Enumerable.Range(0, 8).Select(_ => right.NextUInt64()).ToArray();
-
-        Assert.Equal(a, b);
+        Assert.Equal(left, right);
     }
 
     [Fact]
     public void DifferentSeed_ProducesDifferentSequence()
     {
-        var left = new RandomNumberGenerator();
-        var right = new RandomNumberGenerator();
-        left.Initialize("seed-a");
-        right.Initialize("seed-b");
+        var left = ProduceSequence(RandomNumberGenerator.CreateStateFromSeed("seed-a"), 8);
+        var right = ProduceSequence(RandomNumberGenerator.CreateStateFromSeed("seed-b"), 8);
 
-        var a = Enumerable.Range(0, 8).Select(_ => left.NextUInt64()).ToArray();
-        var b = Enumerable.Range(0, 8).Select(_ => right.NextUInt64()).ToArray();
+        Assert.NotEqual(left, right);
+    }
 
-        Assert.NotEqual(a, b);
+    private static ulong[] ProduceSequence((ulong s0, ulong s1) state, int count)
+    {
+        var values = new ulong[count];
+        var s0 = state.s0;
+        var s1 = state.s1;
+
+        foreach (var i in Enumerable.Range(0, count))
+        {
+            var (value, nextS0, nextS1) = RandomNumberGenerator.NextUInt64(s0, s1);
+            values[i] = value;
+            s0 = nextS0;
+            s1 = nextS1;
+        }
+
+        return values;
     }
 }

@@ -33,10 +33,19 @@ On GitHub, fragment IDs are generated from heading text (emoji is stripped). [`R
 - **Stack state machines** — push/pop string-based state machines with strategy hooks, persisted per layer
 - **Typed blackboards** — `IBlackboard` with `TypedData` values that survive serialization round-trips
 - **Built-in developer console** — 8 built-in commands (`help`, `spawn`, `snd_count`, `find_entity`, `clear_entities`, `bb_get`, `bb_set`, `bb_keys`) with pub/sub output and custom command extensibility
-- **Deterministic RNG** — XorShift128+ implementation behind `IRandom`
+- **Deterministic stateless RNG** — XorShift128+ helper methods; caller owns `(s0,s1)` state progression
 - **Platform-agnostic Core** — depends only on .NET 8; no engine symbols leak into `Origo.Core`
 - **Background sessions** — foreground and background levels share the same `ISessionRun` interface, differing only in the injected `ISndSceneHost`. Create via `ctx.SessionManager.CreateBackgroundSession(key, levelId)` for in-memory simulation; serialization and persistence are managed by `SessionManager` internally
 - **Godot 4 adapter** — thin implementations + DI wiring; swap with your own adapter for Unity, MonoGame, etc.
+
+Stateless RNG quick usage:
+
+```csharp
+var (s0, s1) = RandomNumberGenerator.CreateStateFromSeed("battle-seed");
+var (roll, nextS0, nextS1) = RandomNumberGenerator.NextUInt64(s0, s1);
+// Persist nextS0/nextS1 yourself, then continue:
+var (nextRoll, s2, s3) = RandomNumberGenerator.NextUInt64(nextS0, nextS1);
+```
 
 ---
 
@@ -1273,7 +1282,6 @@ All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
 | `ILogger` | `Log(LogLevel level, string tag, string message)` with `LogLevel` enum |
 | `IScheduler` | Deferred action scheduling |
 | `IStateMachine` | String-stack state machine API |
-| `IRandom` | Deterministic random number generation |
 | `IConsoleInputSource` | Console command input (`TryDequeueCommand`) |
 | `IConsoleOutputChannel` | Console output pub/sub (`Publish` / `Subscribe`) |
 
