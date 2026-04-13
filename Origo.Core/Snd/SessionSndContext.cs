@@ -31,8 +31,10 @@ internal sealed class SessionSndContext : ISndContext
     public void EnqueueBusinessDeferred(Action action) => _global.EnqueueBusinessDeferred(action);
     public void FlushDeferredActionsForCurrentFrame() => _global.FlushDeferredActionsForCurrentFrame();
     public int GetPendingPersistenceRequestCount() => _global.GetPendingPersistenceRequestCount();
+
     public SndMetaData CloneTemplate(string templateKey, string? overrideName = null) =>
         _global.CloneTemplate(templateKey, overrideName);
+
     public bool TrySubmitConsoleCommand(string commandLine) => _global.TrySubmitConsoleCommand(commandLine);
     public void ProcessConsolePending() => _global.ProcessConsolePending();
     public long SubscribeConsoleOutput(Action<string> onLine) => _global.SubscribeConsoleOutput(onLine);

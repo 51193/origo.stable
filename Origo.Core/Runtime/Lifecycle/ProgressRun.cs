@@ -66,9 +66,6 @@ public sealed partial class ProgressRun : IDisposable
 
     public string SaveId { get; private set; }
 
-    /// <inheritdoc />
-    public StateMachineContainer GetProgressStateMachines() => ProgressScope.StateMachines;
-
     public void Dispose()
     {
         if (_disposed) return;
@@ -94,6 +91,9 @@ public sealed partial class ProgressRun : IDisposable
         ProgressScope.StateMachines.Clear();
         ProgressBlackboard.Clear();
     }
+
+    /// <inheritdoc />
+    public StateMachineContainer GetProgressStateMachines() => ProgressScope.StateMachines;
 
     internal void SetSaveId(string saveId)
     {

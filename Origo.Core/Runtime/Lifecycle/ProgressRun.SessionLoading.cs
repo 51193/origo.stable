@@ -1,5 +1,5 @@
 using System;
-using Origo.Core.Abstractions.Logging;
+using System.Collections.Generic;
 using Origo.Core.Save;
 using Origo.Core.Save.Serialization;
 using Origo.Core.StateMachine;
@@ -45,7 +45,8 @@ public sealed partial class ProgressRun
             if (string.IsNullOrWhiteSpace(payload.ActiveLevelId))
                 throw new InvalidOperationException(
                     $"Progress blackboard missing required '{WellKnownKeys.SessionTopology}' before load.");
-            topology.Add(new SessionTopologyCodec.SessionDescriptor(ISessionManager.ForegroundKey, payload.ActiveLevelId, false));
+            topology.Add(new SessionTopologyCodec.SessionDescriptor(ISessionManager.ForegroundKey,
+                payload.ActiveLevelId, false));
         }
 
         // ── Step 3: Delegate to SessionManager → SessionRun (Chain of Responsibility) ──
@@ -176,18 +177,18 @@ public sealed partial class ProgressRun
             _sessionManager.LoadSessionFromPayload(descriptor.Key, bgPayload);
     }
 
-    private System.Collections.Generic.List<SessionTopologyCodec.SessionDescriptor> ParseSessionTopologyFromProgress()
+    private List<SessionTopologyCodec.SessionDescriptor> ParseSessionTopologyFromProgress()
     {
         var (found, raw) = ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
         if (!found || string.IsNullOrWhiteSpace(raw))
         {
             var (hasActive, activeLevelId) = ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
             if (hasActive && !string.IsNullOrWhiteSpace(activeLevelId))
-                return new System.Collections.Generic.List<SessionTopologyCodec.SessionDescriptor>
+                return new List<SessionTopologyCodec.SessionDescriptor>
                 {
                     new(ISessionManager.ForegroundKey, activeLevelId, false)
                 };
-            return new System.Collections.Generic.List<SessionTopologyCodec.SessionDescriptor>();
+            return new List<SessionTopologyCodec.SessionDescriptor>();
         }
 
         return SessionTopologyCodec.Parse(raw);

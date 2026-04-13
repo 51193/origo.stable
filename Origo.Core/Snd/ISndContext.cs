@@ -134,5 +134,4 @@ public interface ISndContext
 
     /// <summary>按启动流程重新读取主菜单入口配置。</summary>
     void RequestLoadMainMenuEntrySave();
-
 }

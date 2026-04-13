@@ -77,8 +77,7 @@ public sealed class SndContext : IStateMachineContext, ISndContext
     internal ISaveStorageService InitialStorageService { get; }
     internal ISavePathPolicy SavePathPolicy { get; }
 
-    public IBlackboard SystemBlackboard => _systemRun.SystemBlackboard;
-    public IBlackboard? ProgressBlackboard => _progressRun?.ProgressBlackboard;
+    public SndRuntime SndRuntime => Runtime.Snd;
 
     public ISessionManager SessionManager => _progressRun?.SessionManager ?? EmptySessionManager.Instance;
 
@@ -87,58 +86,6 @@ public sealed class SndContext : IStateMachineContext, ISndContext
 
     /// <inheritdoc />
     public bool IsFrontSession => CurrentSession?.IsFrontSession ?? false;
-
-    public SndRuntime SndRuntime => Runtime.Snd;
-
-    ISndSceneAccess IStateMachineContext.SceneAccess => Runtime.Snd.SceneHost;
-
-    IBlackboard? IStateMachineContext.SessionBlackboard => SessionManager.ForegroundSession?.SessionBlackboard;
-
-    // ── Internal helpers ──────────────────────────────────────────────
-
-    internal ProgressRun EnsureProgressRun()
-    {
-        return _progressRun ?? throw new InvalidOperationException(
-            "No active ProgressRun. Call RequestLoadMainMenuEntrySave first.");
-    }
-
-    internal void SetProgressRun(ProgressRun? progressRun)
-    {
-        _progressRun = progressRun;
-    }
-
-    internal void BeginWorkflow()
-    {
-        if (_workflowInProgress)
-            throw new InvalidOperationException(
-                "A lifecycle workflow (load/save/change-level) is already in progress. " +
-                "Concurrent workflow operations are not supported.");
-        _workflowInProgress = true;
-    }
-
-    internal void EndWorkflow() => _workflowInProgress = false;
-
-    internal void ShutdownCurrentProgressAndScene()
-    {
-        _progressRun?.Dispose();
-        _progressRun = null;
-        Runtime.Snd.ClearAll();
-    }
-
-    private ProgressRun CreateProgressRun(string saveId)
-    {
-        return new ProgressRun(
-            _systemRun.Runtime,
-            new ProgressParameters(saveId),
-            this,
-            this);
-    }
-
-    // ── Public API ─────────────────────────────────────────────────────
-
-    public void EnqueueBusinessDeferred(Action action) => Runtime.EnqueueBusinessDeferred(action);
-
-    internal void EnqueueSystemDeferred(Action action) => Runtime.EnqueueSystemDeferred(action);
 
     public int GetPendingPersistenceRequestCount() =>
         Interlocked.CompareExchange(ref _pendingPersistenceRequests, 0, 0);
@@ -273,6 +220,56 @@ public sealed class SndContext : IStateMachineContext, ISndContext
     public void RequestLoadInitialSave() => EnqueueSystemDeferred(ExecuteLoadInitialSaveNow);
 
     public void RequestLoadMainMenuEntrySave() => EnqueueSystemDeferred(ExecuteLoadMainMenuEntrySaveNow);
+
+    public IBlackboard SystemBlackboard => _systemRun.SystemBlackboard;
+    public IBlackboard? ProgressBlackboard => _progressRun?.ProgressBlackboard;
+
+    ISndSceneAccess IStateMachineContext.SceneAccess => Runtime.Snd.SceneHost;
+
+    IBlackboard? IStateMachineContext.SessionBlackboard => SessionManager.ForegroundSession?.SessionBlackboard;
+
+    // ── Public API ─────────────────────────────────────────────────────
+
+    public void EnqueueBusinessDeferred(Action action) => Runtime.EnqueueBusinessDeferred(action);
+
+    // ── Internal helpers ──────────────────────────────────────────────
+
+    internal ProgressRun EnsureProgressRun()
+    {
+        return _progressRun ?? throw new InvalidOperationException(
+            "No active ProgressRun. Call RequestLoadMainMenuEntrySave first.");
+    }
+
+    internal void SetProgressRun(ProgressRun? progressRun) => _progressRun = progressRun;
+
+    internal void BeginWorkflow()
+    {
+        if (_workflowInProgress)
+            throw new InvalidOperationException(
+                "A lifecycle workflow (load/save/change-level) is already in progress. " +
+                "Concurrent workflow operations are not supported.");
+        _workflowInProgress = true;
+    }
+
+    internal void EndWorkflow() => _workflowInProgress = false;
+
+    internal void ShutdownCurrentProgressAndScene()
+    {
+        _progressRun?.Dispose();
+        _progressRun = null;
+        Runtime.Snd.ClearAll();
+    }
+
+    private ProgressRun CreateProgressRun(string saveId)
+    {
+        return new ProgressRun(
+            _systemRun.Runtime,
+            new ProgressParameters(saveId),
+            this,
+            this);
+    }
+
+    internal void EnqueueSystemDeferred(Action action) => Runtime.EnqueueSystemDeferred(action);
 
     private ProgressRun LoadOrContinueStrict(string saveId)
     {

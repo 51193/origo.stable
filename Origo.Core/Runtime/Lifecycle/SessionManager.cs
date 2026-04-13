@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Save;
-using Origo.Core.Save.Serialization;
 using Origo.Core.Snd.Scene;
 
 namespace Origo.Core.Runtime.Lifecycle;
@@ -243,7 +241,7 @@ internal sealed class SessionManager : ISessionManager
         sceneHost.BindWorld(_managerRuntime.SndWorld);
         sceneHost.BindContext(_managerRuntime.SndContext);
 
-        var sessionParams = new SessionParameters(levelId, new Blackboard.Blackboard(), sceneHost, false);
+        var sessionParams = new SessionParameters(levelId, new Blackboard.Blackboard(), sceneHost);
         return new SessionRun(_managerRuntime, sessionParams);
     }
 

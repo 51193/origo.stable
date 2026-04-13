@@ -25,25 +25,31 @@ internal sealed class NullSndContext : ISndContext
     public ISessionRun? CurrentSession => null;
     public bool IsFrontSession => false;
     public void EnqueueBusinessDeferred(Action action) => action();
+
     public void FlushDeferredActionsForCurrentFrame()
     {
     }
 
     public int GetPendingPersistenceRequestCount() => 0;
+
     public SndMetaData CloneTemplate(string templateKey, string? overrideName = null) =>
         throw new InvalidOperationException("NullSndContext does not support templates.");
+
     public bool TrySubmitConsoleCommand(string commandLine) => false;
+
     public void ProcessConsolePending()
     {
     }
 
     public long SubscribeConsoleOutput(Action<string> onLine) => 0;
+
     public void UnsubscribeConsoleOutput(long subscriptionId)
     {
     }
 
     public StateMachineContainer? GetProgressStateMachines() => null;
     public IReadOnlyList<string> ListSaves() => Array.Empty<string>();
+
     public void RequestLoadGame(string saveId)
     {
     }
@@ -53,6 +59,7 @@ internal sealed class NullSndContext : ISndContext
     }
 
     public string RequestSaveGameAuto(string? newSaveId = null) => newSaveId ?? string.Empty;
+
     public void SetContinueTarget(string saveId)
     {
     }
@@ -63,9 +70,11 @@ internal sealed class NullSndContext : ISndContext
 
     public bool HasContinueData() => false;
     public bool RequestContinueGame() => false;
+
     public void RequestLoadInitialSave()
     {
     }
+
     public void RequestLoadMainMenuEntrySave()
     {
     }

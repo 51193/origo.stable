@@ -33,6 +33,19 @@ public partial class GodotSndManager : Node, ISndSceneHost, ISndContextAttachabl
     public int ProcessTickCount { get; private set; }
     public double ProcessDeltaSum { get; private set; }
 
+    /// <summary>
+    ///     绑定存档/生命周期门面。
+    ///     支持在生命周期切换时重新绑定会话上下文。
+    /// </summary>
+    public void BindContext(ISndContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (!_runtimeDepsBound) throw new InvalidOperationException("Call BindRuntimeDependencies before BindContext.");
+
+        Context = context;
+    }
+
     public IReadOnlyList<SndMetaData> SerializeMetaList()
     {
         var list = new List<SndMetaData>(_entities.Count);
@@ -117,19 +130,6 @@ public partial class GodotSndManager : Node, ISndSceneHost, ISndContextAttachabl
         SharedWorld = world;
         SharedLogger = logger;
         _runtimeDepsBound = true;
-    }
-
-    /// <summary>
-    ///     绑定存档/生命周期门面。
-    ///     支持在生命周期切换时重新绑定会话上下文。
-    /// </summary>
-    public void BindContext(ISndContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-
-        if (!_runtimeDepsBound) throw new InvalidOperationException("Call BindRuntimeDependencies before BindContext.");
-
-        Context = context;
     }
 
     public void QuitAll()

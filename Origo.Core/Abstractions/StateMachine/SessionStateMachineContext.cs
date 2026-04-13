@@ -14,7 +14,6 @@ internal sealed class SessionStateMachineContext : IStateMachineContext
 {
     private readonly IStateMachineContext _global;
     private readonly IBlackboard _sessionBlackboard;
-    private readonly ISndSceneAccess _sceneAccess;
 
     public SessionStateMachineContext(
         IStateMachineContext global,
@@ -26,7 +25,7 @@ internal sealed class SessionStateMachineContext : IStateMachineContext
         ArgumentNullException.ThrowIfNull(sceneAccess);
         _global = global;
         _sessionBlackboard = sessionBlackboard;
-        _sceneAccess = sceneAccess;
+        SceneAccess = sceneAccess;
     }
 
     /// <inheritdoc />
@@ -39,7 +38,7 @@ internal sealed class SessionStateMachineContext : IStateMachineContext
     public IBlackboard? SessionBlackboard => _sessionBlackboard;
 
     /// <inheritdoc />
-    public ISndSceneAccess SceneAccess => _sceneAccess;
+    public ISndSceneAccess SceneAccess { get; }
 
     /// <inheritdoc />
     public void EnqueueBusinessDeferred(Action action) => _global.EnqueueBusinessDeferred(action);

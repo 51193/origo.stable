@@ -1,6 +1,7 @@
 using System;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.Abstractions.Scene;
 using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.DataSource;
 using Origo.Core.Save.Storage;
@@ -42,7 +43,7 @@ internal sealed class SessionManagerRuntime
     internal ISaveStorageService StorageService { get; }
     internal SndWorld SndWorld { get; }
     internal SndRuntime SndRuntime { get; }
-    internal Abstractions.Scene.ISndSceneHost ForegroundSceneHost { get; }
+    internal ISndSceneHost ForegroundSceneHost { get; }
     internal IStateMachineContext StateMachineContext { get; }
     internal ISndContext SndContext { get; }
 

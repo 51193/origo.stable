@@ -41,6 +41,16 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
         _logger = logger;
     }
 
+    /// <summary>
+    ///     绑定 <see cref="ISndContext" />，用于策略生命周期回调。
+    ///     必须在首次 Spawn/Load 之前调用。
+    /// </summary>
+    public void BindContext(ISndContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        _context = context;
+    }
+
     /// <inheritdoc />
     public ISndEntity Spawn(SndMetaData metaData)
     {
@@ -97,16 +107,6 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
     {
         ArgumentNullException.ThrowIfNull(world);
         _world = world;
-    }
-
-    /// <summary>
-    ///     绑定 <see cref="ISndContext" />，用于策略生命周期回调。
-    ///     必须在首次 Spawn/Load 之前调用。
-    /// </summary>
-    public void BindContext(ISndContext context)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        _context = context;
     }
 
     /// <summary>
