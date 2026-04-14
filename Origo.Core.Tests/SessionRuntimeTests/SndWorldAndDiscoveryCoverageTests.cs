@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.DataSource;
 using Origo.Core.Runtime;
-using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
 using Xunit;
 
@@ -21,7 +20,7 @@ public class SndWorldAndDiscoveryCoverageTests
     public void SndWorld_SerializeMetaList_NonListEnumerable_UsesToListPath()
     {
         var world = TestFactory.CreateSndWorld();
-        IEnumerable<SndMetaData> lazy = MetaYield();
+        var lazy = MetaYield();
         var json = world.SerializeMetaList(lazy);
         Assert.Contains("E1", json, StringComparison.Ordinal);
 

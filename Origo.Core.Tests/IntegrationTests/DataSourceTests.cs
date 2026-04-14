@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Origo.Core.DataSource;
 using Origo.Core.DataSource.Converters;
-using Origo.Core.Snd;
+using Origo.Core.Snd.Metadata;
 using Origo.Core.StateMachine;
 using Xunit;
-using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 
@@ -1343,6 +1342,7 @@ public class DataSourceTests
     public void LazyNode_WhenExpanderThrows_NodeStaysLazy_AndCanRetrySuccessfully()
     {
         var callCount = 0;
+
         DataSourceNode expander(string raw)
         {
             callCount++;
@@ -1365,7 +1365,10 @@ public class DataSourceTests
     [Fact]
     public void LazyNode_WhenExpanderThrows_NodeCanStillBeDisposed()
     {
-        DataSourceNode expander(string raw) => throw new InvalidOperationException("Always fails.");
+        DataSourceNode expander(string raw)
+        {
+            throw new InvalidOperationException("Always fails.");
+        }
 
         var lazyNode = DataSourceNode.CreateLazy("{}", expander);
 

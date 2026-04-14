@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Save;
-using Xunit;
 using Origo.Core.Save.Storage;
+using Xunit;
 
 namespace Origo.Core.Tests;
 
@@ -45,10 +45,8 @@ public class SaveStorageAndPayloadTests
     }
 
     [Fact]
-    public void SaveStorageFacade_EnumerateSaveIds_NullFileSystem_Throws()
-    {
+    public void SaveStorageFacade_EnumerateSaveIds_NullFileSystem_Throws() =>
         Assert.Throws<ArgumentNullException>(() => SaveStorageFacade.EnumerateSaveIds(null!, "root"));
-    }
 
     [Fact]
     public void SaveStorageFacade_SnapshotCurrentToSave_WhitespaceSaveRoot_Throws()

@@ -1,7 +1,6 @@
 using System;
-using Origo.Core.Snd;
-using Xunit;
 using Origo.Core.Snd.Entity;
+using Xunit;
 
 namespace Origo.Core.Tests;
 

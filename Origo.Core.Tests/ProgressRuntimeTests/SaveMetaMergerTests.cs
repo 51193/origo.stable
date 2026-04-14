@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
-using Origo.Core.Save;
-using Origo.Core.Snd;
-using Xunit;
-using MemoryBlackboard = Origo.Core.Blackboard.Blackboard;
 using Origo.Core.Abstractions.Entity;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Save.Meta;
 using Origo.Core.Snd.Metadata;
+using Xunit;
+using MemoryBlackboard = Origo.Core.Blackboard.Blackboard;
 
 namespace Origo.Core.Tests;
 

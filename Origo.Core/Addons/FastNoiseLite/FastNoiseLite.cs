@@ -2423,7 +2423,8 @@ public class FastNoiseLite
         yr += Lerp(ly0x, ly1x, ys) * warpAmp;
     }
 
-    private static void SingleDomainWarpBasicGrid(int seed, float warpAmp, float frequency, FNLfloat x, FNLfloat y, FNLfloat z,
+    private static void SingleDomainWarpBasicGrid(int seed, float warpAmp, float frequency, FNLfloat x, FNLfloat y,
+        FNLfloat z,
         ref FNLfloat xr, ref FNLfloat yr, ref FNLfloat zr)
     {
         var xf = x * frequency;
@@ -2484,7 +2485,8 @@ public class FastNoiseLite
 
 
     // Domain Warp Simplex/OpenSimplex2
-    private static void SingleDomainWarpSimplexGradient(int seed, float warpAmp, float frequency, FNLfloat x, FNLfloat y,
+    private static void SingleDomainWarpSimplexGradient(int seed, float warpAmp, float frequency, FNLfloat x,
+        FNLfloat y,
         ref FNLfloat xr, ref FNLfloat yr, bool outGradOnly)
     {
         const float SQRT3 = 1.7320508075688772935274463415059f;
@@ -2582,7 +2584,8 @@ public class FastNoiseLite
         yr += vy * warpAmp;
     }
 
-    private static void SingleDomainWarpOpenSimplex2Gradient(int seed, float warpAmp, float frequency, FNLfloat x, FNLfloat y,
+    private static void SingleDomainWarpOpenSimplex2Gradient(int seed, float warpAmp, float frequency, FNLfloat x,
+        FNLfloat y,
         FNLfloat z, ref FNLfloat xr, ref FNLfloat yr, ref FNLfloat zr, bool outGradOnly)
     {
         x *= frequency;

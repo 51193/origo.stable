@@ -1,16 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Origo.Core.Abstractions.Blackboard;
-using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Abstractions.StateMachine;
-using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 using Origo.Core.Save.Storage;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
-using Origo.Core.Snd.Scene;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
 using Xunit;
@@ -370,7 +365,7 @@ public class SavePathPolicyContractTests
             ProgressStateMachinesJson = """{"machines":[]}""",
             Levels = new Dictionary<string, LevelPayload>
             {
-                [activeLevelId] = new LevelPayload
+                [activeLevelId] = new()
                 {
                     LevelId = activeLevelId,
                     SndSceneJson = "[]",
@@ -387,7 +382,10 @@ public class SavePathPolicyContractTests
     {
         private readonly string _prefix;
 
-        public TestPrefixedPathPolicy(string prefix) => _prefix = prefix;
+        public TestPrefixedPathPolicy(string prefix)
+        {
+            _prefix = prefix;
+        }
 
         public string GetCurrentDirectory() => $"{_prefix}current";
         public string GetSaveDirectory(string saveId) => $"{_prefix}save_{saveId}";

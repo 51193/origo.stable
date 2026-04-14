@@ -126,13 +126,13 @@ public class SessionManagerTests
     {
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
-        ctx.SessionManager.CreateBackgroundSession("synced", "synced", syncProcess: true);
-        ctx.SessionManager.CreateBackgroundSession("stored", "stored", syncProcess: false);
+        ctx.SessionManager.CreateBackgroundSession("synced", "synced", true);
+        ctx.SessionManager.CreateBackgroundSession("stored", "stored", false);
 
         var ex = Record.Exception(() =>
         {
             ctx.SessionManager.ProcessAllSessions(0.016);
-            ctx.SessionManager.ProcessAllSessions(0.016, includeForeground: true);
+            ctx.SessionManager.ProcessAllSessions(0.016, true);
         });
 
         Assert.Null(ex);
@@ -144,8 +144,8 @@ public class SessionManagerTests
     public void ProcessingKeys_OnlyReturnsSyncedKeys()
     {
         var (ctx, _) = CreateContext();
-        ctx.SessionManager.CreateBackgroundSession("synced", "synced", syncProcess: true);
-        ctx.SessionManager.CreateBackgroundSession("stored", "stored", syncProcess: false);
+        ctx.SessionManager.CreateBackgroundSession("synced", "synced", true);
+        ctx.SessionManager.CreateBackgroundSession("stored", "stored", false);
 
         var processingKeys = ((SessionManager)ctx.SessionManager).ProcessingKeys;
         Assert.Contains("synced", processingKeys);
@@ -155,10 +155,8 @@ public class SessionManagerTests
     // ── Background level IDs in progress blackboard ───────────────────
 
     [Fact]
-    public void SessionTopology_WellKnownKey_Exists()
-    {
+    public void SessionTopology_WellKnownKey_Exists() =>
         Assert.Equal("origo.session_topology", WellKnownKeys.SessionTopology);
-    }
 
     // ── Helpers ─────────────────────────────────────────────────────
 

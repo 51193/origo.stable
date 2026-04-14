@@ -32,11 +32,10 @@ public class FrontSession_UniqueConstraintValidationTests
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
 
-        int foregroundCount = 0;
+        var foregroundCount = 0;
         foreach (var key in ctx.SessionManager.Keys)
-        {
-            if (key == ISessionManager.ForegroundKey) foregroundCount++;
-        }
+            if (key == ISessionManager.ForegroundKey)
+                foregroundCount++;
 
         Assert.Equal(1, foregroundCount);
     }

@@ -2,19 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Origo.Core.Abstractions;
-using Origo.Core.DataSource;
-using Origo.Core.Runtime;
-using Origo.Core.Runtime.Console;
-using Origo.Core.Runtime.Lifecycle;
-using Origo.Core.Save.Storage;
-using Origo.Core.Snd;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Entity;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Node;
 using Origo.Core.Abstractions.Scene;
+using Origo.Core.Abstractions.StateMachine;
+using Origo.Core.DataSource;
+using Origo.Core.Runtime;
+using Origo.Core.Runtime.Console;
+using Origo.Core.Runtime.Lifecycle;
+using Origo.Core.Save.Storage;
+using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
@@ -447,7 +447,7 @@ internal static class TestFactory
         return new ProgressRun(
             systemRuntime,
             new ProgressParameters(saveId),
-            (Abstractions.StateMachine.IStateMachineContext)sndContext,
+            (IStateMachineContext)sndContext,
             sndContext);
     }
 }

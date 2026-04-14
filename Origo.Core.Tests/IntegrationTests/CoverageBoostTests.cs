@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.Blackboard;
-using Origo.Core.Abstractions.Entity;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Abstractions.StateMachine;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
@@ -294,13 +292,13 @@ public class SndContextWorkflowTests
         fs.SeedFile("maps/templates.map", $"{alias}: templates/{alias}.json");
         fs.SeedFile($"templates/{alias}.json",
             $$"""
-            {
-              "name": "{{name}}",
-              "node": { "pairs": {} },
-              "strategy": { "indices": [] },
-              "data": { "pairs": {} }
-            }
-            """);
+              {
+                "name": "{{name}}",
+                "node": { "pairs": {} },
+                "strategy": { "indices": [] },
+                "data": { "pairs": {} }
+              }
+              """);
     }
 
     // ── Console API ──
@@ -497,7 +495,7 @@ public class SndContextWorkflowTests
         var input = new ConsoleInputQueue();
         output = new ConsoleOutputChannel();
         var bb = new Blackboard.Blackboard();
-        var tm = new Serialization.TypeStringMapping();
+        var tm = new TypeStringMapping();
         var runtime = TestFactory.CreateRuntime(logger, host, tm, bb, input, output);
         fs = new TestFileSystem();
         return new SndContext(runtime, fs, "root", "res://initial", "entry.json");
@@ -518,34 +516,21 @@ public class SndContextWorkflowTests
 public class NullSndContextExtendedTests
 {
     [Fact]
-    public void ListSaves_ReturnsEmpty()
-    {
-        Assert.Empty(NullSndContext.Instance.ListSaves());
-    }
+    public void ListSaves_ReturnsEmpty() => Assert.Empty(NullSndContext.Instance.ListSaves());
 
     [Fact]
-    public void RequestSaveGameAuto_WithNull_ReturnsEmpty()
-    {
+    public void RequestSaveGameAuto_WithNull_ReturnsEmpty() =>
         Assert.Equal(string.Empty, NullSndContext.Instance.RequestSaveGameAuto());
-    }
 
     [Fact]
-    public void RequestSaveGameAuto_WithValue_ReturnsSameValue()
-    {
+    public void RequestSaveGameAuto_WithValue_ReturnsSameValue() =>
         Assert.Equal("my_save", NullSndContext.Instance.RequestSaveGameAuto("my_save"));
-    }
 
     [Fact]
-    public void HasContinueData_ReturnsFalse()
-    {
-        Assert.False(NullSndContext.Instance.HasContinueData());
-    }
+    public void HasContinueData_ReturnsFalse() => Assert.False(NullSndContext.Instance.HasContinueData());
 
     [Fact]
-    public void RequestContinueGame_ReturnsFalse()
-    {
-        Assert.False(NullSndContext.Instance.RequestContinueGame());
-    }
+    public void RequestContinueGame_ReturnsFalse() => Assert.False(NullSndContext.Instance.RequestContinueGame());
 
     [Fact]
     public void VoidOperations_DoNotChangeObservableState()
@@ -673,23 +658,83 @@ public class SessionSndContextExtendedTests
         public ISessionManager SessionManager { get; } = EmptySessionManager.Instance;
         public ISessionRun? CurrentSession => null;
         public bool IsFrontSession => false;
-        public void EnqueueBusinessDeferred(Action action) { CallCount++; action(); }
+
+        public void EnqueueBusinessDeferred(Action action)
+        {
+            CallCount++;
+            action();
+        }
+
         public void FlushDeferredActionsForCurrentFrame() => CallCount++;
-        public int GetPendingPersistenceRequestCount() { CallCount++; return 0; }
-        public SndMetaData CloneTemplate(string templateKey, string? overrideName = null) { CallCount++; return new SndMetaData { Name = overrideName ?? templateKey, NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData(), DataMetaData = new DataMetaData() }; }
-        public bool TrySubmitConsoleCommand(string commandLine) { CallCount++; return true; }
+
+        public int GetPendingPersistenceRequestCount()
+        {
+            CallCount++;
+            return 0;
+        }
+
+        public SndMetaData CloneTemplate(string templateKey, string? overrideName = null)
+        {
+            CallCount++;
+            return new SndMetaData
+            {
+                Name = overrideName ?? templateKey, NodeMetaData = new NodeMetaData(),
+                StrategyMetaData = new StrategyMetaData(), DataMetaData = new DataMetaData()
+            };
+        }
+
+        public bool TrySubmitConsoleCommand(string commandLine)
+        {
+            CallCount++;
+            return true;
+        }
+
         public void ProcessConsolePending() => CallCount++;
-        public long SubscribeConsoleOutput(Action<string> onLine) { CallCount++; return 1; }
+
+        public long SubscribeConsoleOutput(Action<string> onLine)
+        {
+            CallCount++;
+            return 1;
+        }
+
         public void UnsubscribeConsoleOutput(long subscriptionId) => CallCount++;
-        public StateMachineContainer? GetProgressStateMachines() { CallCount++; return null; }
-        public IReadOnlyList<string> ListSaves() { CallCount++; return Array.Empty<string>(); }
+
+        public StateMachineContainer? GetProgressStateMachines()
+        {
+            CallCount++;
+            return null;
+        }
+
+        public IReadOnlyList<string> ListSaves()
+        {
+            CallCount++;
+            return Array.Empty<string>();
+        }
+
         public void RequestLoadGame(string saveId) => CallCount++;
         public void RequestSaveGame(string newSaveId) => CallCount++;
-        public string RequestSaveGameAuto(string? newSaveId = null) { CallCount++; return newSaveId ?? "auto"; }
+
+        public string RequestSaveGameAuto(string? newSaveId = null)
+        {
+            CallCount++;
+            return newSaveId ?? "auto";
+        }
+
         public void SetContinueTarget(string saveId) => CallCount++;
         public void RequestSwitchForegroundLevel(string newLevelId) => CallCount++;
-        public bool HasContinueData() { CallCount++; return false; }
-        public bool RequestContinueGame() { CallCount++; return false; }
+
+        public bool HasContinueData()
+        {
+            CallCount++;
+            return false;
+        }
+
+        public bool RequestContinueGame()
+        {
+            CallCount++;
+            return false;
+        }
+
         public void RequestLoadInitialSave() => CallCount++;
         public void RequestLoadMainMenuEntrySave() => CallCount++;
     }
@@ -701,7 +746,10 @@ public class SessionSndContextExtendedTests
         public string LevelId { get; } = levelId;
         public bool IsFrontSession => false;
         public StateMachineContainer GetSessionStateMachines() => throw new NotImplementedException();
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }
 
@@ -791,10 +839,8 @@ public class MemorySndSceneHostTests
 public class MemorySndEntityTests
 {
     [Fact]
-    public void Constructor_ThrowsOnNullName()
-    {
+    public void Constructor_ThrowsOnNullName() =>
         Assert.Throws<ArgumentNullException>(() => new MemorySndEntity(null!));
-    }
 
     [Fact]
     public void Name_ReturnsConstructedName()
@@ -893,10 +939,6 @@ public class MemorySndEntityTests
 // ─────────────────────────────────────────────────────────────────────────────
 public class EntityStrategyBaseTests
 {
-    private sealed class TestEntityStrategy : EntityStrategyBase
-    {
-    }
-
     [Fact]
     public void DefaultHooks_DoNotMutateEntityData()
     {
@@ -916,6 +958,10 @@ public class EntityStrategyBaseTests
 
         Assert.Equal(7, entity.GetData<int>("score"));
     }
+
+    private sealed class TestEntityStrategy : EntityStrategyBase
+    {
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -923,10 +969,6 @@ public class EntityStrategyBaseTests
 // ─────────────────────────────────────────────────────────────────────────────
 public class StateMachineStrategyBaseTests
 {
-    private sealed class TestSmStrategy : StateMachineStrategyBase
-    {
-    }
-
     [Fact]
     public void DefaultHooks_DoNotScheduleActions()
     {
@@ -942,6 +984,10 @@ public class StateMachineStrategyBaseTests
         Assert.Equal(0, ctx.EnqueueCount);
     }
 
+    private sealed class TestSmStrategy : StateMachineStrategyBase
+    {
+    }
+
     private sealed class StubStateMachineContext : IStateMachineContext
     {
         public int EnqueueCount { get; private set; }
@@ -949,6 +995,7 @@ public class StateMachineStrategyBaseTests
         public IBlackboard? ProgressBlackboard => null;
         public IBlackboard? SessionBlackboard => null;
         public ISndSceneAccess SceneAccess => throw new NotImplementedException();
+
         public void EnqueueBusinessDeferred(Action action)
         {
             EnqueueCount++;
@@ -1178,7 +1225,7 @@ public class SndCountCommandHandlerTests
         var input = new ConsoleInputQueue();
         var output = new ConsoleOutputChannel();
         var bb = new Blackboard.Blackboard();
-        var tm = new Serialization.TypeStringMapping();
+        var tm = new TypeStringMapping();
         var runtime = TestFactory.CreateRuntime(logger, host, tm, bb, input, output);
 
         // Spawn some entities
@@ -1214,7 +1261,7 @@ public class SndCountCommandHandlerTests
         var input = new ConsoleInputQueue();
         var output = new ConsoleOutputChannel();
         var bb = new Blackboard.Blackboard();
-        var tm = new Serialization.TypeStringMapping();
+        var tm = new TypeStringMapping();
         var runtime = TestFactory.CreateRuntime(logger, host, tm, bb, input, output);
 
         var received = new List<string>();

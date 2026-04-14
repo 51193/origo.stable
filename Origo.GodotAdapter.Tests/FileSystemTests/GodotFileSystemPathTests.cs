@@ -17,10 +17,8 @@ public class GodotFileSystemPathTests
     [InlineData("../escape")]
     [InlineData("foo/../bar")]
     [InlineData("foo\\..\\bar")]
-    public void GodotPathHelper_Combine_WithTraversal_Throws(string relativePath)
-    {
+    public void GodotPathHelper_Combine_WithTraversal_Throws(string relativePath) =>
         Assert.Throws<ArgumentException>(() => GodotPathHelper.Combine("res://root", relativePath));
-    }
 
     [Fact]
     public void GodotPathHelper_GetParentDirectory_HandlesTrailingSlash()

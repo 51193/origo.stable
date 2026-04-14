@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using Origo.Core.Runtime;
+using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -76,7 +77,7 @@ public class CoreArchitectureGuardrailTests
     [Fact]
     public void ProgressRun_ShouldNotExposeLifecycleMethodsAsPublicApi()
     {
-        var type = typeof(Origo.Core.Runtime.Lifecycle.ProgressRun);
+        var type = typeof(ProgressRun);
         var publicMethods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Select(m => m.Name)
             .ToArray();
@@ -93,7 +94,7 @@ public class CoreArchitectureGuardrailTests
     [Fact]
     public void ISessionRun_ShouldNotExposeLifecycleOrSerializationMethods()
     {
-        var type = typeof(Origo.Core.Runtime.Lifecycle.ISessionRun);
+        var type = typeof(ISessionRun);
         var methodNames = type.GetMethods().Select(m => m.Name).ToArray();
         var propertyNames = type.GetProperties().Select(p => p.Name).ToArray();
 
@@ -107,14 +108,14 @@ public class CoreArchitectureGuardrailTests
     [Fact]
     public void ISessionManager_ShouldNotExposeProcessingKeys()
     {
-        var type = typeof(Origo.Core.Runtime.Lifecycle.ISessionManager);
+        var type = typeof(ISessionManager);
         Assert.Null(type.GetProperty("ProcessingKeys"));
     }
 
     [Fact]
     public void ISessionManager_ShouldNotExposeMountOrUnmount()
     {
-        var type = typeof(Origo.Core.Runtime.Lifecycle.ISessionManager);
+        var type = typeof(ISessionManager);
         var methodNames = type.GetMethods().Select(m => m.Name).ToArray();
 
         // Mount/Unmount replaced by CreateBackgroundSession/DestroySession.

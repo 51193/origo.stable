@@ -24,7 +24,7 @@ public class BackgroundSession_CreationWithCorrectFlagTests
     {
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
-        using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg_level", syncProcess: true);
+        using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg_level", true);
 
         Assert.False(bg.IsFrontSession);
     }

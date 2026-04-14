@@ -4,8 +4,6 @@ using Origo.Core.Abstractions.StateMachine;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 using Origo.Core.Snd;
-using Origo.Core.Snd.Metadata;
-using Origo.Core.Snd.Scene;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
 using Xunit;
@@ -56,7 +54,7 @@ public class ForegroundBackgroundContractTests
         SetupForegroundSession(ctx);
 
         // ForegroundSession 属性类型为 ISessionRun?
-        ISessionRun? fg = ctx.SessionManager.ForegroundSession;
+        var fg = ctx.SessionManager.ForegroundSession;
         Assert.NotNull(fg);
         Assert.IsAssignableFrom<ISessionRun>(fg);
     }
@@ -313,10 +311,8 @@ public class ForegroundBackgroundContractTests
     {
         internal static List<string>? Events { get; set; }
 
-        public override void OnPushRuntime(StateMachineStrategyContext context, IStateMachineContext ctx)
-        {
+        public override void OnPushRuntime(StateMachineStrategyContext context, IStateMachineContext ctx) =>
             Events?.Add($"push:{context.BeforeTop ?? "null"}->{context.AfterTop ?? "null"}");
-        }
     }
 
     [StrategyIndex("contract.pop")]

@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.Scene;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 using Origo.Core.Snd;
-using Origo.Core.Snd.Strategy;
-using Xunit;
-using Origo.Core.Abstractions.Entity;
-using Origo.Core.Abstractions.Scene;
 using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Scene;
+using Origo.Core.Snd.Strategy;
+using Xunit;
 
 namespace Origo.Core.Tests;
 
@@ -558,7 +558,7 @@ public class BackgroundSessionTests
     public void BuildSavePayload_IncludesBackgroundSessionsInPayload()
     {
         var (ctx, _) = CreateForegroundContext();
-        var bg = ctx.SessionManager.CreateBackgroundSession("bg1", "bg_level", syncProcess: true);
+        var bg = ctx.SessionManager.CreateBackgroundSession("bg1", "bg_level", true);
         bg.SessionBlackboard.Set("bg_key", 42);
 
         var progressRun = ctx.EnsureProgressRun();
@@ -580,7 +580,7 @@ public class BackgroundSessionTests
         var (ctx, fs) = CreateForegroundContext();
 
         // Create and mount a background session with data.
-        var bg = ctx.SessionManager.CreateBackgroundSession("sim1", "bg_sim", syncProcess: true);
+        var bg = ctx.SessionManager.CreateBackgroundSession("sim1", "bg_sim", true);
         bg.SessionBlackboard.Set("sim_round", 10);
         bg.SceneHost.Spawn(CreateMeta("BgEntity"));
 
@@ -637,8 +637,8 @@ public class BackgroundSessionTests
     public void BuildSavePayload_IncludesSyncProcessInBackgroundLevelIds()
     {
         var (ctx, _) = CreateForegroundContext();
-        ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", syncProcess: true);
-        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", syncProcess: false);
+        ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", true);
+        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", false);
 
         var progressRun = ctx.EnsureProgressRun();
         progressRun.BuildSavePayload("save_sync_test");
@@ -653,8 +653,8 @@ public class BackgroundSessionTests
     public void SaveAndLoad_RoundTrips_SyncProcessFlag()
     {
         var (ctx, _) = CreateForegroundContext();
-        ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", syncProcess: true);
-        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", syncProcess: false);
+        ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", true);
+        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", false);
 
         var progressRun = ctx.EnsureProgressRun();
         var payload = progressRun.BuildSavePayload("save_sync_rt");
@@ -689,7 +689,7 @@ public class BackgroundSessionTests
         var (ctx, fs) = CreateForegroundContext();
 
         // Create a background session with data.
-        var bg = ctx.SessionManager.CreateBackgroundSession("sim1", "bg_sim", syncProcess: true);
+        var bg = ctx.SessionManager.CreateBackgroundSession("sim1", "bg_sim", true);
         bg.SessionBlackboard.Set("sim_round", 10);
         bg.SceneHost.Spawn(CreateMeta("BgEntity"));
 
@@ -821,7 +821,10 @@ public class BackgroundSessionTests
     {
         private readonly ICollection<string> _events;
 
-        public TrackingStrategy(ICollection<string> events) => _events = events;
+        public TrackingStrategy(ICollection<string> events)
+        {
+            _events = events;
+        }
 
         public override void AfterSpawn(ISndEntity entity, ISndContext ctx) =>
             _events.Add($"AfterSpawn:{entity.Name}");
@@ -850,7 +853,10 @@ public class BackgroundSessionTests
     {
         private readonly Action _onProcess;
 
-        public ProcessCounterStrategy(Action onProcess) => _onProcess = onProcess;
+        public ProcessCounterStrategy(Action onProcess)
+        {
+            _onProcess = onProcess;
+        }
 
         public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _onProcess();
     }
@@ -860,7 +866,10 @@ public class BackgroundSessionTests
     {
         private readonly ICollection<string> _seen;
 
-        public SessionContextSpyStrategy(ICollection<string> seen) => _seen = seen;
+        public SessionContextSpyStrategy(ICollection<string> seen)
+        {
+            _seen = seen;
+        }
 
         public override void Process(ISndEntity entity, double delta, ISndContext ctx)
         {

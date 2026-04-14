@@ -31,10 +31,8 @@ public class SessionTopologyCodecTests
     [InlineData("key=level_only")]
     [InlineData("=level=true")]
     [InlineData("key==true")]
-    public void Parse_MalformedOrEmptyKeyOrLevel_ThrowsInvalidOperation(string raw)
-    {
+    public void Parse_MalformedOrEmptyKeyOrLevel_ThrowsInvalidOperation(string raw) =>
         Assert.Throws<InvalidOperationException>(() => SessionTopologyCodec.Parse(raw));
-    }
 
     [Fact]
     public void Parse_LevelIdContainsExtraSeparator_UsesSecondFieldAsLevelId()

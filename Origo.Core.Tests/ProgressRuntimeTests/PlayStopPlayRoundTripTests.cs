@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using Origo.Core.Runtime.Lifecycle;
-using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -59,8 +57,8 @@ public class PlayStopPlayRoundTripTests
         pr1.LoadAndMountForeground("level_a");
 
         // Create background sessions: one with syncProcess=true, one with syncProcess=false.
-        ctx1.SessionManager.CreateBackgroundSession("bg_tick", "bg_level_tick", syncProcess: true);
-        ctx1.SessionManager.CreateBackgroundSession("bg_store", "bg_level_store", syncProcess: false);
+        ctx1.SessionManager.CreateBackgroundSession("bg_tick", "bg_level_tick", true);
+        ctx1.SessionManager.CreateBackgroundSession("bg_store", "bg_level_store", false);
 
         var sm = (SessionManager)ctx1.SessionManager;
         Assert.Contains("bg_tick", sm.ProcessingKeys);
@@ -186,11 +184,11 @@ public class PlayStopPlayRoundTripTests
         fg1.SessionBlackboard.Set("score", 42);
 
         // Tickable background.
-        var bgTick = ctx1.SessionManager.CreateBackgroundSession("sim", "sim_level", syncProcess: true);
+        var bgTick = ctx1.SessionManager.CreateBackgroundSession("sim", "sim_level", true);
         bgTick.SessionBlackboard.Set("step", 7);
 
         // Non-tickable background.
-        var bgStore = ctx1.SessionManager.CreateBackgroundSession("cache", "cache_level", syncProcess: false);
+        var bgStore = ctx1.SessionManager.CreateBackgroundSession("cache", "cache_level", false);
         bgStore.SessionBlackboard.Set("cached", true);
 
         // Verify state before serialization.
@@ -269,7 +267,7 @@ public class PlayStopPlayRoundTripTests
         pr1.LoadAndMountForeground("level_x");
         pr1.ProgressBlackboard.Set("user_data", "important");
 
-        ctx1.SessionManager.CreateBackgroundSession("bg_sim", "sim_level", syncProcess: true);
+        ctx1.SessionManager.CreateBackgroundSession("bg_sim", "sim_level", true);
 
         var payload = pr1.BuildSavePayload("save-rt");
 
@@ -316,7 +314,7 @@ public class PlayStopPlayRoundTripTests
         // Create second state.
         pr.SwitchForeground("second_level");
         pr.ProgressBlackboard.Set("second_data", "B");
-        ctx.SessionManager.CreateBackgroundSession("bg2", "bg2_level", syncProcess: true);
+        ctx.SessionManager.CreateBackgroundSession("bg2", "bg2_level", true);
 
         var payload2 = pr.BuildSavePayload("save-2");
 

@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions.Console;
-using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
 using Origo.Core.Runtime.Console.CommandImpl;
 using Xunit;

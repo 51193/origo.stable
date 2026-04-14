@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Console;
 using Origo.Core.Runtime;
 using Origo.Core.Runtime.Console;
 using Xunit;
-using Origo.Core.Abstractions.Console;
 
 namespace Origo.Core.Tests;
 

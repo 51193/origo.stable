@@ -4,8 +4,8 @@ using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
 using Origo.Core.Save.Storage;
 using Origo.Core.Snd;
-using Xunit;
 using Origo.Core.Snd.Metadata;
+using Xunit;
 
 namespace Origo.Core.Tests;
 
@@ -126,7 +126,8 @@ public class LifecycleRunsTests
         Assert.Equal("b", progressRun.ForegroundSession!.LevelId);
         Assert.Equal(ISessionManager.ForegroundKey, ((SessionRun)progressRun.ForegroundSession!).MountKey);
 
-        var (foundActive, activeFromProgress) = progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
+        var (foundActive, activeFromProgress) =
+            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
         Assert.True(foundActive);
         Assert.Equal("b", activeFromProgress);
 
@@ -158,7 +159,8 @@ public class LifecycleRunsTests
         Assert.NotNull(progressRun.ForegroundSession);
         Assert.Equal("b", progressRun.ForegroundSession!.LevelId);
 
-        var (foundActive, activeFromProgress) = progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
+        var (foundActive, activeFromProgress) =
+            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
         Assert.True(foundActive);
         Assert.Equal("b", activeFromProgress);
 
@@ -273,7 +275,7 @@ public class LifecycleRunsTests
             SaveId = "001",
             ActiveLevelId = "default",
             ProgressJson = """{"origo.active_level_id":{"type":"String","data":"default"}}""",
-            ProgressStateMachinesJson = null!  // Missing — should throw
+            ProgressStateMachinesJson = null! // Missing — should throw
         };
 
         Assert.Throws<InvalidOperationException>(() => progressRun.LoadFromPayload(payload));
@@ -366,7 +368,7 @@ public class LifecycleRunsTests
     public void ResolveLevelPayload_ReturnsNull_WhenNoData()
     {
         var fs = new TestFileSystem();
-        var service = new Save.Storage.DefaultSaveStorageService(fs, "root");
+        var service = new DefaultSaveStorageService(fs, "root");
 
         var result = service.ResolveLevelPayload("001", "nonexistent");
 

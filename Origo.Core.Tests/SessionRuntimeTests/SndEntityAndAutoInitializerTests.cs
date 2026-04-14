@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Entity;
 using Origo.Core.Runtime;
 using Origo.Core.Snd;
+using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Strategy;
 using Xunit;
-using Origo.Core.Abstractions.Entity;
-using Origo.Core.Snd.Metadata;
 
 namespace Origo.Core.Tests;
 

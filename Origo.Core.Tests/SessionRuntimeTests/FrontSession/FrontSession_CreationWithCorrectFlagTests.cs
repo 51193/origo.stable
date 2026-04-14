@@ -1,5 +1,5 @@
-using System;
 using Origo.Core.Runtime.Lifecycle;
+using Origo.Core.Save;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -26,7 +26,7 @@ public class FrontSession_CreationWithCorrectFlagTests
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
         // Load a payload into foreground
-        var payload = new Save.LevelPayload
+        var payload = new LevelPayload
         {
             LevelId = "default",
             SndSceneJson = "[]",

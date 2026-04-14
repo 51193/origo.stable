@@ -1,16 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Origo.Core.Abstractions.Blackboard;
-using Origo.Core.Abstractions.Entity;
+using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Abstractions.StateMachine;
-using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save;
+using Origo.Core.Save.Meta;
 using Origo.Core.Save.Storage;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
-using Origo.Core.Snd.Scene;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
 using Xunit;
@@ -127,8 +124,8 @@ public class SessionDecouplingTests
         Assert.IsAssignableFrom<ISndSceneHost>(bg.SceneHost);
 
         // Verify methods are directly callable without casting.
-        ISndSceneHost fgHost = fg.SceneHost;
-        ISndSceneHost bgHost = bg.SceneHost;
+        var fgHost = fg.SceneHost;
+        var bgHost = bg.SceneHost;
 
         // Foreground uses TestSndSceneHost (simple meta).
         var fgEntity = fgHost.Spawn(new SndMetaData { Name = "fg_test" });
@@ -186,7 +183,8 @@ public class SessionDecouplingTests
 
         // The custom policy prefixes "custom_" to directory names,
         // so level directory becomes "custom_current/custom_level_dungeon/".
-        var expectedSndScene = $"root/{customPolicy.GetLevelSndSceneFile(customPolicy.GetLevelDirectory(currentDir, "dungeon"))}";
+        var expectedSndScene =
+            $"root/{customPolicy.GetLevelSndSceneFile(customPolicy.GetLevelDirectory(currentDir, "dungeon"))}";
         Assert.True(fs.Exists(expectedSndScene),
             $"Expected file at '{expectedSndScene}' to exist (custom path policy should change layout).");
 
@@ -304,7 +302,10 @@ public class SessionDecouplingTests
     {
         private readonly string _prefix;
 
-        public PrefixedSavePathPolicy(string prefix) => _prefix = prefix;
+        public PrefixedSavePathPolicy(string prefix)
+        {
+            _prefix = prefix;
+        }
 
         public string GetCurrentDirectory() => $"{_prefix}current";
         public string GetSaveDirectory(string saveId) => $"{_prefix}save_{saveId}";
@@ -314,7 +315,10 @@ public class SessionDecouplingTests
             $"{baseDirectory}/{_prefix}progress_state_machines.json";
 
         public string GetCustomMetaFile(string baseDirectory) => $"{baseDirectory}/{_prefix}meta.map";
-        public string GetLevelDirectory(string baseDirectory, string levelId) => $"{baseDirectory}/{_prefix}level_{levelId}";
+
+        public string GetLevelDirectory(string baseDirectory, string levelId) =>
+            $"{baseDirectory}/{_prefix}level_{levelId}";
+
         public string GetLevelSndSceneFile(string levelDirectory) => $"{levelDirectory}/snd_scene.json";
         public string GetLevelSessionFile(string levelDirectory) => $"{levelDirectory}/session.json";
 
@@ -331,14 +335,17 @@ public class SessionDecouplingTests
     {
         private readonly ISaveStorageService _inner;
 
-        public TrackingSaveStorageService(ISaveStorageService inner) => _inner = inner;
+        public TrackingSaveStorageService(ISaveStorageService inner)
+        {
+            _inner = inner;
+        }
 
         public int WriteLevelPayloadOnlyCalls { get; private set; }
         public LevelPayload? LastWrittenPayload { get; private set; }
 
         public IReadOnlyList<string> EnumerateSaveIds() => _inner.EnumerateSaveIds();
 
-        public IReadOnlyList<Save.Meta.SaveMetaDataEntry> EnumerateSavesWithMetaData() =>
+        public IReadOnlyList<SaveMetaDataEntry> EnumerateSavesWithMetaData() =>
             _inner.EnumerateSavesWithMetaData();
 
         public void WriteSavePayloadToCurrent(SaveGamePayload payload) =>
@@ -346,7 +353,7 @@ public class SessionDecouplingTests
 
         public void WriteSavePayloadToCurrentThenSnapshot(
             SaveGamePayload payload, string newSaveId,
-            Origo.Core.Abstractions.Logging.ILogger logger) =>
+            ILogger logger) =>
             _inner.WriteSavePayloadToCurrentThenSnapshot(payload, newSaveId, logger);
 
         public void WriteLevelPayloadOnly(string baseDirectoryRel, LevelPayload levelPayload, bool overwrite = true)
@@ -368,7 +375,7 @@ public class SessionDecouplingTests
             _inner.WriteProgressOnlyToCurrent(progressJson, progressStateMachinesJson, overwrite);
 
         public SaveGamePayload ReadSavePayloadFromCurrent(string saveId, string activeLevelId,
-            Origo.Core.Abstractions.Logging.ILogger? logger = null) =>
+            ILogger? logger = null) =>
             _inner.ReadSavePayloadFromCurrent(saveId, activeLevelId, logger);
 
         public SaveGamePayload ReadSavePayloadFromSnapshot(string saveId, string activeLevelId) =>

@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Origo.Core.Random;
 using Xunit;
 

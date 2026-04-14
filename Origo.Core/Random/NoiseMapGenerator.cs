@@ -16,26 +16,22 @@ public static class NoiseMapGenerator
     /// <summary>
     ///     生成 Simplex + Worley(70/30) 混合噪声图，返回长度为 <c>size*size</c> 的行优先数组，值域为 <c>0..1</c>。
     /// </summary>
-    public static float[] GenerateSimplexWorleyBlendMap(int size, int seed = DefaultSeed, float frequency = DefaultFrequency)
+    public static float[] GenerateSimplexWorleyBlendMap(int size, int seed = DefaultSeed,
+        float frequency = DefaultFrequency)
     {
-        if (size <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(size), size, "Size must be greater than 0.");
-        }
+        if (size <= 0) throw new ArgumentOutOfRangeException(nameof(size), size, "Size must be greater than 0.");
 
         var simplex = CreateSimplexNoise(seed, frequency);
         var worley = CreateWorleyNoise(seed, frequency);
         var map = new float[size * size];
 
         for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
         {
-            for (var x = 0; x < size; x++)
-            {
-                var simplexValue = simplex.GetNoise(x, y);
-                var worleyValue = worley.GetNoise(x, y);
-                var mixed = simplexValue * SimplexWeight + worleyValue * WorleyWeight;
-                map[y * size + x] = NormalizeToZeroOne(mixed);
-            }
+            var simplexValue = simplex.GetNoise(x, y);
+            var worleyValue = worley.GetNoise(x, y);
+            var mixed = simplexValue * SimplexWeight + worleyValue * WorleyWeight;
+            map[y * size + x] = NormalizeToZeroOne(mixed);
         }
 
         return map;

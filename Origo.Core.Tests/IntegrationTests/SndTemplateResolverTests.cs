@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Origo.Core.DataSource;
 using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
 using Xunit;
@@ -84,11 +85,11 @@ public class SndTemplateResolverTests
         return new SndTemplateResolver(fs, TestFactory.CreateJsonCodec(), registry.Get<SndMetaData>(), map);
     }
 
-    private sealed class NullMetaConverter : Origo.Core.DataSource.DataSourceConverter<SndMetaData>
+    private sealed class NullMetaConverter : DataSourceConverter<SndMetaData>
     {
-        public override SndMetaData Read(Origo.Core.DataSource.DataSourceNode node) => null!;
+        public override SndMetaData Read(DataSourceNode node) => null!;
 
-        public override Origo.Core.DataSource.DataSourceNode Write(SndMetaData value) =>
-            Origo.Core.DataSource.DataSourceNode.CreateNull();
+        public override DataSourceNode Write(SndMetaData value) =>
+            DataSourceNode.CreateNull();
     }
 }

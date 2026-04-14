@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.Blackboard;
+using Origo.Core.Abstractions.Scene;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Runtime.StateMachine;
 using Origo.Core.Snd;
@@ -65,23 +66,83 @@ public class ContextBoundaryTests
         public ISessionManager SessionManager { get; } = EmptySessionManager.Instance;
         public ISessionRun? CurrentSession => null;
         public bool IsFrontSession => false;
-        public void EnqueueBusinessDeferred(Action action) { CallCount++; action(); }
+
+        public void EnqueueBusinessDeferred(Action action)
+        {
+            CallCount++;
+            action();
+        }
+
         public void FlushDeferredActionsForCurrentFrame() => CallCount++;
-        public int GetPendingPersistenceRequestCount() { CallCount++; return 0; }
-        public SndMetaData CloneTemplate(string templateKey, string? overrideName = null) { CallCount++; return new SndMetaData { Name = overrideName ?? templateKey, NodeMetaData = new NodeMetaData(), StrategyMetaData = new StrategyMetaData(), DataMetaData = new DataMetaData() }; }
-        public bool TrySubmitConsoleCommand(string commandLine) { CallCount++; return true; }
+
+        public int GetPendingPersistenceRequestCount()
+        {
+            CallCount++;
+            return 0;
+        }
+
+        public SndMetaData CloneTemplate(string templateKey, string? overrideName = null)
+        {
+            CallCount++;
+            return new SndMetaData
+            {
+                Name = overrideName ?? templateKey, NodeMetaData = new NodeMetaData(),
+                StrategyMetaData = new StrategyMetaData(), DataMetaData = new DataMetaData()
+            };
+        }
+
+        public bool TrySubmitConsoleCommand(string commandLine)
+        {
+            CallCount++;
+            return true;
+        }
+
         public void ProcessConsolePending() => CallCount++;
-        public long SubscribeConsoleOutput(Action<string> onLine) { CallCount++; return 1; }
+
+        public long SubscribeConsoleOutput(Action<string> onLine)
+        {
+            CallCount++;
+            return 1;
+        }
+
         public void UnsubscribeConsoleOutput(long subscriptionId) => CallCount++;
-        public StateMachineContainer? GetProgressStateMachines() { CallCount++; return null; }
-        public IReadOnlyList<string> ListSaves() { CallCount++; return Array.Empty<string>(); }
+
+        public StateMachineContainer? GetProgressStateMachines()
+        {
+            CallCount++;
+            return null;
+        }
+
+        public IReadOnlyList<string> ListSaves()
+        {
+            CallCount++;
+            return Array.Empty<string>();
+        }
+
         public void RequestLoadGame(string saveId) => CallCount++;
         public void RequestSaveGame(string newSaveId) => CallCount++;
-        public string RequestSaveGameAuto(string? newSaveId = null) { CallCount++; return newSaveId ?? "auto"; }
+
+        public string RequestSaveGameAuto(string? newSaveId = null)
+        {
+            CallCount++;
+            return newSaveId ?? "auto";
+        }
+
         public void SetContinueTarget(string saveId) => CallCount++;
         public void RequestSwitchForegroundLevel(string newLevelId) => CallCount++;
-        public bool HasContinueData() { CallCount++; return false; }
-        public bool RequestContinueGame() { CallCount++; return false; }
+
+        public bool HasContinueData()
+        {
+            CallCount++;
+            return false;
+        }
+
+        public bool RequestContinueGame()
+        {
+            CallCount++;
+            return false;
+        }
+
         public void RequestLoadInitialSave() => CallCount++;
         public void RequestLoadMainMenuEntrySave() => CallCount++;
     }
@@ -89,11 +150,13 @@ public class ContextBoundaryTests
     private sealed class FakeSessionRun(string levelId) : ISessionRun
     {
         public IBlackboard SessionBlackboard { get; } = new Blackboard.Blackboard();
-        public Origo.Core.Abstractions.Scene.ISndSceneHost SceneHost => throw new NotImplementedException();
+        public ISndSceneHost SceneHost => throw new NotImplementedException();
         public string LevelId { get; } = levelId;
         public bool IsFrontSession => false;
         public StateMachineContainer GetSessionStateMachines() => throw new NotImplementedException();
-        public void Dispose() { }
-    }
 
+        public void Dispose()
+        {
+        }
+    }
 }

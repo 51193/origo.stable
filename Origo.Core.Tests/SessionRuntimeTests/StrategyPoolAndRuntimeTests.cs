@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Runtime.Console;
-using Origo.Core.Snd;
-using Origo.Core.Snd.Strategy;
-using Xunit;
 using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Scene;
+using Origo.Core.Snd.Strategy;
+using Xunit;
 
 namespace Origo.Core.Tests;
 
