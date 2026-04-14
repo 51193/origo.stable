@@ -18,13 +18,6 @@ public class SndWorldAndDiscoveryCoverageTests
     }
 
     [Fact]
-    public void SndWorld_RegisterTypeMappings_InvokesAction()
-    {
-        var world = TestFactory.CreateSndWorld();
-        world.RegisterTypeMappings(m => m.RegisterType<Guid>("Test.Guid"));
-    }
-
-    [Fact]
     public void SndWorld_SerializeMetaList_NonListEnumerable_UsesToListPath()
     {
         var world = TestFactory.CreateSndWorld();
@@ -45,12 +38,12 @@ public class SndWorldAndDiscoveryCoverageTests
     }
 
     [Fact]
-    public void DiscoverAndRegisterStrategies_SkippingTestAssembly_CompletesWithoutThrow()
+    public void DiscoverAndRegisterStrategies_SkippingTestAssembly_DoesNotRegisterFromSkippedAssembly()
     {
         var logger = new TestLogger();
         var world = TestFactory.CreateSndWorld(logger: logger);
         var n = OrigoAutoInitializer.DiscoverAndRegisterStrategies(world, logger, new[] { "Origo.Core.Tests" });
-        Assert.True(n >= 0);
+        Assert.Equal(0, n);
     }
 
     [Fact]

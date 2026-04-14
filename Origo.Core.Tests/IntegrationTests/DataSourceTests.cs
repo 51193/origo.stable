@@ -1205,7 +1205,9 @@ public class DataSourceTests
     {
         var node = DataSourceNode.CreateNull();
         node.Dispose();
-        node.Dispose(); // Should not throw
+        var ex = Record.Exception(node.Dispose);
+        Assert.Null(ex);
+        Assert.Throws<ObjectDisposedException>(() => _ = node.Kind);
     }
 
     [Fact]

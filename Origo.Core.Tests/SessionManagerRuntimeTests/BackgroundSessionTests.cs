@@ -306,7 +306,8 @@ public class BackgroundSessionTests
         var (ctx, _) = CreateForegroundContext();
         var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
         bg.Dispose();
-        bg.Dispose(); // Should not throw.
+        var ex = Record.Exception(bg.Dispose);
+        Assert.Null(ex);
     }
 
     [Fact]

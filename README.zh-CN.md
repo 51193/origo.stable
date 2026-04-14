@@ -36,6 +36,7 @@
 - **类型化黑板** —— `IBlackboard` 使用 `TypedData` 值，在序列化往返中保持类型
 - **内置开发者控制台** —— 8 个内置命令（`help`、`spawn`、`snd_count`、`find_entity`、`clear_entities`、`bb_get`、`bb_set`、`bb_keys`），支持发布/订阅输出及自定义命令扩展
 - **确定性无状态随机数** —— XorShift128+ 工具方法，调用方自行维护 `(s0,s1)` 状态推进
+- **程序化噪声图辅助** —— 提供 `Simplex + Worley` 的 `70%/30%` 混合噪声图，输出值域 `0..1`，更贴近玩法层直接使用
 - **平台无关的 Core** —— 仅依赖 .NET 8；`Origo.Core` 中无任何引擎符号泄露
 - **前台/后台关卡** —— 前台关卡和后台关卡共享同一 `ISessionRun` 接口，区别仅在于注入的 `ISndSceneHost`。通过 `ctx.SessionManager.CreateBackgroundSession(key, levelId)` 创建纯内存后台关卡，序列化与持久化由 `SessionManager` 内部管理
 - **Godot 4 适配器** —— 薄层实现 + DI 连线；可替换为 Unity、MonoGame 等自定义适配器
@@ -47,6 +48,15 @@ var (s0, s1) = RandomNumberGenerator.CreateStateFromSeed("battle-seed");
 var (roll, nextS0, nextS1) = RandomNumberGenerator.NextUInt64(s0, s1);
 // 由业务侧自行保存 nextS0/nextS1，然后继续生成：
 var (nextRoll, s2, s3) = RandomNumberGenerator.NextUInt64(nextS0, nextS1);
+```
+
+噪声图快速示例：
+
+```csharp
+var size = 256;
+var map = NoiseMapGenerator.GenerateSimplexWorleyBlendMap(size);
+// map 为行优先一维数组，长度 size * size
+// 每个值都归一化到 0..1
 ```
 
 ---
@@ -61,6 +71,7 @@ var (nextRoll, s2, s3) = RandomNumberGenerator.NextUInt64(nextS0, nextS1);
 Origo.Core/               纯 C# 核心（Microsoft.NET.Sdk，net8.0，无引擎依赖）
 Origo.GodotAdapter/       Godot 4 适配器（Godot.NET.Sdk 4.6.1，薄层实现 + DI）
 Origo.Core.Tests/         Core 单元测试（xUnit v3；数量见「测试」一节）
+Origo.GodotAdapter.Tests/ 适配层测试（xUnit v3；Bootstrap/路径/序列化护栏）
 scripts/                  ci.sh（完整 CI）、run-test.sh（仅测试的快捷方式）
 Directory.Build.props     共享 MSBuild 属性
 Origo.sln                 解决方案文件
@@ -127,11 +138,12 @@ Origo 面向 **集成方**：稳定的边界与可观察的行为，优先于把
 
 - [ ] `README.md` / `README.zh-CN.md` 中的命令与 API 说明与本仓库一致。
 - [ ] [`LICENSE`](LICENSE) 存在且 README 已链接。
+- [ ] 添加、移除或升级内嵌第三方依赖时，同步更新 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ### 2. 构建、测试、覆盖率
 
 - [ ] 在仓库根目录执行 `bash scripts/ci.sh` 成功（与 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 入口一致）。
-- [ ] `Origo.Core` **行覆盖率 ≥ 90%**（由 `Origo.Core.Tests` 中 Coverlet 门禁保证；`Runtime/OrigoAutoInitializer.cs` 已从分母排除，见 `Origo.Core.Tests.csproj`）。
+- [ ] `Origo.Core` **行覆盖率 ≥ 90%**（由 `Origo.Core.Tests` 中 Coverlet 门禁保证；`Runtime/OrigoAutoInitializer.cs` 与 `Addons/FastNoiseLite/FastNoiseLite.cs` 已从分母排除，见 `Origo.Core.Tests.csproj`）。
 - [ ] （可选）`dotnet test … --list-tests` 与发版说明核对。
 
 ### 3. 存档行为与产品预期
@@ -1550,16 +1562,17 @@ bash scripts/ci.sh
 dotnet test Origo.sln --configuration Release
 ```
 
-CI 对 `Origo.Core` 强制执行 **行覆盖率 ≥ 90%**（Coverlet）。`Runtime/OrigoAutoInitializer.cs` 已从该百分比统计中**排除**（反射/引导代码），见 `Origo.Core.Tests.csproj`。本地生成覆盖率报告示例：
+CI 对 `Origo.Core` 强制执行 **行覆盖率 ≥ 90%**（Coverlet）。`Runtime/OrigoAutoInitializer.cs` 与 `Addons/FastNoiseLite/FastNoiseLite.cs` 已从该百分比统计中**排除**（反射/引导代码与内嵌第三方源码），见 `Origo.Core.Tests.csproj`。本地生成覆盖率报告示例：
 
 ```bash
 dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
-  -p:CollectCoverage=true -p:Threshold=86 -p:ThresholdType=line -p:ThresholdStat=total
+  -p:CollectCoverage=true -p:Threshold=90 -p:ThresholdType=line -p:ThresholdStat=total
 ```
 
 | 项目 | 说明 |
 |------|------|
 | `Origo.Core.Tests` | SND、存档、生命周期、控制台、DataSource、序列化、黑板、后台关卡等 |
+| `Origo.GodotAdapter.Tests` | 适配层测试（Bootstrap 契约、文件系统路径策略、Godot 转换器注册） |
 
 测试项目使用 **xUnit v3**。当前测试数量请使用 `dotnet test ... --list-tests` 查看。发版前请按上文 [发版检查清单](#release-checklist) 与 [存档 I/O 契约](#save-system-contracts) 自检。
 
@@ -1576,6 +1589,11 @@ Origo.Core.Tests/
 ├── IntegrationTests/             # 跨层集成与工具测试
 ├── TestDoubles.cs                # 共享测试替身和 TestFactory
 └── GlobalUsings.cs               # 共享全局 using
+
+Origo.GodotAdapter.Tests/
+├── FileSystemTests/              # Godot 路径辅助与文件系统契约测试
+├── BootstrapTests/               # 启动装配与空参数守卫测试
+└── SerializationTests/           # Godot 类型映射与转换器注册测试
 ```
 
 ---
@@ -1585,6 +1603,11 @@ Origo.Core.Tests/
 ## 📜 许可证
 
 本项目采用 [MIT 许可证](LICENSE) 授权。
+
+本仓库同时包含第三方代码：
+
+- `FastNoiseLite`（MIT），内嵌路径：`Origo.Core/Addons/FastNoiseLite/FastNoiseLite.cs`
+- 署名与许可证文本见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`LICENSE.FastNoiseLite`](LICENSE.FastNoiseLite)。
 
 ---
 

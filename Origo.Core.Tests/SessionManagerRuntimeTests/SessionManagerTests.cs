@@ -7,14 +7,14 @@ using Xunit;
 namespace Origo.Core.Tests;
 
 /// <summary>
-///     SessionManager 单元测试：验证 KVP 注册表、前台访问器、后台挂载/卸载、Process 同步。
+///     SessionManager 单元测试：验证 KVP 注册表、前台访问器、后台会话创建/销毁、Process 同步。
 /// </summary>
 public class SessionManagerTests
 {
-    // ── Mount / Unmount ────────────────────────────────────────────────
+    // ── Create / Destroy Session ───────────────────────────────────────
 
     [Fact]
-    public void Mount_AddsSession_TryGetReturnsIt()
+    public void CreateBackgroundSession_AddsSession_TryGetReturnsIt()
     {
         var (ctx, _) = CreateContext();
         var bg = ctx.SessionManager.CreateBackgroundSession("bg1", "bg1");
@@ -24,7 +24,7 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void Unmount_RemovesSession_TryGetReturnsNull()
+    public void DestroySession_RemovesSession_TryGetReturnsNull()
     {
         var (ctx, _) = CreateContext();
         var bg = ctx.SessionManager.CreateBackgroundSession("bg1", "bg1");
@@ -35,7 +35,7 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void Unmount_NonExistentKey_ReturnsNull()
+    public void DestroySession_NonExistentKey_DoesNotThrow()
     {
         var (ctx, _) = CreateContext();
         // DestroySession on non-existent key should not throw
@@ -44,7 +44,7 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void Mount_DuplicateKey_Throws()
+    public void CreateBackgroundSession_DuplicateKey_Throws()
     {
         var (ctx, _) = CreateContext();
         ctx.SessionManager.CreateBackgroundSession("dup", "bg1");
@@ -53,7 +53,7 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void Mount_ForegroundKey_Succeeds()
+    public void ForegroundKey_IsAvailable_WhenForegroundSessionExists()
     {
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
@@ -62,7 +62,7 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void Unmount_ForegroundKey_Succeeds()
+    public void DestroySession_ForegroundKey_ClearsForegroundSession()
     {
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
@@ -129,9 +129,15 @@ public class SessionManagerTests
         ctx.SessionManager.CreateBackgroundSession("synced", "synced", syncProcess: true);
         ctx.SessionManager.CreateBackgroundSession("stored", "stored", syncProcess: false);
 
-        // Should not throw; synced session gets ProcessAll via FullMemorySndSceneHost.
-        ctx.SessionManager.ProcessAllSessions(0.016);
-        ctx.SessionManager.ProcessAllSessions(0.016, includeForeground: true);
+        var ex = Record.Exception(() =>
+        {
+            ctx.SessionManager.ProcessAllSessions(0.016);
+            ctx.SessionManager.ProcessAllSessions(0.016, includeForeground: true);
+        });
+
+        Assert.Null(ex);
+        Assert.Contains("synced", ((SessionManager)ctx.SessionManager).ProcessingKeys);
+        Assert.DoesNotContain("stored", ((SessionManager)ctx.SessionManager).ProcessingKeys);
     }
 
     [Fact]

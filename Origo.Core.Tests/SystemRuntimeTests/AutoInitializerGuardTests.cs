@@ -30,6 +30,28 @@ public class AutoInitializerGuardTests
         Assert.Contains("_counter", mutableFieldNames, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void IsStatelessStrategyType_WithOnlyStaticFields_ReturnsTrue()
+    {
+        var ok = OrigoAutoInitializer.IsStatelessStrategyType(
+            typeof(StatelessAutoInitStrategy), out var mutableFieldNames);
+
+        Assert.True(ok);
+        Assert.Equal(string.Empty, mutableFieldNames);
+    }
+
+    [Fact]
+    public void DiscoverAndRegisterStrategies_WithBroadSkipPrefixes_ReturnsZero()
+    {
+        var logger = new TestLogger();
+        var world = TestFactory.CreateSndWorld(logger: logger);
+
+        var registered = OrigoAutoInitializer.DiscoverAndRegisterStrategies(
+            world, logger, new[] { "Origo" });
+
+        Assert.Equal(0, registered);
+    }
+
     [StrategyIndex(IndexConst)]
     private sealed class AnnotatedStrategy : EntityStrategyBase
     {
@@ -43,6 +65,14 @@ public class AutoInitializerGuardTests
     {
         public const string IndexConst = "auto.init.stateful.local";
         private int _counter;
+        public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
+    }
+
+    [StrategyIndex(IndexConst)]
+    private sealed class StatelessAutoInitStrategy : EntityStrategyBase
+    {
+        public const string IndexConst = "auto.init.stateless.local";
+        private static int _counter;
         public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
     }
 }

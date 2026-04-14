@@ -127,8 +127,9 @@ public class SavePathResolverTests
     public void SavePathResolver_EnsureParentDirectory_NoOpForRootFile()
     {
         var fs = new TestFileSystem();
-        // File at root has empty parent; should not throw
-        SavePathResolver.EnsureParentDirectory(fs, "file.txt");
+        var ex = Record.Exception(() => SavePathResolver.EnsureParentDirectory(fs, "file.txt"));
+        Assert.Null(ex);
+        Assert.False(fs.DirectoryExists("file.txt"));
     }
 
     [Fact]
@@ -197,10 +198,13 @@ public class SavePathResolverTests
     [Fact]
     public void SavePathResolver_RejectPathTraversal_AllowsSafePaths()
     {
-        // Should not throw
-        SavePathResolver.RejectPathTraversal("safe/path");
-        SavePathResolver.RejectPathTraversal("file.json");
-        SavePathResolver.RejectPathTraversal("");
+        var ex = Record.Exception(() =>
+        {
+            SavePathResolver.RejectPathTraversal("safe/path");
+            SavePathResolver.RejectPathTraversal("file.json");
+            SavePathResolver.RejectPathTraversal("");
+        });
+        Assert.Null(ex);
     }
 }
 

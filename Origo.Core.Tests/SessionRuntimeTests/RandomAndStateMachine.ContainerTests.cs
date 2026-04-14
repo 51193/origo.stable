@@ -271,7 +271,8 @@ public partial class RandomAndStateMachineTests
         var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
         var pool = runtime.SndWorld.StrategyPool;
         var c = new StateMachineContainer(pool, ctx);
-        c.Remove("none");
+        var ex = Record.Exception(() => c.Remove("none"));
+        Assert.Null(ex);
     }
 
     [Fact]

@@ -265,9 +265,13 @@ public class NullLoggerTests
     [Fact]
     public void NullLogger_Log_DoesNotThrow()
     {
-        NullLogger.Instance.Log(LogLevel.Info, "tag", "message");
-        NullLogger.Instance.Log(LogLevel.Warning, "tag", "message");
-        NullLogger.Instance.Log(LogLevel.Error, "tag", "message");
+        var ex = Record.Exception(() =>
+        {
+            NullLogger.Instance.Log(LogLevel.Info, "tag", "message");
+            NullLogger.Instance.Log(LogLevel.Warning, "tag", "message");
+            NullLogger.Instance.Log(LogLevel.Error, "tag", "message");
+        });
+        Assert.Null(ex);
     }
 
     [Fact]

@@ -120,8 +120,13 @@ public class MemoryFileSystemTests
     public void MemoryFileSystem_CreateDirectory_EmptyPath_NoOp()
     {
         var fs = new MemoryFileSystem();
-        fs.CreateDirectory("");
-        fs.CreateDirectory("   ");
+        var ex = Record.Exception(() =>
+        {
+            fs.CreateDirectory("");
+            fs.CreateDirectory("   ");
+        });
+        Assert.Null(ex);
+        Assert.Empty(new List<string>(fs.EnumerateDirectories("")));
     }
 
     [Fact]

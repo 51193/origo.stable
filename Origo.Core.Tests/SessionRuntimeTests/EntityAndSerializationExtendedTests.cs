@@ -241,14 +241,16 @@ public class DataObserverManagerExtendedTests
     public void DataObserverManager_NotifyObservers_UnknownName_DoesNotThrow()
     {
         var mgr = new DataObserverManager();
-        mgr.NotifyObservers("nonexistent", null, null);
+        var ex = Record.Exception(() => mgr.NotifyObservers("nonexistent", null, null));
+        Assert.Null(ex);
     }
 
     [Fact]
     public void DataObserverManager_Unsubscribe_UnknownName_DoesNotThrow()
     {
         var mgr = new DataObserverManager();
-        mgr.Unsubscribe("nonexistent", (_, _) => { });
+        var ex = Record.Exception(() => mgr.Unsubscribe("nonexistent", (_, _) => { }));
+        Assert.Null(ex);
     }
 
     [Fact]
@@ -363,8 +365,9 @@ public class TypeStringMappingExtendedTests
     public void TypeStringMapping_RegisterType_DuplicateSameType_NoThrow()
     {
         var mapping = new TypeStringMapping();
-        // Re-registering same type->name pair should not throw
-        mapping.RegisterType<int>(BclTypeNames.Int32);
+        var ex = Record.Exception(() => mapping.RegisterType<int>(BclTypeNames.Int32));
+        Assert.Null(ex);
+        Assert.Equal(typeof(int), mapping.GetTypeByName(BclTypeNames.Int32));
     }
 
     [Fact]

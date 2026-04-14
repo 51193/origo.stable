@@ -34,6 +34,7 @@ On GitHub, fragment IDs are generated from heading text (emoji is stripped). [`R
 - **Typed blackboards** — `IBlackboard` with `TypedData` values that survive serialization round-trips
 - **Built-in developer console** — 8 built-in commands (`help`, `spawn`, `snd_count`, `find_entity`, `clear_entities`, `bb_get`, `bb_set`, `bb_keys`) with pub/sub output and custom command extensibility
 - **Deterministic stateless RNG** — XorShift128+ helper methods; caller owns `(s0,s1)` state progression
+- **Procedural noise map helper** — generate `Simplex + Worley` blended maps (`70%/30%`) in `0..1` range for gameplay-facing systems
 - **Platform-agnostic Core** — depends only on .NET 8; no engine symbols leak into `Origo.Core`
 - **Background sessions** — foreground and background levels share the same `ISessionRun` interface, differing only in the injected `ISndSceneHost`. Create via `ctx.SessionManager.CreateBackgroundSession(key, levelId)` for in-memory simulation; serialization and persistence are managed by `SessionManager` internally
 - **Godot 4 adapter** — thin implementations + DI wiring; swap with your own adapter for Unity, MonoGame, etc.
@@ -47,6 +48,15 @@ var (roll, nextS0, nextS1) = RandomNumberGenerator.NextUInt64(s0, s1);
 var (nextRoll, s2, s3) = RandomNumberGenerator.NextUInt64(nextS0, nextS1);
 ```
 
+Noise map quick usage:
+
+```csharp
+var size = 256;
+var map = NoiseMapGenerator.GenerateSimplexWorleyBlendMap(size);
+// map is row-major and length is size * size
+// each value is normalized to 0..1
+```
+
 ---
 
 ## 📂 Project Layout
@@ -57,6 +67,7 @@ Paths below are relative to **this repository’s root** (the directory that con
 Origo.Core/               Pure C# core (Microsoft.NET.Sdk, net8.0, no engine dependency)
 Origo.GodotAdapter/       Godot 4 adapter (Godot.NET.Sdk 4.6.1, thin implementations + DI)
 Origo.Core.Tests/         Core unit tests (xUnit v3; see Testing for current count)
+Origo.GodotAdapter.Tests/ Adapter tests (xUnit v3; bootstrap/path/serialization guardrails)
 scripts/                  ci.sh (full CI pipeline), run-test.sh (test-only shortcut)
 Directory.Build.props     Shared MSBuild properties
 Origo.sln                 Solution file
@@ -117,11 +128,12 @@ Use before tagging or publishing a package built from this repo.
 
 - [ ] `README.md` / `README.zh-CN.md` commands and API notes match this tree.
 - [ ] [`LICENSE`](LICENSE) exists and is linked from the README.
+- [ ] [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) is updated when adding, removing, or upgrading vendored dependencies.
 
 ### 2. Build, tests, coverage
 
 - [ ] `bash scripts/ci.sh` succeeds from the repo root (same entry point as [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-- [ ] `Origo.Core` **line coverage ≥ 90 %** via Coverlet in `Origo.Core.Tests` (`Runtime/OrigoAutoInitializer.cs` excluded — see `Origo.Core.Tests.csproj`).
+- [ ] `Origo.Core` **line coverage ≥ 90 %** via Coverlet in `Origo.Core.Tests` (`Runtime/OrigoAutoInitializer.cs` and `Addons/FastNoiseLite/FastNoiseLite.cs` excluded — see `Origo.Core.Tests.csproj`).
 - [ ] Optional: `dotnet test … --list-tests` for release notes.
 
 ### 3. Saves vs product expectations
@@ -1508,7 +1520,7 @@ Manual equivalent:
 dotnet test Origo.sln --configuration Release
 ```
 
-CI enforces **line coverage ≥ 90%** for `Origo.Core` (via Coverlet). The file `Runtime/OrigoAutoInitializer.cs` is **excluded** from that percentage (reflection/bootstrap); see `Origo.Core.Tests.csproj`. To reproduce the coverage report locally:
+CI enforces **line coverage ≥ 90%** for `Origo.Core` (via Coverlet). The files `Runtime/OrigoAutoInitializer.cs` and `Addons/FastNoiseLite/FastNoiseLite.cs` are **excluded** from that percentage (reflection/bootstrap and vendored third-party source); see `Origo.Core.Tests.csproj`. To reproduce the coverage report locally:
 
 ```bash
 dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
@@ -1518,6 +1530,7 @@ dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
 | Project | Role |
 |---------|------|
 | `Origo.Core.Tests` | SND, Save, Lifecycle, Console, DataSource, Serialization, Blackboard, Background Sessions |
+| `Origo.GodotAdapter.Tests` | Adapter-focused tests (bootstrap contracts, file-system path policies, Godot converter registry) |
 
 Test projects use **xUnit v3**. Use `dotnet test ... --list-tests` for the current test count. For a shipping gate, follow [Release checklist](#release-checklist) and [Save system contracts](#save-system-contracts) above.
 
@@ -1534,6 +1547,11 @@ Origo.Core.Tests/
 ├── IntegrationTests/             # Cross-layer integration and utility tests
 ├── TestDoubles.cs                # Shared test doubles and TestFactory
 └── GlobalUsings.cs               # Shared global usings
+
+Origo.GodotAdapter.Tests/
+├── FileSystemTests/              # Godot path helper and file-system contract tests
+├── BootstrapTests/               # Bootstrap wiring and null-guard tests
+└── SerializationTests/           # Godot type mapping and converter registration tests
 ```
 
 ---
@@ -1541,6 +1559,11 @@ Origo.Core.Tests/
 ## 📜 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+This repository also includes third-party code:
+
+- `FastNoiseLite` (MIT), vendored at `Origo.Core/Addons/FastNoiseLite/FastNoiseLite.cs`
+- See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`LICENSE.FastNoiseLite`](LICENSE.FastNoiseLite) for attribution and license text.
 
 ---
 

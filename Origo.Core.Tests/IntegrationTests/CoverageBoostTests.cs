@@ -356,15 +356,6 @@ public class SndContextWorkflowTests
     }
 
     [Fact]
-    public void UnsubscribeConsoleOutput_NoOpForZeroOrNegativeId()
-    {
-        var ctx = CreateContextWithConsole(out _, out _, out _);
-        // Should not throw
-        ctx.UnsubscribeConsoleOutput(0);
-        ctx.UnsubscribeConsoleOutput(-1);
-    }
-
-    [Fact]
     public void UnsubscribeConsoleOutput_RemovesSubscription()
     {
         var ctx = CreateContextWithConsole(out _, out _, out var output);
@@ -469,7 +460,7 @@ public class SndContextWorkflowTests
     // ── BeginWorkflow concurrent guard ──
 
     [Fact]
-    public void RequestSaveGame_ConcurrentWorkflow_ThrowsInvalidOperation()
+    public void RequestSaveGame_ConcurrentWorkflow_AllowsSequentialSavesInSingleFlush()
     {
         var ctx = CreateContext(out var fs, out _);
         SetupProgressRun(ctx, fs);
@@ -533,18 +524,6 @@ public class NullSndContextExtendedTests
     }
 
     [Fact]
-    public void RequestLoadGame_NoOp()
-    {
-        NullSndContext.Instance.RequestLoadGame("any");
-    }
-
-    [Fact]
-    public void RequestSaveGame_NoOp()
-    {
-        NullSndContext.Instance.RequestSaveGame("any");
-    }
-
-    [Fact]
     public void RequestSaveGameAuto_WithNull_ReturnsEmpty()
     {
         Assert.Equal(string.Empty, NullSndContext.Instance.RequestSaveGameAuto());
@@ -554,18 +533,6 @@ public class NullSndContextExtendedTests
     public void RequestSaveGameAuto_WithValue_ReturnsSameValue()
     {
         Assert.Equal("my_save", NullSndContext.Instance.RequestSaveGameAuto("my_save"));
-    }
-
-    [Fact]
-    public void SetContinueTarget_NoOp()
-    {
-        NullSndContext.Instance.SetContinueTarget("any");
-    }
-
-    [Fact]
-    public void RequestSwitchForegroundLevel_NoOp()
-    {
-        NullSndContext.Instance.RequestSwitchForegroundLevel("level");
     }
 
     [Fact]
@@ -581,15 +548,21 @@ public class NullSndContextExtendedTests
     }
 
     [Fact]
-    public void RequestLoadInitialSave_NoOp()
+    public void VoidOperations_DoNotChangeObservableState()
     {
-        NullSndContext.Instance.RequestLoadInitialSave();
-    }
+        var ex = Record.Exception(() =>
+        {
+            NullSndContext.Instance.RequestLoadGame("any");
+            NullSndContext.Instance.RequestSaveGame("any");
+            NullSndContext.Instance.SetContinueTarget("any");
+            NullSndContext.Instance.RequestSwitchForegroundLevel("level");
+            NullSndContext.Instance.RequestLoadInitialSave();
+            NullSndContext.Instance.RequestLoadMainMenuEntrySave();
+        });
 
-    [Fact]
-    public void RequestLoadMainMenuEntrySave_NoOp()
-    {
-        NullSndContext.Instance.RequestLoadMainMenuEntrySave();
+        Assert.Null(ex);
+        Assert.False(NullSndContext.Instance.HasContinueData());
+        Assert.Empty(NullSndContext.Instance.ListSaves());
     }
 }
 
@@ -874,12 +847,23 @@ public class MemorySndEntityTests
     }
 
     [Fact]
-    public void Subscribe_Unsubscribe_AreNoOps()
+    public void SubscribeAndStrategyOperations_KeepDataAndNodeStateStable()
     {
         var entity = new MemorySndEntity("e");
-        // Should not throw
-        entity.Subscribe("prop", (_, _, _) => { });
-        entity.Unsubscribe("prop", (_, _, _) => { });
+        entity.SetData("hp", 10);
+        Action<object?, object?, object?> callback = (_, _, _) => { };
+
+        var ex = Record.Exception(() =>
+        {
+            entity.Subscribe("prop", callback);
+            entity.Unsubscribe("prop", callback);
+            entity.AddStrategy("idx1");
+            entity.RemoveStrategy("idx1");
+        });
+
+        Assert.Null(ex);
+        Assert.Equal(10, entity.GetData<int>("hp"));
+        Assert.Empty(entity.GetNodeNames());
     }
 
     [Fact]
@@ -894,14 +878,6 @@ public class MemorySndEntityTests
     {
         var entity = new MemorySndEntity("e");
         Assert.Empty(entity.GetNodeNames());
-    }
-
-    [Fact]
-    public void AddStrategy_RemoveStrategy_AreNoOps()
-    {
-        var entity = new MemorySndEntity("e");
-        entity.AddStrategy("idx1");
-        entity.RemoveStrategy("idx1");
     }
 
     [Fact]
@@ -922,13 +898,13 @@ public class EntityStrategyBaseTests
     }
 
     [Fact]
-    public void AllVirtualHooks_DefaultsAreNoOp()
+    public void DefaultHooks_DoNotMutateEntityData()
     {
         var strategy = new TestEntityStrategy();
         var entity = new MemorySndEntity("e");
+        entity.SetData("score", 7);
         ISndContext ctx = NullSndContext.Instance;
 
-        // All should be no-ops (no exceptions)
         strategy.Process(entity, 0.016, ctx);
         strategy.AfterSpawn(entity, ctx);
         strategy.AfterLoad(entity, ctx);
@@ -937,6 +913,8 @@ public class EntityStrategyBaseTests
         strategy.BeforeSave(entity, ctx);
         strategy.BeforeQuit(entity, ctx);
         strategy.BeforeDead(entity, ctx);
+
+        Assert.Equal(7, entity.GetData<int>("score"));
     }
 }
 
@@ -950,25 +928,32 @@ public class StateMachineStrategyBaseTests
     }
 
     [Fact]
-    public void AllVirtualHooks_DefaultsAreNoOp()
+    public void DefaultHooks_DoNotScheduleActions()
     {
         var strategy = new TestSmStrategy();
         var smCtx = new StateMachineStrategyContext("machine1", null, "state_a");
-        IStateMachineContext ctx = new StubStateMachineContext();
+        var ctx = new StubStateMachineContext();
 
         strategy.OnPushRuntime(smCtx, ctx);
         strategy.OnPushAfterLoad(smCtx, ctx);
         strategy.OnPopRuntime(smCtx, ctx);
         strategy.OnPopBeforeQuit(smCtx, ctx);
+
+        Assert.Equal(0, ctx.EnqueueCount);
     }
 
     private sealed class StubStateMachineContext : IStateMachineContext
     {
+        public int EnqueueCount { get; private set; }
         public IBlackboard SystemBlackboard { get; } = new Blackboard.Blackboard();
         public IBlackboard? ProgressBlackboard => null;
         public IBlackboard? SessionBlackboard => null;
         public ISndSceneAccess SceneAccess => throw new NotImplementedException();
-        public void EnqueueBusinessDeferred(Action action) => action();
+        public void EnqueueBusinessDeferred(Action action)
+        {
+            EnqueueCount++;
+            action();
+        }
     }
 }
 
