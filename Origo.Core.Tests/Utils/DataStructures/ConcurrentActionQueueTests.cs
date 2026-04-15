@@ -1,0 +1,82 @@
+using System;
+using Origo.Core.Utils.DataStructures;
+using Xunit;
+
+namespace Origo.Core.Tests;
+
+// ── KeyValueFileParser ─────────────────────────────────────────────────
+
+public class ConcurrentActionQueueTests
+{
+    [Fact]
+    public void ConcurrentActionQueue_Enqueue_IncreasesCount()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        queue.Enqueue(() => { });
+        queue.Enqueue(() => { });
+        Assert.Equal(2, queue.Count);
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_ExecuteAll_RunsAllActions()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        var callCount = 0;
+        queue.Enqueue(() => callCount++);
+        queue.Enqueue(() => callCount++);
+        queue.Enqueue(() => callCount++);
+        var executed = queue.ExecuteAll();
+        Assert.Equal(3, executed);
+        Assert.Equal(3, callCount);
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_ExecuteAll_EmptyQueue_ReturnsZero()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        Assert.Equal(0, queue.ExecuteAll());
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_Clear_EmptiesQueue()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        queue.Enqueue(() => { });
+        queue.Enqueue(() => { });
+        queue.Clear();
+        Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_ExecuteAll_ActionThatReenqueues()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        var executed = false;
+        queue.Enqueue(() => queue.Enqueue(() => executed = true));
+        var count = queue.ExecuteAll();
+        Assert.Equal(2, count);
+        Assert.True(executed);
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_Enqueue_ThrowsOnNull()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        Assert.Throws<ArgumentNullException>(() => queue.Enqueue(null!));
+    }
+
+    [Fact]
+    public void ConcurrentActionQueue_Constructor_ThrowsOnNullLogger() =>
+        Assert.Throws<ArgumentNullException>(() => new ConcurrentActionQueue(null!));
+
+    [Fact]
+    public void ConcurrentActionQueue_ExecuteAll_PropagatesException()
+    {
+        var queue = new ConcurrentActionQueue(new TestLogger());
+        queue.Enqueue(() => throw new InvalidOperationException("boom"));
+        Assert.Throws<InvalidOperationException>(() => queue.ExecuteAll());
+    }
+}
+
+// ── LogMessageBuilder ──────────────────────────────────────────────────

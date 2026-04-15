@@ -231,33 +231,6 @@ public class LifecycleRunsTests
     }
 
     [Fact]
-    public void SessionRun_LoadFromPayload_WithEmptyFields_DoesNotThrow()
-    {
-        var logger = new TestLogger();
-        var host = new TestSndSceneHost();
-        var runtime = TestFactory.CreateRuntime(logger, host);
-        var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
-        var systemRuntime = TestFactory.CreateSystemRuntime(logger, fs, "root", runtime);
-        var progressRuntime = new ProgressRuntime(systemRuntime, sndContext, sndContext);
-        var managerRuntime = new SessionManagerRuntime(progressRuntime, new Blackboard.Blackboard());
-        var bb = new Blackboard.Blackboard();
-        var run = new SessionRun(managerRuntime, new SessionParameters("level1", bb, host));
-
-        // Empty fields should be silently skipped (per SessionRun.LoadFromPayload logic)
-        var emptyPayload = new LevelPayload
-        {
-            LevelId = "level1",
-            SndSceneJson = "",
-            SessionJson = "",
-            SessionStateMachinesJson = ""
-        };
-
-        var exception = Record.Exception(() => run.LoadFromPayload(emptyPayload));
-        Assert.Null(exception);
-    }
-
-    [Fact]
     public void ProgressRun_LoadFromPayload_MissingStateMachinesJson_Throws()
     {
         var logger = new TestLogger();

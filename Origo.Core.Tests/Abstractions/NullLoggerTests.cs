@@ -1,0 +1,22 @@
+using Origo.Core.Abstractions;
+using Origo.Core.Abstractions.Logging;
+using Xunit;
+
+namespace Origo.Core.Tests;
+
+// ── KeyValueFileParser ─────────────────────────────────────────────────
+
+public class NullLoggerTests
+{
+    [Fact]
+    public void NullLogger_Instance_IsSingleton() => Assert.Same(NullLogger.Instance, NullLogger.Instance);
+
+    [Fact]
+    public void NullLogger_ImplementsILogger()
+    {
+        ILogger logger = NullLogger.Instance;
+        Assert.NotNull(logger);
+    }
+}
+
+// ── WellKnownKeys ──────────────────────────────────────────────────────

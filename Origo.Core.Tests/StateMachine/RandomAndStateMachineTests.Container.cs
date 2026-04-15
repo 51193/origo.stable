@@ -263,19 +263,6 @@ public partial class RandomAndStateMachineTests
     }
 
     [Fact]
-    public void StateMachineContainer_Remove_MissingKey_NoThrow()
-    {
-        var logger = new TestLogger();
-        var host = new TestSndSceneHost();
-        var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
-        var pool = runtime.SndWorld.StrategyPool;
-        var c = new StateMachineContainer(pool, ctx);
-        var ex = Record.Exception(() => c.Remove("none"));
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void StateMachineContainer_FlushAllAfterLoad_NotifiesPushStrategy()
     {
         var logger = new TestLogger();

@@ -35,21 +35,26 @@ public class SessionManagerTests
     }
 
     [Fact]
-    public void DestroySession_NonExistentKey_DoesNotThrow()
-    {
-        var (ctx, _) = CreateContext();
-        // DestroySession on non-existent key should not throw
-        var ex = Record.Exception(() => ctx.SessionManager.DestroySession("no_such_key"));
-        Assert.Null(ex);
-    }
-
-    [Fact]
     public void CreateBackgroundSession_DuplicateKey_Throws()
     {
         var (ctx, _) = CreateContext();
         ctx.SessionManager.CreateBackgroundSession("dup", "bg1");
 
         Assert.Throws<InvalidOperationException>(() => ctx.SessionManager.CreateBackgroundSession("dup", "bg2"));
+    }
+
+    [Fact]
+    public void DestroySession_NonExistentKey_DoesNotChangeMountedSessions()
+    {
+        var (ctx, _) = CreateContext();
+        SetupForegroundSession(ctx);
+        ctx.SessionManager.CreateBackgroundSession("bg1", "bg1");
+
+        ctx.SessionManager.DestroySession("no_such_key");
+
+        Assert.True(ctx.SessionManager.Contains(ISessionManager.ForegroundKey));
+        Assert.True(ctx.SessionManager.Contains("bg1"));
+        Assert.NotNull(ctx.SessionManager.ForegroundSession);
     }
 
     [Fact]

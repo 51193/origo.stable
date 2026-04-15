@@ -1585,20 +1585,36 @@ dotnet test Origo.Core.Tests/Origo.Core.Tests.csproj -c Release \
 
 ```
 Origo.Core.Tests/
-├── SystemRuntimeTests/           # 系统层测试（控制台、调度、类型映射）
-├── ProgressRuntimeTests/         # 流程层测试（存档、生命周期、入口流程）
-├── SessionManagerRuntimeTests/   # 会话管理器测试（后台会话、解耦、契约）
-├── SessionRuntimeTests/          # 会话层测试（实体、状态机、策略）
-│   ├── FrontSession/             # 前台 Session 标志、唯一性、策略 Context
-│   └── BackgroundSession/        # 后台 Session 标志、多实例、Context
-├── IntegrationTests/             # 跨层集成与工具测试
-├── TestDoubles.cs                # 共享测试替身和 TestFactory
-└── GlobalUsings.cs               # 共享全局 using
+├── Abstractions/                 # Null/Memory/Test FS 契约与黑盒行为测试
+├── Architecture/                 # 架构与自动初始化护栏
+├── Blackboard/                   # Blackboard 行为测试
+├── DataSource/                   # codec/registry/data-node 测试
+├── Logging/                      # LogMessageBuilder 测试
+├── Random/                       # 随机数与噪声生成测试
+├── Runtime/                      # 运行时、生命周期、控制台、调度测试
+│   ├── Console/
+│   │   └── CommandImpl/
+│   └── Lifecycle/
+├── Save/                         # 存档 payload/meta/storage/serialization 测试
+│   ├── Meta/
+│   ├── Serialization/
+│   └── Storage/
+├── Serialization/                # TypeStringMapping / json-mapping 测试
+├── Snd/                          # SND context/world/entity/scene/strategy 测试
+│   ├── Entity/
+│   ├── Metadata/
+│   ├── Scene/
+│   └── Strategy/
+├── StateMachine/                 # 栈状态机测试
+├── Utils/                        # 工具与数据结构测试
+│   └── DataStructures/
+└── TestSupport/                  # 共享测试替身与全局 using
 
 Origo.GodotAdapter.Tests/
-├── FileSystemTests/              # Godot 路径辅助与文件系统契约测试
-├── BootstrapTests/               # 启动装配与空参数守卫测试
-└── SerializationTests/           # Godot 类型映射与转换器注册测试
+├── Architecture/                 # 适配层架构护栏
+├── Bootstrap/                    # 启动装配与空参数守卫测试
+├── FileSystem/                   # 路径辅助与文件系统契约测试
+└── Serialization/                # 类型映射与转换器注册测试
 ```
 
 ---

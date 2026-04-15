@@ -1543,20 +1543,36 @@ Test projects use **xUnit v3**. Use `dotnet test ... --list-tests` for the curre
 
 ```
 Origo.Core.Tests/
-├── SystemRuntimeTests/           # System layer tests (console, scheduling, type mapping)
-├── ProgressRuntimeTests/         # Progress layer tests (save, lifecycle, entry flow)
-├── SessionManagerRuntimeTests/   # Session manager tests (background, decoupling, contracts)
-├── SessionRuntimeTests/          # Session layer tests (entity, state machine, strategy)
-│   ├── FrontSession/             # Front session flag, uniqueness, strategy context
-│   └── BackgroundSession/        # Background session flag, multiple instances, context
-├── IntegrationTests/             # Cross-layer integration and utility tests
-├── TestDoubles.cs                # Shared test doubles and TestFactory
-└── GlobalUsings.cs               # Shared global usings
+├── Abstractions/                 # Null/Memory/Test FS contracts and black-box behavior tests
+├── Architecture/                 # architecture and auto-init guardrails
+├── Blackboard/                   # Blackboard behavior tests
+├── DataSource/                   # codec/registry/data-node tests
+├── Logging/                      # LogMessageBuilder tests
+├── Random/                       # RNG + noise generator tests
+├── Runtime/                      # runtime, lifecycle, console, scheduling tests
+│   ├── Console/
+│   │   └── CommandImpl/
+│   └── Lifecycle/
+├── Save/                         # save payload/meta/storage/serialization tests
+│   ├── Meta/
+│   ├── Serialization/
+│   └── Storage/
+├── Serialization/                # TypeStringMapping / json-mapping tests
+├── Snd/                          # SND context/world/entity/scene/strategy tests
+│   ├── Entity/
+│   ├── Metadata/
+│   ├── Scene/
+│   └── Strategy/
+├── StateMachine/                 # stack state-machine tests
+├── Utils/                        # utility + data-structure tests
+│   └── DataStructures/
+└── TestSupport/                  # shared test doubles and global usings
 
 Origo.GodotAdapter.Tests/
-├── FileSystemTests/              # Godot path helper and file-system contract tests
-├── BootstrapTests/               # Bootstrap wiring and null-guard tests
-└── SerializationTests/           # Godot type mapping and converter registration tests
+├── Architecture/                 # adapter architecture guardrails
+├── Bootstrap/                    # bootstrap wiring and null-guard tests
+├── FileSystem/                   # path helper and file-system contract tests
+└── Serialization/                # type mapping and converter registration tests
 ```
 
 ---
