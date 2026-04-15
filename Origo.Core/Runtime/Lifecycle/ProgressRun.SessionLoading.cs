@@ -41,13 +41,8 @@ public sealed partial class ProgressRun
         // then delegates session creation to SessionManager.
         var topology = ParseSessionTopologyFromProgress();
         if (topology.Count == 0)
-        {
-            if (string.IsNullOrWhiteSpace(payload.ActiveLevelId))
-                throw new InvalidOperationException(
-                    $"Progress blackboard missing required '{WellKnownKeys.SessionTopology}' before load.");
-            topology.Add(new SessionTopologyCodec.SessionDescriptor(ISessionManager.ForegroundKey,
-                payload.ActiveLevelId, false));
-        }
+            throw new InvalidOperationException(
+                $"Progress blackboard missing required '{WellKnownKeys.SessionTopology}' before load.");
 
         // ── Step 3: Delegate to SessionManager → SessionRun (Chain of Responsibility) ──
         _sessionManager.Clear();
@@ -92,7 +87,7 @@ public sealed partial class ProgressRun
         var session = _sessionManager.CreateForegroundFromPayload(
             levelId, _progressRuntime.ForegroundSceneHost, levelPayload);
         ProgressScope.StateMachines.FlushAllAfterLoad();
-        SyncActiveLevelIdToProgress(levelId);
+        SyncForegroundTopologyToProgress(levelId);
         return session;
     }
 
@@ -103,15 +98,14 @@ public sealed partial class ProgressRun
 
         var session = _sessionManager.CreateForegroundSession(levelId, _progressRuntime.ForegroundSceneHost);
         FlushStateMachinesAfterSceneReady();
-        SyncActiveLevelIdToProgress(levelId);
+        SyncForegroundTopologyToProgress(levelId);
         return session;
     }
 
-    private void SyncActiveLevelIdToProgress(string levelId)
+    private void SyncForegroundTopologyToProgress(string levelId)
     {
         if (string.IsNullOrWhiteSpace(levelId))
             throw new ArgumentException("Level id cannot be null or whitespace.", nameof(levelId));
-        ProgressBlackboard.Set(WellKnownKeys.ActiveLevelId, levelId);
         ProgressBlackboard.Set(WellKnownKeys.SessionTopology,
             SessionTopologyCodec.Serialize(ISessionManager.ForegroundKey, levelId, false));
     }
@@ -125,11 +119,15 @@ public sealed partial class ProgressRun
             throw new InvalidOperationException(
                 $"Foreground session level '{fg.LevelId}' does not match expected active level '{expectedActiveLevelId}'.");
 
-        var (found, id) = ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
-        if (!found || string.IsNullOrWhiteSpace(id)
-                   || !string.Equals(id, expectedActiveLevelId, StringComparison.Ordinal))
+        var (found, rawTopology) = ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
+        if (!found || string.IsNullOrWhiteSpace(rawTopology))
             throw new InvalidOperationException(
-                $"Progress blackboard missing or mismatched '{WellKnownKeys.ActiveLevelId}': expected '{expectedActiveLevelId}'.");
+                $"Progress blackboard missing required '{WellKnownKeys.SessionTopology}': expected foreground '{expectedActiveLevelId}'.");
+
+        var topologyActiveLevelId = SessionTopologyCodec.ExtractForegroundLevelId(rawTopology);
+        if (!string.Equals(topologyActiveLevelId, expectedActiveLevelId, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Progress '{WellKnownKeys.SessionTopology}' foreground ('{topologyActiveLevelId}') does not match expected active level '{expectedActiveLevelId}'.");
     }
 
     private void FlushStateMachinesAfterSceneReady()
@@ -181,15 +179,7 @@ public sealed partial class ProgressRun
     {
         var (found, raw) = ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
         if (!found || string.IsNullOrWhiteSpace(raw))
-        {
-            var (hasActive, activeLevelId) = ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
-            if (hasActive && !string.IsNullOrWhiteSpace(activeLevelId))
-                return new List<SessionTopologyCodec.SessionDescriptor>
-                {
-                    new(ISessionManager.ForegroundKey, activeLevelId, false)
-                };
             return new List<SessionTopologyCodec.SessionDescriptor>();
-        }
 
         return SessionTopologyCodec.Parse(raw);
     }

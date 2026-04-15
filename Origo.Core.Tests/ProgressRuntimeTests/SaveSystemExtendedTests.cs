@@ -359,7 +359,7 @@ public class SaveContextTests
         var progress = new Blackboard.Blackboard();
         var session = new Blackboard.Blackboard();
         progress.Set("gold", 500);
-        progress.Set(WellKnownKeys.ActiveLevelId, "level1");
+        progress.Set(WellKnownKeys.SessionTopology, "__foreground__=level1=false");
 
         var ctx = new SaveContext(progress, session, world);
         var host = new TestSndSceneHost();
@@ -377,7 +377,7 @@ public class SaveContextTests
     {
         var world = CreateWorld();
         var progress = new Blackboard.Blackboard();
-        progress.Set(WellKnownKeys.ActiveLevelId, "level1");
+        progress.Set(WellKnownKeys.SessionTopology, "__foreground__=level1=false");
         var ctx = new SaveContext(progress, new Blackboard.Blackboard(), world);
         var host = new TestSndSceneHost();
         var meta = new Dictionary<string, string> { ["display"] = "Save 1" };

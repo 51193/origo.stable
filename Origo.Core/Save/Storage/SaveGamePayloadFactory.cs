@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Scene;
+using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save.Serialization;
 
 namespace Origo.Core.Save.Storage;
@@ -51,14 +52,15 @@ internal sealed class SaveGamePayloadFactory
                 "Session state machines json cannot be null or whitespace (strict mode).",
                 nameof(sessionStateMachinesJson));
 
-        var (foundActive, progressActiveLevelId) = _progress.TryGet<string>(WellKnownKeys.ActiveLevelId);
-        if (!foundActive || string.IsNullOrWhiteSpace(progressActiveLevelId))
+        var (foundTopology, rawTopology) = _progress.TryGet<string>(WellKnownKeys.SessionTopology);
+        if (!foundTopology || string.IsNullOrWhiteSpace(rawTopology))
             throw new InvalidOperationException(
-                $"Progress blackboard missing required '{WellKnownKeys.ActiveLevelId}' before building save payload.");
+                $"Progress blackboard missing required '{WellKnownKeys.SessionTopology}' before building save payload.");
 
+        var progressActiveLevelId = SessionTopologyCodec.ExtractForegroundLevelId(rawTopology);
         if (!string.Equals(progressActiveLevelId, currentLevelId, StringComparison.Ordinal))
             throw new InvalidOperationException(
-                $"Progress '{WellKnownKeys.ActiveLevelId}' ('{progressActiveLevelId}') does not match currentLevelId ('{currentLevelId}').");
+                $"Progress '{WellKnownKeys.SessionTopology}' foreground ('{progressActiveLevelId}') does not match currentLevelId ('{currentLevelId}').");
 
         var progressJson = _blackboardSerializer.Serialize(_progress);
         var sessionJson = _blackboardSerializer.Serialize(_session);

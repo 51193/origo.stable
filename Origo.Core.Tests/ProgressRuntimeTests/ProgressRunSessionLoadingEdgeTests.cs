@@ -28,14 +28,14 @@ public class ProgressRunSessionLoadingEdgeTests
     }
 
     [Fact]
-    public void LoadFromPayload_WhenTopologyAndActiveLevelAreMissing_ThrowsInvalidOperation()
+    public void LoadFromPayload_WhenTopologyMissing_ThrowsInvalidOperation()
     {
         var progressRun = CreateProgressRun();
 
         var payload = new SaveGamePayload
         {
             SaveId = "001",
-            ActiveLevelId = " ",
+            ActiveLevelId = "default",
             ProgressJson = "{}",
             ProgressStateMachinesJson = "{\"machines\":[]}",
             Levels = new Dictionary<string, LevelPayload>()

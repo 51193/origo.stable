@@ -618,8 +618,10 @@ public class BackgroundSessionTests
     {
         var (ctx, _) = CreateForegroundContext();
 
-        // Set a stale value.
-        ctx.ProgressBlackboard!.Set(WellKnownKeys.SessionTopology, "old=data");
+        // Set a stale but valid topology value (includes foreground + stale background).
+        ctx.ProgressBlackboard!.Set(
+            WellKnownKeys.SessionTopology,
+            $"{ISessionManager.ForegroundKey}=test_level=false,stale=old=false");
 
         var progressRun = ctx.EnsureProgressRun();
         var payload = progressRun.BuildSavePayload("save_empty");
@@ -638,7 +640,7 @@ public class BackgroundSessionTests
     {
         var (ctx, _) = CreateForegroundContext();
         ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", true);
-        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", false);
+        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level");
 
         var progressRun = ctx.EnsureProgressRun();
         progressRun.BuildSavePayload("save_sync_test");
@@ -654,7 +656,7 @@ public class BackgroundSessionTests
     {
         var (ctx, _) = CreateForegroundContext();
         ctx.SessionManager.CreateBackgroundSession("bg_sync", "bg_sync_level", true);
-        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level", false);
+        ctx.SessionManager.CreateBackgroundSession("bg_nosync", "bg_nosync_level");
 
         var progressRun = ctx.EnsureProgressRun();
         var payload = progressRun.BuildSavePayload("save_sync_rt");

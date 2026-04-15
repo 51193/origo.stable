@@ -290,8 +290,8 @@ public class WellKnownKeysTests
         Assert.Equal("origo.active_save_id", WellKnownKeys.ActiveSaveId);
 
     [Fact]
-    public void WellKnownKeys_ActiveLevelId_HasExpectedValue() =>
-        Assert.Equal("origo.active_level_id", WellKnownKeys.ActiveLevelId);
+    public void WellKnownKeys_SessionTopology_HasExpectedValue() =>
+        Assert.Equal("origo.session_topology", WellKnownKeys.SessionTopology);
 }
 
 // ── TestFileSystem coverage ────────────────────────────────────────────

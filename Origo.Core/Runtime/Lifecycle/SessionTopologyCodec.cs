@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Origo.Core.Save;
 
 namespace Origo.Core.Runtime.Lifecycle;
 
@@ -53,6 +54,47 @@ internal static class SessionTopologyCodec
         }
 
         return list;
+    }
+
+    /// <summary>
+    ///     Parses topology raw string and extracts the foreground level id.
+    /// </summary>
+    public static string ExtractForegroundLevelId(
+        string raw,
+        string foregroundKey = ISessionManager.ForegroundKey)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            throw new InvalidOperationException(
+                $"Missing required '{WellKnownKeys.SessionTopology}' in progress blackboard.");
+        return ExtractForegroundLevelId(Parse(raw), foregroundKey);
+    }
+
+    /// <summary>
+    ///     Extracts the foreground level id from parsed topology descriptors.
+    /// </summary>
+    public static string ExtractForegroundLevelId(
+        IReadOnlyList<SessionDescriptor> descriptors,
+        string foregroundKey = ISessionManager.ForegroundKey)
+    {
+        ArgumentNullException.ThrowIfNull(descriptors);
+        if (string.IsNullOrWhiteSpace(foregroundKey))
+            throw new ArgumentException("Foreground key cannot be null or whitespace.", nameof(foregroundKey));
+
+        string? foregroundLevelId = null;
+        foreach (var descriptor in descriptors)
+        {
+            if (!string.Equals(descriptor.Key, foregroundKey, StringComparison.Ordinal))
+                continue;
+            if (foregroundLevelId is not null)
+                throw new InvalidOperationException(
+                    $"Session topology contains duplicate foreground key '{foregroundKey}'.");
+            foregroundLevelId = descriptor.LevelId;
+        }
+
+        if (string.IsNullOrWhiteSpace(foregroundLevelId))
+            throw new InvalidOperationException(
+                $"Session topology missing required foreground key '{foregroundKey}'.");
+        return foregroundLevelId;
     }
 
     /// <summary>Lightweight descriptor for a session topology entry.</summary>

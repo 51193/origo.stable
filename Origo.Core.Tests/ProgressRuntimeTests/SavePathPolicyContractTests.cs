@@ -361,7 +361,8 @@ public class SavePathPolicyContractTests
         {
             SaveId = "001",
             ActiveLevelId = activeLevelId,
-            ProgressJson = """{"origo.active_level_id":{"type":"String","data":"dungeon"}}""",
+            ProgressJson =
+                $$$"""{"origo.session_topology":{"type":"String","data":"__foreground__={{{activeLevelId}}}=false"}}""",
             ProgressStateMachinesJson = """{"machines":[]}""",
             Levels = new Dictionary<string, LevelPayload>
             {

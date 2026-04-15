@@ -127,7 +127,7 @@ public class SessionManagerTests
         var (ctx, _) = CreateContext();
         SetupForegroundSession(ctx);
         ctx.SessionManager.CreateBackgroundSession("synced", "synced", true);
-        ctx.SessionManager.CreateBackgroundSession("stored", "stored", false);
+        ctx.SessionManager.CreateBackgroundSession("stored", "stored");
 
         var ex = Record.Exception(() =>
         {
@@ -145,7 +145,7 @@ public class SessionManagerTests
     {
         var (ctx, _) = CreateContext();
         ctx.SessionManager.CreateBackgroundSession("synced", "synced", true);
-        ctx.SessionManager.CreateBackgroundSession("stored", "stored", false);
+        ctx.SessionManager.CreateBackgroundSession("stored", "stored");
 
         var processingKeys = ((SessionManager)ctx.SessionManager).ProcessingKeys;
         Assert.Contains("synced", processingKeys);

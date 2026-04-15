@@ -501,9 +501,11 @@ Each blackboard layer aligns 1:1 with its corresponding **Run** object:
 
 ```csharp
 WellKnownKeys.ActiveSaveId       = "origo.active_save_id";
-WellKnownKeys.ActiveLevelId      = "origo.active_level_id";
 WellKnownKeys.SessionTopology    = "origo.session_topology";
 ```
+
+`ProgressRun` no longer stores a standalone active level key in `ProgressBlackboard`.
+The foreground level is derived from `WellKnownKeys.SessionTopology` (`__foreground__=levelId=syncProcess`).
 
 ---
 
@@ -928,6 +930,9 @@ SessionRun            → deserializes own data (SessionBlackboard, session stat
 | ProgressBlackboard reference | All sessions share the same `ProgressBlackboard` instance from `ProgressRun` |
 | SessionBlackboard isolation | Each session gets a new `IBlackboard` instance; data restored from `LevelPayload.SessionJson` |
 
+`syncProcess` controls only whether a session participates in `SessionManager.ProcessAllSessions(...)`.
+Foreground entries are intentionally serialized as `__foreground__=levelId=false`; this means "not updated through the background batch process", not "foreground does not update". Foreground updates are driven by the runtime/engine foreground scene loop.
+
 **Foreground uniqueness constraint:** At most one session can be mounted at `ISessionManager.ForegroundKey`. The `SessionManager` enforces this: mounting a new foreground session automatically destroys the previous one.
 
 #### API Surface
@@ -943,7 +948,7 @@ Since background levels implement the standard `ISessionRun` interface, the API 
 | `ctx.SessionManager.TryGet(key)` | `ISessionManager` method | Look up a session by key |
 | `ctx.SessionManager.CreateBackgroundSession(key, levelId, syncProcess?)` | `ISessionManager` method | Create a background `ISessionRun` (auto-mounted) — shares `SndWorld`, `ProgressBlackboard`, file system. When `syncProcess` is `true`, the session participates in `ProcessAllSessions` updates |
 | `ctx.SessionManager.DestroySession(key)` | `ISessionManager` method | Destroy and dispose a background session |
-| `ctx.SessionManager.ProcessAllSessions(delta, includeForeground?)` | `ISessionManager` method | Process all sync-enabled sessions for one frame |
+| `ctx.SessionManager.ProcessAllSessions(delta, includeForeground?)` | `ISessionManager` method | Process one frame for sessions with `syncProcess=true` (primarily background sessions) |
 | `LevelId` | `ISessionRun` property | Level identifier |
 | `SessionBlackboard` | `ISessionRun` property | Session-level blackboard (own) |
 | `GetSessionStateMachines()` | `ISessionRun` method | Access session-level state machines |

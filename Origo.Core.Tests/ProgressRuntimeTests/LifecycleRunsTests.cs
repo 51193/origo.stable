@@ -49,7 +49,7 @@ public class LifecycleRunsTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"origo.active_level_id":{"type":"String","data":"default"}}""",
+            ProgressJson = """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""",
             ProgressStateMachinesJson = "{\"machines\":[]}",
             Levels = new Dictionary<string, LevelPayload>
             {
@@ -71,7 +71,7 @@ public class LifecycleRunsTests
     }
 
     [Fact]
-    public void ProgressRun_LoadFromPayload_WithEmptyProgressJson_SyncsActiveLevelIdToBlackboard()
+    public void ProgressRun_LoadFromPayload_WithEmptyProgressJson_ThrowsMissingSessionTopology()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -98,11 +98,8 @@ public class LifecycleRunsTests
             }
         };
 
-        progressRun.LoadFromPayload(payload);
-
-        var (found, id) = progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
-        Assert.True(found);
-        Assert.Equal("default", id);
+        var ex = Assert.Throws<InvalidOperationException>(() => progressRun.LoadFromPayload(payload));
+        Assert.Contains(WellKnownKeys.SessionTopology, ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,10 +123,10 @@ public class LifecycleRunsTests
         Assert.Equal("b", progressRun.ForegroundSession!.LevelId);
         Assert.Equal(ISessionManager.ForegroundKey, ((SessionRun)progressRun.ForegroundSession!).MountKey);
 
-        var (foundActive, activeFromProgress) =
-            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
-        Assert.True(foundActive);
-        Assert.Equal("b", activeFromProgress);
+        var (foundTopology, topology) =
+            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
+        Assert.True(foundTopology);
+        Assert.Equal("__foreground__=b=false", topology);
 
         Assert.True(fs.Exists("root/current/progress.json"));
         Assert.True(fs.Exists("root/current/progress_state_machines.json"));
@@ -159,17 +156,17 @@ public class LifecycleRunsTests
         Assert.NotNull(progressRun.ForegroundSession);
         Assert.Equal("b", progressRun.ForegroundSession!.LevelId);
 
-        var (foundActive, activeFromProgress) =
-            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
-        Assert.True(foundActive);
-        Assert.Equal("b", activeFromProgress);
+        var (foundTopology, topology) =
+            progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
+        Assert.True(foundTopology);
+        Assert.Equal("__foreground__=b=false", topology);
 
         Assert.True(fs.Exists("root/current/progress.json"));
         Assert.True(fs.Exists("root/current/progress_state_machines.json"));
     }
 
     [Fact]
-    public void ProgressRun_LoadAndMountForeground_SyncsActiveLevelIdToProgressBlackboard()
+    public void ProgressRun_LoadAndMountForeground_SyncsSessionTopologyToProgressBlackboard()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -177,18 +174,18 @@ public class LifecycleRunsTests
         var fs = new TestFileSystem();
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
-        Assert.False(progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId).found);
+        Assert.False(progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology).found);
 
         progressRun.LoadAndMountForeground("dungeon");
 
-        var (found, id) = progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.ActiveLevelId);
+        var (found, topology) = progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology);
         Assert.True(found);
-        Assert.Equal("dungeon", id);
+        Assert.Equal("__foreground__=dungeon=false", topology);
         Assert.Equal("dungeon", progressRun.ForegroundSession!.LevelId);
     }
 
     [Fact]
-    public void ProgressRun_BuildSavePayload_ThrowsWhenProgressActiveLevelIdDoesNotMatchForeground()
+    public void ProgressRun_BuildSavePayload_ThrowsWhenProgressTopologyForegroundDoesNotMatchForeground()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -197,7 +194,7 @@ public class LifecycleRunsTests
         var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         progressRun.LoadAndMountForeground("alpha");
-        progressRun.ProgressBlackboard.Set(WellKnownKeys.ActiveLevelId, "wrong");
+        progressRun.ProgressBlackboard.Set(WellKnownKeys.SessionTopology, "__foreground__=wrong=false");
 
         Assert.Throws<InvalidOperationException>(() => progressRun.BuildSavePayload("new-save-01"));
     }
@@ -274,7 +271,7 @@ public class LifecycleRunsTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"origo.active_level_id":{"type":"String","data":"default"}}""",
+            ProgressJson = """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""",
             ProgressStateMachinesJson = null! // Missing — should throw
         };
 

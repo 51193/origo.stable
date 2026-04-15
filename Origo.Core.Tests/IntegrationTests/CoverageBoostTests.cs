@@ -28,7 +28,7 @@ public class SndContextWorkflowTests
         string root,
         string saveId,
         string activeLevelId,
-        string progressJson = """{"origo.active_level_id":{"type":"String","data":"default"}}""")
+        string progressJson = """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""")
     {
         var saveDir = $"{root}/save_{saveId}";
         var levelDir = $"{saveDir}/level_{activeLevelId}";
@@ -44,7 +44,7 @@ public class SndContextWorkflowTests
         var saveDir = $"{initialRoot}/save_000";
         var levelDir = $"{saveDir}/level_{levelId}";
         fs.SeedFile($"{saveDir}/progress.json",
-            $$$"""{"origo.active_level_id":{"type":"String","data":"{{{levelId}}}"}}""");
+            $$$"""{"origo.session_topology":{"type":"String","data":"__foreground__={{{levelId}}}=false"}}""");
         fs.SeedFile($"{saveDir}/progress_state_machines.json", """{"machines":[]}""");
         fs.SeedFile($"{levelDir}/snd_scene.json", "[]");
         fs.SeedFile($"{levelDir}/session.json", "{}");

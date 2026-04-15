@@ -58,7 +58,7 @@ public class PlayStopPlayRoundTripTests
 
         // Create background sessions: one with syncProcess=true, one with syncProcess=false.
         ctx1.SessionManager.CreateBackgroundSession("bg_tick", "bg_level_tick", true);
-        ctx1.SessionManager.CreateBackgroundSession("bg_store", "bg_level_store", false);
+        ctx1.SessionManager.CreateBackgroundSession("bg_store", "bg_level_store");
 
         var sm = (SessionManager)ctx1.SessionManager;
         Assert.Contains("bg_tick", sm.ProcessingKeys);
@@ -188,7 +188,7 @@ public class PlayStopPlayRoundTripTests
         bgTick.SessionBlackboard.Set("step", 7);
 
         // Non-tickable background.
-        var bgStore = ctx1.SessionManager.CreateBackgroundSession("cache", "cache_level", false);
+        var bgStore = ctx1.SessionManager.CreateBackgroundSession("cache", "cache_level");
         bgStore.SessionBlackboard.Set("cached", true);
 
         // Verify state before serialization.

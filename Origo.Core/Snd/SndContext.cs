@@ -284,11 +284,13 @@ public sealed class SndContext : IStateMachineContext, ISndContext
                 throw new InvalidOperationException($"Missing required progress.json in save '{saveId}'.");
             var progressDict = Runtime.SndWorld.DeserializeTypedDataMap(progressJson);
 
-            if (!progressDict.TryGetValue(WellKnownKeys.ActiveLevelId, out var levelData)
-                || levelData.Data is not string activeLevelId
-                || string.IsNullOrWhiteSpace(activeLevelId))
+            if (!progressDict.TryGetValue(WellKnownKeys.SessionTopology, out var topologyData)
+                || topologyData.Data is not string rawTopology
+                || string.IsNullOrWhiteSpace(rawTopology))
                 throw new InvalidOperationException(
-                    $"Cannot determine ActiveLevelId from progress in save '{saveId}'.");
+                    $"Cannot determine foreground level from '{WellKnownKeys.SessionTopology}' in progress for save '{saveId}'.");
+
+            var activeLevelId = SessionTopologyCodec.ExtractForegroundLevelId(rawTopology);
 
             var payload = StorageService.ReadSavePayloadFromSnapshot(saveId, activeLevelId);
             StorageService.DeleteCurrentDirectory();

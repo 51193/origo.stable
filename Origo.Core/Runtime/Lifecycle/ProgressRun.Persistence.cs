@@ -8,7 +8,7 @@ public sealed partial class ProgressRun
     {
         var fgSession = ForegroundSession;
         if (fgSession is not null)
-            SyncActiveLevelIdToProgress(fgSession.LevelId);
+            SyncForegroundTopologyToProgress(fgSession.LevelId);
 
         var sessionBb = fgSession?.SessionBlackboard ?? new Blackboard.Blackboard();
 
