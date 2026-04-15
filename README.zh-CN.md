@@ -1628,7 +1628,7 @@ Origo.GodotAdapter.Tests/
 本仓库同时包含第三方代码：
 
 - `FastNoiseLite`（MIT），内嵌路径：`Origo.Core/Addons/FastNoiseLite/FastNoiseLite.cs`
-- 署名与许可证文本见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`LICENSE.FastNoiseLite`](LICENSE.FastNoiseLite)。
+- 署名与许可证文本见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 [`licenses/LICENSE.FastNoiseLite`](licenses/LICENSE.FastNoiseLite)。
 
 ---
 

@@ -10,7 +10,7 @@ notices and license terms are listed below.
 - **Upstream version**: `1.1.1` (as marked in the vendored source header)
 - **Local path**: `Origo.Core/Addons/FastNoiseLite/FastNoiseLite.cs`
 - **License**: MIT
-- **Local license copy**: `LICENSE.FastNoiseLite`
+- **Local license copy**: `licenses/LICENSE.FastNoiseLite`
 
 ### Copyright
 

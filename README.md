@@ -1584,7 +1584,7 @@ This project is licensed under the [MIT License](LICENSE).
 This repository also includes third-party code:
 
 - `FastNoiseLite` (MIT), vendored at `Origo.Core/Addons/FastNoiseLite/FastNoiseLite.cs`
-- See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`LICENSE.FastNoiseLite`](LICENSE.FastNoiseLite) for attribution and license text.
+- See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and [`licenses/LICENSE.FastNoiseLite`](licenses/LICENSE.FastNoiseLite) for attribution and license text.
 
 ---
 
