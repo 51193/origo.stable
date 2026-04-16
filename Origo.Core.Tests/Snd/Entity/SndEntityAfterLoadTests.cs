@@ -36,9 +36,8 @@ public class SndEntityAfterLoadTests
                          "data": { "pairs": {} }
                        }
                        """;
-            var codec = runtime.SndWorld.JsonCodec;
             var registry = runtime.SndWorld.ConverterRegistry;
-            var node = codec.Decode(json);
+            using var node = TestFactory.NodeFromJson(json);
             var meta = registry.Read<SndMetaData>(node);
 
             var entity = runtime.SndWorld.CreateEntity(nodeFactory, ctx, logger);

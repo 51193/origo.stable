@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.DataSource;
 using Origo.Core.Snd.Metadata;
 
@@ -13,21 +12,17 @@ internal sealed class SndTemplateResolver
 {
     private readonly Dictionary<string, SndMetaData> _cache = new(StringComparer.Ordinal);
     private readonly DataSourceConverter<SndMetaData> _converter;
-    private readonly IFileSystem _fileSystem;
-    private readonly IDataSourceCodec _jsonCodec;
+    private readonly IDataSourceIoGateway _dataSourceIo;
     private readonly Dictionary<string, string> _paths;
 
     public SndTemplateResolver(
-        IFileSystem fileSystem,
-        IDataSourceCodec jsonCodec,
+        IDataSourceIoGateway dataSourceIo,
         DataSourceConverter<SndMetaData> converter,
         Dictionary<string, string> templatePaths)
     {
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        ArgumentNullException.ThrowIfNull(jsonCodec);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(converter);
-        _fileSystem = fileSystem;
-        _jsonCodec = jsonCodec;
+        _dataSourceIo = dataSourceIo;
         _converter = converter;
         _paths = new Dictionary<string, string>(templatePaths, StringComparer.Ordinal);
     }
@@ -43,8 +38,7 @@ internal sealed class SndTemplateResolver
         if (!_paths.TryGetValue(alias, out var path))
             throw new KeyNotFoundException($"Template alias '{alias}' not found in template map.");
 
-        var json = _fileSystem.ReadAllText(path);
-        using var node = _jsonCodec.Decode(json);
+        using var node = _dataSourceIo.ReadTree(path);
         var meta = _converter.Read(node);
         if (meta is null)
             throw new InvalidOperationException($"Template '{alias}' at '{path}' deserialized to null.");

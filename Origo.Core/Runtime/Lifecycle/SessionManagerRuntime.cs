@@ -54,8 +54,5 @@ internal sealed class SessionManagerRuntime
     /// </summary>
     internal IBlackboard ProgressBlackboard { get; }
 
-    // ── Convenience accessors ──
-
-    internal IDataSourceCodec JsonCodec => SndWorld.JsonCodec;
     internal DataSourceConverterRegistry ConverterRegistry => SndWorld.ConverterRegistry;
 }

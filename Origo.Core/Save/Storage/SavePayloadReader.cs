@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.DataSource;
 using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
@@ -15,10 +16,27 @@ internal static class SavePayloadReader
         string saveId,
         string activeLevelId,
         ILogger? logger = null) =>
-        ReadFromCurrent(fileSystem, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy(), logger);
+        ReadFromCurrent(
+            fileSystem,
+            DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            saveId,
+            activeLevelId,
+            logger);
 
     public static SaveGamePayload ReadFromCurrent(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId,
+        string activeLevelId,
+        ILogger? logger = null) =>
+        ReadFromCurrent(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy(),
+            logger);
+
+    public static SaveGamePayload ReadFromCurrent(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
         string activeLevelId,
@@ -26,6 +44,7 @@ internal static class SavePayloadReader
         ILogger? logger = null)
     {
         ValidateSaveRoot(fileSystem, saveRootPath);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
         var baseRel = pathPolicy.GetCurrentDirectory();
 
@@ -37,25 +56,26 @@ internal static class SavePayloadReader
 
         var progressRel = pathPolicy.GetProgressFile(baseRel);
         var progressSmRel = pathPolicy.GetProgressStateMachinesFile(baseRel);
-        var (progressJson, progressStateMachinesJson, customMeta) = ReadProgressAndCustomMeta(
+        var (progressNode, progressStateMachinesNode, customMeta) = ReadProgressAndCustomMeta(
             fileSystem,
+            dataSourceIo,
             saveRootPath,
             baseRel,
             pathPolicy,
             $"Missing required progress.json in current (path='{progressRel}').",
             $"Missing required progress_state_machines.json in current (path='{progressSmRel}').");
 
-        var level = ReadLevelPayload(fileSystem, saveRootPath, baseRel, activeLevelId, pathPolicy);
+        var level = ReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseRel, activeLevelId, pathPolicy);
 
         var levels = new Dictionary<string, LevelPayload> { [activeLevelId] = level };
-        ReadRemainingLevelPayloads(fileSystem, saveRootPath, baseRel, levels, pathPolicy);
+        ReadRemainingLevelPayloads(fileSystem, dataSourceIo, saveRootPath, baseRel, levels, pathPolicy);
 
         return new SaveGamePayload
         {
             SaveId = saveId,
             ActiveLevelId = activeLevelId,
-            ProgressJson = progressJson,
-            ProgressStateMachinesJson = progressStateMachinesJson,
+            ProgressNode = progressNode,
+            ProgressStateMachinesNode = progressStateMachinesNode,
             CustomMeta = customMeta,
             Levels = levels
         };
@@ -66,39 +86,51 @@ internal static class SavePayloadReader
         string saveRootPath,
         string saveId,
         string activeLevelId) =>
-        ReadFromSnapshot(fileSystem, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy());
+        ReadFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath, saveId,
+            activeLevelId);
 
     public static SaveGamePayload ReadFromSnapshot(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId,
+        string activeLevelId) =>
+        ReadFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy());
+
+    public static SaveGamePayload ReadFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
         string activeLevelId,
         ISavePathPolicy pathPolicy)
     {
         ValidateSaveRoot(fileSystem, saveRootPath);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
         var baseRel = pathPolicy.GetSaveDirectory(saveId);
         var progressRel = pathPolicy.GetProgressFile(baseRel);
         var progressSmRel = pathPolicy.GetProgressStateMachinesFile(baseRel);
-        var (progressJson, progressStateMachinesJson, customMeta) = ReadProgressAndCustomMeta(
+        var (progressNode, progressStateMachinesNode, customMeta) = ReadProgressAndCustomMeta(
             fileSystem,
+            dataSourceIo,
             saveRootPath,
             baseRel,
             pathPolicy,
             $"Missing required progress.json in save '{saveId}' (path='{progressRel}').",
             $"Missing required progress_state_machines.json in save '{saveId}' (path='{progressSmRel}').");
 
-        var level = ReadLevelPayload(fileSystem, saveRootPath, baseRel, activeLevelId, pathPolicy);
+        var level = ReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseRel, activeLevelId, pathPolicy);
 
         var levels = new Dictionary<string, LevelPayload> { [activeLevelId] = level };
-        ReadRemainingLevelPayloads(fileSystem, saveRootPath, baseRel, levels, pathPolicy);
+        ReadRemainingLevelPayloads(fileSystem, dataSourceIo, saveRootPath, baseRel, levels, pathPolicy);
 
         return new SaveGamePayload
         {
             SaveId = saveId,
             ActiveLevelId = activeLevelId,
-            ProgressJson = progressJson,
-            ProgressStateMachinesJson = progressStateMachinesJson,
+            ProgressNode = progressNode,
+            ProgressStateMachinesNode = progressStateMachinesNode,
             CustomMeta = customMeta,
             Levels = levels
         };
@@ -111,10 +143,12 @@ internal static class SavePayloadReader
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
     }
 
-    private static (string ProgressJson, string ProgressStateMachinesJson, IReadOnlyDictionary<string, string>?
+    private static (DataSourceNode ProgressNode, DataSourceNode ProgressStateMachinesNode,
+        IReadOnlyDictionary<string, string>?
         CustomMeta)
         ReadProgressAndCustomMeta(
             IFileSystem fileSystem,
+            IDataSourceIoGateway dataSourceIo,
             string saveRootPath,
             string baseDirectoryRel,
             ISavePathPolicy pathPolicy,
@@ -125,13 +159,13 @@ internal static class SavePayloadReader
         var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
         if (!fileSystem.Exists(progressAbs))
             throw new InvalidOperationException(missingProgressMessage);
-        var progressJson = fileSystem.ReadAllText(progressAbs);
+        var progressNode = dataSourceIo.ReadTree(progressAbs);
 
         var progressSmRel = pathPolicy.GetProgressStateMachinesFile(baseDirectoryRel);
         var progressSmAbs = fileSystem.CombinePath(saveRootPath, progressSmRel);
         if (!fileSystem.Exists(progressSmAbs))
             throw new InvalidOperationException(missingProgressStateMachinesMessage);
-        var progressStateMachinesJson = fileSystem.ReadAllText(progressSmAbs);
+        var progressStateMachinesNode = dataSourceIo.ReadTree(progressSmAbs);
 
         var customMetaRel = pathPolicy.GetCustomMetaFile(baseDirectoryRel);
         var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
@@ -139,22 +173,33 @@ internal static class SavePayloadReader
             ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(customMetaAbs), NullLogger.Instance)
             : null;
 
-        return (progressJson, progressStateMachinesJson, customMeta);
+        return (progressNode, progressStateMachinesNode, customMeta);
     }
 
-    public static string? ReadProgressJsonFromSnapshot(
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
         IFileSystem fileSystem,
         string saveRootPath,
         string saveId) =>
-        ReadProgressJsonFromSnapshot(fileSystem, saveRootPath, saveId, new DefaultSavePathPolicy());
+        ReadProgressNodeFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            saveId);
 
-    public static string? ReadProgressJsonFromSnapshot(
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId) =>
+        ReadProgressNodeFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, new DefaultSavePathPolicy());
+
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
         ISavePathPolicy pathPolicy)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
@@ -163,17 +208,27 @@ internal static class SavePayloadReader
         var progressRel = pathPolicy.GetProgressFile(saveRel);
         var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
 
-        return fileSystem.Exists(progressAbs) ? fileSystem.ReadAllText(progressAbs) : null;
+        return fileSystem.Exists(progressAbs) ? dataSourceIo.ReadTree(progressAbs) : null;
     }
 
     public static LevelPayload? TryReadLevelPayloadFromCurrent(
         IFileSystem fileSystem,
         string saveRootPath,
         string levelId) =>
-        TryReadLevelPayloadFromCurrent(fileSystem, saveRootPath, levelId, new DefaultSavePathPolicy());
+        TryReadLevelPayloadFromCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            levelId);
 
     public static LevelPayload? TryReadLevelPayloadFromCurrent(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string levelId) =>
+        TryReadLevelPayloadFromCurrent(fileSystem, dataSourceIo, saveRootPath, levelId, new DefaultSavePathPolicy());
+
+    public static LevelPayload? TryReadLevelPayloadFromCurrent(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string levelId,
         ISavePathPolicy pathPolicy)
@@ -184,7 +239,7 @@ internal static class SavePayloadReader
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
 
         var currentRel = pathPolicy.GetCurrentDirectory();
-        return TryReadLevelPayload(fileSystem, saveRootPath, currentRel, levelId, pathPolicy);
+        return TryReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, currentRel, levelId, pathPolicy);
     }
 
     public static LevelPayload? TryReadLevelPayloadFromSnapshot(
@@ -192,10 +247,21 @@ internal static class SavePayloadReader
         string snapshotRootPath,
         string saveId,
         string levelId) =>
-        TryReadLevelPayloadFromSnapshot(fileSystem, snapshotRootPath, saveId, levelId, new DefaultSavePathPolicy());
+        TryReadLevelPayloadFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            snapshotRootPath, saveId, levelId);
 
     public static LevelPayload? TryReadLevelPayloadFromSnapshot(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string snapshotRootPath,
+        string saveId,
+        string levelId) =>
+        TryReadLevelPayloadFromSnapshot(fileSystem, dataSourceIo, snapshotRootPath, saveId, levelId,
+            new DefaultSavePathPolicy());
+
+    public static LevelPayload? TryReadLevelPayloadFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string snapshotRootPath,
         string saveId,
         string levelId,
@@ -207,11 +273,12 @@ internal static class SavePayloadReader
             throw new ArgumentException("Snapshot root path cannot be null or whitespace.", nameof(snapshotRootPath));
 
         var saveRel = pathPolicy.GetSaveDirectory(saveId);
-        return TryReadLevelPayload(fileSystem, snapshotRootPath, saveRel, levelId, pathPolicy);
+        return TryReadLevelPayload(fileSystem, dataSourceIo, snapshotRootPath, saveRel, levelId, pathPolicy);
     }
 
     private static LevelPayload? TryReadLevelPayload(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string rootPath,
         string baseDirectoryRel,
         string levelId,
@@ -247,20 +314,21 @@ internal static class SavePayloadReader
         return new LevelPayload
         {
             LevelId = levelId,
-            SndSceneJson = fileSystem.ReadAllText(sndSceneAbs),
-            SessionJson = fileSystem.ReadAllText(sessionAbs),
-            SessionStateMachinesJson = fileSystem.ReadAllText(sessionSmAbs)
+            SndSceneNode = dataSourceIo.ReadTree(sndSceneAbs),
+            SessionNode = dataSourceIo.ReadTree(sessionAbs),
+            SessionStateMachinesNode = dataSourceIo.ReadTree(sessionSmAbs)
         };
     }
 
     private static LevelPayload ReadLevelPayload(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         string levelId,
         ISavePathPolicy pathPolicy)
     {
-        return TryReadLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, levelId, pathPolicy)
+        return TryReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, levelId, pathPolicy)
                ?? throw new InvalidOperationException($"Missing level '{levelId}'.");
     }
 
@@ -270,6 +338,7 @@ internal static class SavePayloadReader
     /// </summary>
     private static void ReadRemainingLevelPayloads(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         Dictionary<string, LevelPayload> levels,
@@ -289,7 +358,8 @@ internal static class SavePayloadReader
             if (string.IsNullOrWhiteSpace(levelId) || levels.ContainsKey(levelId))
                 continue;
 
-            var levelPayload = TryReadLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, levelId, pathPolicy);
+            var levelPayload = TryReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, levelId,
+                pathPolicy);
             if (levelPayload is not null)
                 levels[levelId] = levelPayload;
         }

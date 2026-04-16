@@ -78,11 +78,11 @@ public class JsonAndMappingsTests
 
         var mappings = new SndMappings();
         var logger = new TestLogger();
-        var codec = TestFactory.CreateJsonCodec();
+        var io = TestFactory.CreateIoGateway(fs);
         var registry = TestFactory.CreateRegistry(new TypeStringMapping());
 
         mappings.LoadSceneAliases(fs, "maps/scenes.map", logger);
-        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, logger);
+        mappings.LoadTemplates(fs, "maps/templates.map", io, registry, logger);
 
         Assert.Equal("res://hero.tscn", mappings.ResolveSceneAlias("hero"));
         Assert.Throws<KeyNotFoundException>(() => mappings.ResolveSceneAlias("missing_alias"));
@@ -111,9 +111,10 @@ public class JsonAndMappingsTests
             }
             """);
         var codec = TestFactory.CreateJsonCodec();
+        var io = TestFactory.CreateIoGateway(fs);
         var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
-        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, NullLogger.Instance);
+        mappings.LoadTemplates(fs, "maps/templates.map", io, registry, NullLogger.Instance);
 
         var json = """
                    [
@@ -179,10 +180,10 @@ public class JsonAndMappingsTests
     {
         var fs = new TestFileSystem();
         fs.SeedFile("maps/empty_templates.map", "# no entries\n");
-        var codec = TestFactory.CreateJsonCodec();
+        var io = TestFactory.CreateIoGateway(fs);
         var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
-        mappings.LoadTemplates(fs, "maps/empty_templates.map", codec, registry, NullLogger.Instance);
+        mappings.LoadTemplates(fs, "maps/empty_templates.map", io, registry, NullLogger.Instance);
 
         var ex = Assert.Throws<InvalidOperationException>(() => mappings.ResolveTemplate("any_alias"));
         Assert.Contains("empty", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -194,11 +195,11 @@ public class JsonAndMappingsTests
         var fs = new TestFileSystem();
         fs.SeedFile("maps/templates.map", "bad_template: templates/bad.json");
         fs.SeedFile("templates/bad.json", "{ invalid-json");
-        var codec = TestFactory.CreateJsonCodec();
+        var io = TestFactory.CreateIoGateway(fs);
         var registry = TestFactory.CreateRegistry(new TypeStringMapping());
         var mappings = new SndMappings();
         var logger = new TestLogger();
-        mappings.LoadTemplates(fs, "maps/templates.map", codec, registry, logger);
+        mappings.LoadTemplates(fs, "maps/templates.map", io, registry, logger);
 
         Assert.ThrowsAny<Exception>(() => mappings.ResolveTemplate("bad_template"));
     }

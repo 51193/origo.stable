@@ -76,12 +76,12 @@ internal sealed class SndMappings
     public void LoadTemplates(
         IFileSystem fileSystem,
         string mapFilePath,
-        IDataSourceCodec jsonCodec,
+        IDataSourceIoGateway dataSourceIo,
         DataSourceConverterRegistry registry,
         ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        ArgumentNullException.ThrowIfNull(jsonCodec);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(logger);
 
@@ -99,7 +99,7 @@ internal sealed class SndMappings
             _templatePaths[kv.Key] = kv.Value;
 
         var sndMetaConverter = registry.Get<SndMetaData>();
-        _templateResolver = new SndTemplateResolver(fileSystem, jsonCodec, sndMetaConverter, _templatePaths);
+        _templateResolver = new SndTemplateResolver(dataSourceIo, sndMetaConverter, _templatePaths);
         logger.Log(LogLevel.Info, nameof(SndMappings),
             new LogMessageBuilder().AddSuffix("filePath", mapFilePath)
                 .Build($"Loaded {_templatePaths.Count} Snd templates."));

@@ -135,18 +135,16 @@ public sealed partial class ProgressRun : IDisposable
         var saveContext = new SaveContext(
             ProgressBlackboard, fgSession.SessionBlackboard, _progressRuntime.SndWorld);
 
-        var progressSmJson = ProgressScope.StateMachines.SerializeToDataSource(
-            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
-        var sessionSmJson = fgSession.GetSessionStateMachines().SerializeToDataSource(
-            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
+        var progressSmNode = ProgressScope.StateMachines.SerializeToNode(_progressRuntime.ConverterRegistry);
+        var sessionSmNode = fgSession.GetSessionStateMachines().SerializeToNode(_progressRuntime.ConverterRegistry);
 
         var payload = saveContext.SaveGame(
             fgSession.SceneHost,
             newSaveId,
             fgSession.LevelId,
             mergedMeta,
-            progressSmJson,
-            sessionSmJson);
+            progressSmNode,
+            sessionSmNode);
 
         var bgPayloads = _sessionManager.SerializeBackgroundSessions();
         foreach (var kvp in bgSessions)

@@ -30,8 +30,7 @@ public sealed class OrigoRuntime
         ISndSceneHost sndSceneHost,
         TypeStringMapping typeStringMapping,
         DataSourceConverterRegistry converterRegistry,
-        IDataSourceCodec jsonCodec,
-        IDataSourceCodec mapCodec,
+        IDataSourceIoGateway dataSourceIo,
         IBlackboard? systemBlackboard = null,
         ConsoleInputQueue? consoleInput = null,
         IConsoleOutputChannel? consoleOutputChannel = null)
@@ -41,9 +40,8 @@ public sealed class OrigoRuntime
         ArgumentNullException.ThrowIfNull(sndSceneHost);
         ArgumentNullException.ThrowIfNull(typeStringMapping);
         ArgumentNullException.ThrowIfNull(converterRegistry);
-        ArgumentNullException.ThrowIfNull(jsonCodec);
-        ArgumentNullException.ThrowIfNull(mapCodec);
-        SndWorld = new SndWorld(typeStringMapping, Logger, converterRegistry, jsonCodec, mapCodec);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
+        SndWorld = new SndWorld(typeStringMapping, Logger, converterRegistry, dataSourceIo);
         Snd = new SndRuntime(SndWorld, sndSceneHost);
         _businessDeferredScheduler = new ActionScheduler(Logger);
         _systemDeferredScheduler = new ActionScheduler(Logger);

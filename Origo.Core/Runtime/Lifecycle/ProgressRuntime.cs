@@ -47,8 +47,5 @@ internal sealed class ProgressRuntime
     internal ISndContext SndContext { get; }
     internal ISavePathPolicy SavePathPolicy { get; }
 
-    // ── Convenience accessors for serialization ──
-
-    internal IDataSourceCodec JsonCodec => SndWorld.JsonCodec;
     internal DataSourceConverterRegistry ConverterRegistry => SndWorld.ConverterRegistry;
 }

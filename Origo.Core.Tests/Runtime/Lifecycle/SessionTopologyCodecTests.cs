@@ -6,6 +6,22 @@ namespace Origo.Core.Tests;
 
 public class SessionTopologyCodecTests
 {
+    public static TheoryData<string> Parse_MalformedOrEmptyKeyOrLevel_Data { get; } = new()
+    {
+        "only_key",
+        "key=level_only",
+        "=level=true",
+        "key==true"
+    };
+
+    public static TheoryData<string, bool> Parse_SyncFieldParsing_Data { get; } = new()
+    {
+        { "bg=alpha=TRUE", true },
+        { "bg=alpha=true", true },
+        { "bg=alpha=False", false },
+        { "bg=alpha=not_bool", false }
+    };
+
     [Fact]
     public void Parse_AndSerialize_RoundTripPreservesDescriptors()
     {
@@ -27,10 +43,7 @@ public class SessionTopologyCodecTests
     }
 
     [Theory]
-    [InlineData("only_key")]
-    [InlineData("key=level_only")]
-    [InlineData("=level=true")]
-    [InlineData("key==true")]
+    [MemberData(nameof(Parse_MalformedOrEmptyKeyOrLevel_Data))]
     public void Parse_MalformedOrEmptyKeyOrLevel_ThrowsInvalidOperation(string raw) =>
         Assert.Throws<InvalidOperationException>(() => SessionTopologyCodec.Parse(raw));
 
@@ -46,10 +59,7 @@ public class SessionTopologyCodecTests
     }
 
     [Theory]
-    [InlineData("bg=alpha=TRUE", true)]
-    [InlineData("bg=alpha=true", true)]
-    [InlineData("bg=alpha=False", false)]
-    [InlineData("bg=alpha=not_bool", false)]
+    [MemberData(nameof(Parse_SyncFieldParsing_Data))]
     public void Parse_SyncFieldParsing_FollowsBoolTryParseRules(string raw, bool expectedSync)
     {
         var descriptor = Assert.Single(SessionTopologyCodec.Parse(raw));

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.DataSource;
 using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
@@ -15,6 +16,7 @@ namespace Origo.Core.Save.Storage;
 public sealed class DefaultSaveStorageService : ISaveStorageService
 {
     private readonly IFileSystem _fileSystem;
+    private readonly IDataSourceIoGateway _ioGateway;
     private readonly ISavePathPolicy _pathPolicy;
     private readonly string _saveRootPath;
 
@@ -26,6 +28,7 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
         _fileSystem = fileSystem;
         _saveRootPath = saveRootPath;
         _pathPolicy = pathPolicy ?? new DefaultSavePathPolicy();
+        _ioGateway = DataSourceFactory.CreateDefaultIoGateway(fileSystem, false);
     }
 
     public IReadOnlyList<string> EnumerateSaveIds() =>
@@ -35,21 +38,21 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
         SaveStorageFacade.EnumerateSavesWithMetaData(_fileSystem, _saveRootPath, _pathPolicy);
 
     public void WriteSavePayloadToCurrent(SaveGamePayload payload) =>
-        SavePayloadWriter.WriteToCurrent(_fileSystem, _saveRootPath, payload, _pathPolicy);
+        SavePayloadWriter.WriteToCurrent(_fileSystem, _ioGateway, _saveRootPath, payload, _pathPolicy);
 
     public void WriteSavePayloadToCurrentThenSnapshot(
         SaveGamePayload payload,
         string newSaveId,
         ILogger logger) =>
         SaveStorageFacade.WriteSavePayloadToCurrentThenSnapshot(
-            _fileSystem, _saveRootPath, payload, newSaveId, logger, _pathPolicy);
+            _fileSystem, _ioGateway, _saveRootPath, payload, newSaveId, logger, _pathPolicy);
 
     public void WriteLevelPayloadOnly(
         string baseDirectoryRel,
         LevelPayload levelPayload,
         bool overwrite = true) =>
         SavePayloadWriter.WriteLevelPayloadOnly(
-            _fileSystem, _saveRootPath, baseDirectoryRel, levelPayload, _pathPolicy, overwrite);
+            _fileSystem, _ioGateway, _saveRootPath, baseDirectoryRel, levelPayload, _pathPolicy, overwrite);
 
     public void WriteLevelPayloadOnlyToCurrent(LevelPayload levelPayload, bool overwrite = true)
     {
@@ -58,31 +61,33 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
     }
 
     public void WriteProgressOnlyToCurrent(
-        string progressJson,
-        string progressStateMachinesJson,
+        DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode,
         bool overwrite = true) =>
         SavePayloadWriter.WriteProgressOnlyToCurrent(
-            _fileSystem, _saveRootPath, progressJson, progressStateMachinesJson, _pathPolicy, overwrite);
+            _fileSystem, _ioGateway, _saveRootPath, progressNode, progressStateMachinesNode, _pathPolicy, overwrite);
 
     public SaveGamePayload ReadSavePayloadFromCurrent(
         string saveId,
         string activeLevelId,
         ILogger? logger = null) =>
-        SavePayloadReader.ReadFromCurrent(_fileSystem, _saveRootPath, saveId, activeLevelId, _pathPolicy, logger);
+        SavePayloadReader.ReadFromCurrent(
+            _fileSystem, _ioGateway, _saveRootPath, saveId, activeLevelId, _pathPolicy, logger);
 
     public SaveGamePayload ReadSavePayloadFromSnapshot(
         string saveId,
         string activeLevelId) =>
-        SavePayloadReader.ReadFromSnapshot(_fileSystem, _saveRootPath, saveId, activeLevelId, _pathPolicy);
+        SavePayloadReader.ReadFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId, activeLevelId, _pathPolicy);
 
-    public string? ReadProgressJsonFromSnapshot(string saveId) =>
-        SavePayloadReader.ReadProgressJsonFromSnapshot(_fileSystem, _saveRootPath, saveId, _pathPolicy);
+    public DataSourceNode? ReadProgressNodeFromSnapshot(string saveId) =>
+        SavePayloadReader.ReadProgressNodeFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId, _pathPolicy);
 
     public LevelPayload? TryReadLevelPayloadFromCurrent(string levelId) =>
-        SavePayloadReader.TryReadLevelPayloadFromCurrent(_fileSystem, _saveRootPath, levelId, _pathPolicy);
+        SavePayloadReader.TryReadLevelPayloadFromCurrent(_fileSystem, _ioGateway, _saveRootPath, levelId, _pathPolicy);
 
     public LevelPayload? TryReadLevelPayloadFromSnapshot(string saveId, string levelId) =>
-        SavePayloadReader.TryReadLevelPayloadFromSnapshot(_fileSystem, _saveRootPath, saveId, levelId, _pathPolicy);
+        SavePayloadReader.TryReadLevelPayloadFromSnapshot(
+            _fileSystem, _ioGateway, _saveRootPath, saveId, levelId, _pathPolicy);
 
     public LevelPayload? ResolveLevelPayload(string saveId, string levelId)
     {

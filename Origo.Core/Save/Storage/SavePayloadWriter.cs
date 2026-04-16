@@ -1,5 +1,6 @@
 using System;
 using Origo.Core.Abstractions.FileSystem;
+using Origo.Core.DataSource;
 using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
@@ -9,25 +10,38 @@ internal static class SavePayloadWriter
     public static void WriteProgressOnlyToCurrent(
         IFileSystem fileSystem,
         string saveRootPath,
-        string progressJson,
-        string progressStateMachinesJson,
+        DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode,
         bool overwrite = true) =>
-        WriteProgressOnlyToCurrent(fileSystem, saveRootPath, progressJson, progressStateMachinesJson,
+        WriteProgressOnlyToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            progressNode, progressStateMachinesNode, overwrite);
+
+    public static void WriteProgressOnlyToCurrent(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode,
+        bool overwrite = true) =>
+        WriteProgressOnlyToCurrent(fileSystem, dataSourceIo, saveRootPath, progressNode, progressStateMachinesNode,
             new DefaultSavePathPolicy(), overwrite);
 
     public static void WriteProgressOnlyToCurrent(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
-        string progressJson,
-        string progressStateMachinesJson,
+        DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode,
         ISavePathPolicy pathPolicy,
         bool overwrite = true)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
-        ValidateStrictProgressPayload(progressJson, progressStateMachinesJson);
+        ValidateStrictProgressPayload(progressNode, progressStateMachinesNode);
 
         var currentRel = pathPolicy.GetCurrentDirectory();
         var currentAbs = fileSystem.CombinePath(saveRootPath, currentRel);
@@ -36,33 +50,43 @@ internal static class SavePayloadWriter
         var progressRel = pathPolicy.GetProgressFile(currentRel);
         var progressAbs = fileSystem.CombinePath(saveRootPath, progressRel);
         SavePathResolver.EnsureParentDirectory(fileSystem, progressAbs);
-        fileSystem.WriteAllText(progressAbs, progressJson, overwrite);
+        dataSourceIo.WriteTree(progressAbs, progressNode, overwrite);
 
         var progressSmRel = pathPolicy.GetProgressStateMachinesFile(currentRel);
         var progressSmAbs = fileSystem.CombinePath(saveRootPath, progressSmRel);
         SavePathResolver.EnsureParentDirectory(fileSystem, progressSmAbs);
-        fileSystem.WriteAllText(progressSmAbs, progressStateMachinesJson, overwrite);
+        dataSourceIo.WriteTree(progressSmAbs, progressStateMachinesNode, overwrite);
     }
 
     public static void WriteToCurrent(
         IFileSystem fileSystem,
         string saveRootPath,
         SaveGamePayload payload) =>
-        WriteToCurrent(fileSystem, saveRootPath, payload, new DefaultSavePathPolicy());
+        WriteToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath, payload,
+            new DefaultSavePathPolicy());
 
     public static void WriteToCurrent(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        SaveGamePayload payload) =>
+        WriteToCurrent(fileSystem, dataSourceIo, saveRootPath, payload, new DefaultSavePathPolicy());
+
+    public static void WriteToCurrent(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         SaveGamePayload payload,
         ISavePathPolicy pathPolicy)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentNullException.ThrowIfNull(pathPolicy);
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
 
-        ValidateStrictProgressPayload(payload.ProgressJson, payload.ProgressStateMachinesJson);
+        ValidateStrictProgressPayload(payload.ProgressNode, payload.ProgressStateMachinesNode);
 
         var currentRel = pathPolicy.GetCurrentDirectory();
         var currentAbs = fileSystem.CombinePath(saveRootPath, currentRel);
@@ -74,9 +98,10 @@ internal static class SavePayloadWriter
 
         WriteProgressOnlyToCurrent(
             fileSystem,
+            dataSourceIo,
             saveRootPath,
-            payload.ProgressJson,
-            payload.ProgressStateMachinesJson,
+            payload.ProgressNode,
+            payload.ProgressStateMachinesNode,
             pathPolicy);
 
         var customMetaRel = pathPolicy.GetCustomMetaFile(currentRel);
@@ -98,7 +123,7 @@ internal static class SavePayloadWriter
 
         // Write all level payloads (foreground + background sessions).
         foreach (var level in payload.Levels.Values)
-            WriteLevelPayload(fileSystem, saveRootPath, currentRel, level, true, pathPolicy);
+            WriteLevelPayload(fileSystem, dataSourceIo, saveRootPath, currentRel, level, true, pathPolicy);
 
         fileSystem.Delete(markerAbs);
     }
@@ -109,19 +134,32 @@ internal static class SavePayloadWriter
         string baseDirectoryRel,
         LevelPayload level,
         bool overwrite = true) =>
-        WriteLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, level, overwrite, new DefaultSavePathPolicy());
+        WriteLevelPayloadOnly(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath,
+            baseDirectoryRel, level, overwrite);
 
     public static void WriteLevelPayloadOnly(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string baseDirectoryRel,
+        LevelPayload level,
+        bool overwrite = true) =>
+        WriteLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, level, overwrite,
+            new DefaultSavePathPolicy());
+
+    public static void WriteLevelPayloadOnly(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload level,
         ISavePathPolicy pathPolicy,
         bool overwrite = true) =>
-        WriteLevelPayload(fileSystem, saveRootPath, baseDirectoryRel, level, overwrite, pathPolicy);
+        WriteLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, level, overwrite, pathPolicy);
 
     private static void WriteLevelPayload(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload level,
@@ -138,29 +176,32 @@ internal static class SavePayloadWriter
         var sndSceneAbs = fileSystem.CombinePath(saveRootPath, sndSceneRel);
         var sessionAbs = fileSystem.CombinePath(saveRootPath, sessionRel);
 
-        if (string.IsNullOrWhiteSpace(level.SndSceneJson))
+        if (level.SndSceneNode.IsNull)
             throw new InvalidOperationException(
-                $"Level payload '{level.LevelId}' missing required SndSceneJson (strict mode).");
-        if (string.IsNullOrWhiteSpace(level.SessionJson))
+                $"Level payload '{level.LevelId}' missing required SndSceneNode (strict mode).");
+        if (level.SessionNode.IsNull)
             throw new InvalidOperationException(
-                $"Level payload '{level.LevelId}' missing required SessionJson (strict mode).");
-        fileSystem.WriteAllText(sndSceneAbs, level.SndSceneJson, overwrite);
-        fileSystem.WriteAllText(sessionAbs, level.SessionJson, overwrite);
+                $"Level payload '{level.LevelId}' missing required SessionNode (strict mode).");
+        dataSourceIo.WriteTree(sndSceneAbs, level.SndSceneNode, overwrite);
+        dataSourceIo.WriteTree(sessionAbs, level.SessionNode, overwrite);
 
         var sessionSmRel = pathPolicy.GetLevelSessionStateMachinesFile(levelDirRel);
         var sessionSmAbs = fileSystem.CombinePath(saveRootPath, sessionSmRel);
         SavePathResolver.EnsureParentDirectory(fileSystem, sessionSmAbs);
-        if (string.IsNullOrWhiteSpace(level.SessionStateMachinesJson))
+        if (level.SessionStateMachinesNode.IsNull)
             throw new InvalidOperationException(
-                $"Level payload '{level.LevelId}' missing required SessionStateMachinesJson (strict mode).");
-        fileSystem.WriteAllText(sessionSmAbs, level.SessionStateMachinesJson, overwrite);
+                $"Level payload '{level.LevelId}' missing required SessionStateMachinesNode (strict mode).");
+        dataSourceIo.WriteTree(sessionSmAbs, level.SessionStateMachinesNode, overwrite);
     }
 
-    private static void ValidateStrictProgressPayload(string progressJson, string progressStateMachinesJson)
+    private static void ValidateStrictProgressPayload(DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode)
     {
-        if (string.IsNullOrWhiteSpace(progressJson))
-            throw new InvalidOperationException("Missing required ProgressJson (strict mode).");
-        if (string.IsNullOrWhiteSpace(progressStateMachinesJson))
-            throw new InvalidOperationException("Missing required ProgressStateMachinesJson (strict mode).");
+        ArgumentNullException.ThrowIfNull(progressNode);
+        ArgumentNullException.ThrowIfNull(progressStateMachinesNode);
+        if (progressNode.IsNull)
+            throw new InvalidOperationException("Missing required ProgressNode (strict mode).");
+        if (progressStateMachinesNode.IsNull)
+            throw new InvalidOperationException("Missing required ProgressStateMachinesNode (strict mode).");
     }
 }

@@ -364,6 +364,14 @@ internal sealed class DummySndEntity : ISndEntity
 /// </summary>
 internal static class TestFactory
 {
+    public static JsonDataSourceCodec CreateJsonCodec() => new();
+
+    public static MapDataSourceCodec CreateMapCodec() => new();
+
+    public static DataSourceNode NodeFromJson(string json) => CreateJsonCodec().Decode(json);
+
+    public static string JsonFromNode(DataSourceNode node) => CreateJsonCodec().Encode(node);
+
     public static DataSourceConverterRegistry CreateRegistry()
     {
         var tm = new TypeStringMapping();
@@ -374,9 +382,8 @@ internal static class TestFactory
         TypeStringMapping tm) =>
         DataSourceFactory.CreateDefaultRegistry(tm);
 
-    public static IDataSourceCodec CreateJsonCodec() => DataSourceFactory.CreateJsonCodec();
-
-    public static IDataSourceCodec CreateMapCodec() => DataSourceFactory.CreateMapCodec();
+    public static IDataSourceIoGateway CreateIoGateway(IFileSystem fileSystem) =>
+        DataSourceFactory.CreateDefaultIoGateway(fileSystem);
 
     public static SndWorld CreateSndWorld(
         TypeStringMapping? tm = null,
@@ -385,7 +392,7 @@ internal static class TestFactory
         tm ??= new TypeStringMapping();
         logger ??= new TestLogger();
         var reg = CreateRegistry(tm);
-        return new SndWorld(tm, logger, reg, CreateJsonCodec(), CreateMapCodec());
+        return new SndWorld(tm, logger, reg, CreateIoGateway(new TestFileSystem()));
     }
 
     public static OrigoRuntime CreateRuntime(
@@ -399,8 +406,9 @@ internal static class TestFactory
         tm ??= new TypeStringMapping();
         systemBb ??= new Blackboard.Blackboard();
         var reg = CreateRegistry(tm);
+        var io = CreateIoGateway(new TestFileSystem());
         return new OrigoRuntime(
-            logger, sceneHost, tm, reg, CreateJsonCodec(), CreateMapCodec(), systemBb);
+            logger, sceneHost, tm, reg, io, systemBb);
     }
 
     public static OrigoRuntime CreateRuntime(
@@ -412,8 +420,9 @@ internal static class TestFactory
         ConsoleOutputChannel consoleOutput)
     {
         var reg = CreateRegistry(tm);
+        var io = CreateIoGateway(new TestFileSystem());
         return new OrigoRuntime(
-            logger, sceneHost, tm, reg, CreateJsonCodec(), CreateMapCodec(),
+            logger, sceneHost, tm, reg, io,
             systemBb, consoleInput, consoleOutput);
     }
 

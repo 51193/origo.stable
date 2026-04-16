@@ -41,9 +41,9 @@ public class SavePathPolicyContractTests
         var payload = new LevelPayload
         {
             LevelId = "testlvl",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = """{"machines":[]}"""
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
         };
         var currentDir = customPolicy.GetCurrentDirectory();
         ctx.StorageService.WriteLevelPayloadOnly(currentDir, payload);
@@ -76,9 +76,9 @@ public class SavePathPolicyContractTests
         var payload = new LevelPayload
         {
             LevelId = "initlvl",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = """{"machines":[]}"""
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
         };
         var currentDir = customPolicy.GetCurrentDirectory();
         ctx.InitialStorageService.WriteLevelPayloadOnly(currentDir, payload);
@@ -107,9 +107,9 @@ public class SavePathPolicyContractTests
         var payload = new LevelPayload
         {
             LevelId = "faclvl",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = """{"machines":[]}"""
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
         };
         var currentDir = customPolicy.GetCurrentDirectory();
         systemRuntime.StorageService.WriteLevelPayloadOnly(currentDir, payload);
@@ -361,17 +361,17 @@ public class SavePathPolicyContractTests
         {
             SaveId = "001",
             ActiveLevelId = activeLevelId,
-            ProgressJson =
-                $$$"""{"origo.session_topology":{"type":"String","data":"__foreground__={{{activeLevelId}}}=false"}}""",
-            ProgressStateMachinesJson = """{"machines":[]}""",
+            ProgressNode = TestFactory.NodeFromJson(
+                $$$"""{"origo.session_topology":{"type":"String","data":"__foreground__={{{activeLevelId}}}=false"}}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}"""),
             Levels = new Dictionary<string, LevelPayload>
             {
                 [activeLevelId] = new()
                 {
                     LevelId = activeLevelId,
-                    SndSceneJson = "[]",
-                    SessionJson = "{}",
-                    SessionStateMachinesJson = """{"machines":[]}"""
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
                 }
             }
         };

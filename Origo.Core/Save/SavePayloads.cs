@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Origo.Core.DataSource;
 
 namespace Origo.Core.Save;
 
@@ -13,24 +14,23 @@ public sealed class LevelPayload
     public string LevelId { get; set; } = string.Empty;
 
     /// <summary>
-    ///     该关卡 SND 场景的序列化 JSON。
+    ///     该关卡 SND 场景的序列化节点。
     /// </summary>
-    public string SndSceneJson { get; set; } = string.Empty;
+    public DataSourceNode SndSceneNode { get; set; } = DataSourceNode.CreateNull();
 
     /// <summary>
-    ///     该关卡 Session 黑板的序列化 JSON。
+    ///     该关卡 Session 黑板的序列化节点。
     /// </summary>
-    public string SessionJson { get; set; } = string.Empty;
+    public DataSourceNode SessionNode { get; set; } = DataSourceNode.CreateNull();
 
     /// <summary>
-    ///     会话级字符串栈状态机快照 JSON（与 <c>session.json</c> 同目录的 <c>session_state_machines.json</c> 对应）。
+    ///     会话级字符串栈状态机快照节点（与 <c>session.json</c> 同目录的 <c>session_state_machines.json</c> 对应）。
     /// </summary>
-    public string SessionStateMachinesJson { get; set; } = string.Empty;
+    public DataSourceNode SessionStateMachinesNode { get; set; } = DataSourceNode.CreateNull();
 }
 
 /// <summary>
-///     一次完整存档所需的数据包，仅包含与 Core 相关的 JSON 字符串。
-///     具体文件布局与 I/O 由适配层决定。
+///     一次完整存档所需的数据包，领域载荷为 <see cref="DataSourceNode" />；磁盘编码由 <see cref="IDataSourceIoGateway" /> 负责。
 /// </summary>
 public sealed class SaveGamePayload
 {
@@ -55,14 +55,14 @@ public sealed class SaveGamePayload
     public string ActiveLevelId { get; set; } = string.Empty;
 
     /// <summary>
-    ///     流程级黑板的序列化 JSON。
+    ///     流程级黑板的序列化节点。
     /// </summary>
-    public string ProgressJson { get; set; } = string.Empty;
+    public DataSourceNode ProgressNode { get; set; } = DataSourceNode.CreateNull();
 
     /// <summary>
-    ///     流程级字符串栈状态机快照 JSON（与 <c>progress.json</c> 同目录的 <c>progress_state_machines.json</c> 对应）。
+    ///     流程级字符串栈状态机快照节点（与 <c>progress.json</c> 同目录的 <c>progress_state_machines.json</c> 对应）。
     /// </summary>
-    public string ProgressStateMachinesJson { get; set; } = string.Empty;
+    public DataSourceNode ProgressStateMachinesNode { get; set; } = DataSourceNode.CreateNull();
 
     /// <summary>
     ///     可选的存档展示元数据（sidecar map 内容）。

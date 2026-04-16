@@ -23,11 +23,11 @@ public class SaveContextTests
         progress.Set("stage", 3);
 
         var ctx = new SaveContext(progress, session, world);
-        var json = ctx.SerializeProgress();
+        using var node = ctx.SerializeProgress();
 
         var progress2 = new Blackboard.Blackboard();
         var ctx2 = new SaveContext(progress2, new Blackboard.Blackboard(), world);
-        ctx2.DeserializeProgress(json);
+        ctx2.DeserializeProgress(node);
 
         Assert.Equal(3, progress2.TryGet<int>("stage").value);
     }
@@ -41,11 +41,11 @@ public class SaveContextTests
         session.Set("hp", 100);
 
         var ctx = new SaveContext(progress, session, world);
-        var json = ctx.SerializeSession();
+        using var node = ctx.SerializeSession();
 
         var session2 = new Blackboard.Blackboard();
         var ctx2 = new SaveContext(new Blackboard.Blackboard(), session2, world);
-        ctx2.DeserializeSession(json);
+        ctx2.DeserializeSession(node);
 
         Assert.Equal(100, session2.TryGet<int>("hp").value);
     }
@@ -57,8 +57,8 @@ public class SaveContextTests
         var ctx = new SaveContext(new Blackboard.Blackboard(), new Blackboard.Blackboard(), world);
         var host = new TestSndSceneHost();
 
-        var json = ctx.SerializeSndScene(host);
-        Assert.NotNull(json);
+        using var node = ctx.SerializeSndScene(host);
+        Assert.NotNull(node);
     }
 
     [Fact]
@@ -69,7 +69,8 @@ public class SaveContextTests
         var host = new TestSndSceneHost();
         host.Spawn(new SndMetaData { Name = "old" });
 
-        ctx.DeserializeSndScene(host, "[]");
+        using var node = TestFactory.NodeFromJson("[]");
+        ctx.DeserializeSndScene(host, node);
         Assert.Equal(1, host.ClearAllCount);
     }
 
@@ -85,11 +86,13 @@ public class SaveContextTests
         var ctx = new SaveContext(progress, session, world);
         var host = new TestSndSceneHost();
 
-        var payload = ctx.SaveGame(host, "slot1", "level1", null, "{}", "{}");
+        using var progressSmNode = TestFactory.NodeFromJson("{}");
+        using var sessionSmNode = TestFactory.NodeFromJson("{}");
+        var payload = ctx.SaveGame(host, "slot1", "level1", null, progressSmNode, sessionSmNode);
 
         Assert.Equal("slot1", payload.SaveId);
         Assert.Equal("level1", payload.ActiveLevelId);
-        Assert.NotNull(payload.ProgressJson);
+        Assert.NotNull(payload.ProgressNode);
         Assert.Contains("level1", payload.Levels.Keys);
     }
 
@@ -103,7 +106,9 @@ public class SaveContextTests
         var host = new TestSndSceneHost();
         var meta = new Dictionary<string, string> { ["display"] = "Save 1" };
 
-        var payload = ctx.SaveGame(host, "slot1", "level1", meta, "{}", "{}");
+        using var progressSmNode = TestFactory.NodeFromJson("{}");
+        using var sessionSmNode = TestFactory.NodeFromJson("{}");
+        var payload = ctx.SaveGame(host, "slot1", "level1", meta, progressSmNode, sessionSmNode);
 
         Assert.NotNull(payload.CustomMeta);
         Assert.Equal("Save 1", payload.CustomMeta!["display"]);

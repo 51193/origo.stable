@@ -18,8 +18,9 @@ public class ProgressRunSessionLoadingEdgeTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"origo.session_topology":{"type":"String","data":"bad_entry"}}""",
-            ProgressStateMachinesJson = "{\"machines\":[]}",
+            ProgressNode = TestFactory.NodeFromJson(
+                """{"origo.session_topology":{"type":"String","data":"bad_entry"}}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}"),
             Levels = new Dictionary<string, LevelPayload>()
         };
 
@@ -36,8 +37,8 @@ public class ProgressRunSessionLoadingEdgeTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = "{}",
-            ProgressStateMachinesJson = "{\"machines\":[]}",
+            ProgressNode = TestFactory.NodeFromJson("{}"),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}"),
             Levels = new Dictionary<string, LevelPayload>()
         };
 

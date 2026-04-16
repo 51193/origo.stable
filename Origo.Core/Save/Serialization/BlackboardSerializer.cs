@@ -8,29 +8,24 @@ namespace Origo.Core.Save.Serialization;
 
 internal sealed class BlackboardSerializer
 {
-    private readonly IDataSourceCodec _codec;
     private readonly DataSourceConverterRegistry _registry;
 
-    public BlackboardSerializer(IDataSourceCodec codec, DataSourceConverterRegistry registry)
+    public BlackboardSerializer(DataSourceConverterRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(codec);
         ArgumentNullException.ThrowIfNull(registry);
-        _codec = codec;
         _registry = registry;
     }
 
-    public string Serialize(IBlackboard blackboard)
+    public DataSourceNode Serialize(IBlackboard blackboard)
     {
         var data = blackboard.SerializeAll();
-        using var node = _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
-        return _codec.Encode(node);
+        return _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
     }
 
-    public void DeserializeInto(IBlackboard blackboard, string serializedText)
+    public void DeserializeInto(IBlackboard blackboard, DataSourceNode serializedNode)
     {
-        ArgumentNullException.ThrowIfNull(serializedText);
-        using var node = _codec.Decode(serializedText);
-        var dict = _registry.Read<IReadOnlyDictionary<string, TypedData>>(node);
+        ArgumentNullException.ThrowIfNull(serializedNode);
+        var dict = _registry.Read<IReadOnlyDictionary<string, TypedData>>(serializedNode);
         if (dict is null)
             throw new InvalidOperationException("Failed to deserialize blackboard data.");
         blackboard.DeserializeAll(dict);

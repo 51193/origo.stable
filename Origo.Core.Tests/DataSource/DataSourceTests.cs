@@ -1384,7 +1384,7 @@ public class DataSourceTests
     [Fact]
     public void MapCodec_Decode_LineWithoutColon_SkipsLine()
     {
-        var codec = DataSourceFactory.CreateMapCodec();
+        var codec = TestFactory.CreateMapCodec();
         var text = "validkey: value\nno_colon_here\nanotherkey: value2";
         var node = codec.Decode(text);
 
@@ -1397,7 +1397,7 @@ public class DataSourceTests
     [Fact]
     public void MapCodec_Decode_EmptyValueAfterColon_ReturnsEmptyString()
     {
-        var codec = DataSourceFactory.CreateMapCodec();
+        var codec = TestFactory.CreateMapCodec();
         var text = "emptyval:";
         var node = codec.Decode(text);
 
@@ -1408,7 +1408,7 @@ public class DataSourceTests
     [Fact]
     public void MapCodec_Decode_OnlyCommentsAndEmptyLines_ReturnsEmptyObject()
     {
-        var codec = DataSourceFactory.CreateMapCodec();
+        var codec = TestFactory.CreateMapCodec();
         var text = "# comment\n\n  # another comment\n   ";
         var node = codec.Decode(text);
 

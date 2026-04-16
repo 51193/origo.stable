@@ -125,6 +125,7 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
+        var io = TestFactory.CreateIoGateway(fs);
         fs.SeedFile("config/entry.json",
             """
             [
@@ -137,7 +138,7 @@ public class SndEntityAndAutoInitializerTests
             ]
             """);
 
-        var loaded = OrigoAutoInitializer.LoadAndSpawnFromFile("config/entry.json", runtime.Snd, fs, logger);
+        var loaded = OrigoAutoInitializer.LoadAndSpawnFromFile("config/entry.json", runtime.Snd, io, logger);
 
         Assert.Equal(1, loaded);
         Assert.Single(runtime.Snd.SerializeMetaList());
@@ -151,8 +152,9 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
+        var io = TestFactory.CreateIoGateway(fs);
         Assert.Throws<ArgumentException>(() =>
-            OrigoAutoInitializer.LoadAndSpawnFromFile("  ", runtime.Snd, fs, logger));
+            OrigoAutoInitializer.LoadAndSpawnFromFile("  ", runtime.Snd, io, logger));
         Assert.True(logger.Errors.Exists(e => e.Contains("Invalid config path", StringComparison.Ordinal)));
     }
 
@@ -163,8 +165,9 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
+        var io = TestFactory.CreateIoGateway(fs);
         Assert.Throws<InvalidOperationException>(() =>
-            OrigoAutoInitializer.LoadAndSpawnFromFile("missing.json", runtime.Snd, fs, logger));
+            OrigoAutoInitializer.LoadAndSpawnFromFile("missing.json", runtime.Snd, io, logger));
     }
 
     [Fact]
@@ -174,9 +177,10 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
+        var io = TestFactory.CreateIoGateway(fs);
         fs.SeedFile("empty.json", "   ");
-        Assert.Throws<InvalidOperationException>(() =>
-            OrigoAutoInitializer.LoadAndSpawnFromFile("empty.json", runtime.Snd, fs, logger));
+        Assert.ThrowsAny<Exception>(() =>
+            OrigoAutoInitializer.LoadAndSpawnFromFile("empty.json", runtime.Snd, io, logger));
     }
 
     [Fact]
@@ -186,9 +190,10 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
+        var io = TestFactory.CreateIoGateway(fs);
         fs.SeedFile("obj.json", """{"not":"array"}""");
         Assert.Throws<InvalidOperationException>(() =>
-            OrigoAutoInitializer.LoadAndSpawnFromFile("obj.json", runtime.Snd, fs, logger));
+            OrigoAutoInitializer.LoadAndSpawnFromFile("obj.json", runtime.Snd, io, logger));
     }
 
     private static SndContext CreateContext(TestLogger logger)

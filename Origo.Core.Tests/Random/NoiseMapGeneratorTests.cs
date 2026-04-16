@@ -6,6 +6,8 @@ namespace Origo.Core.Tests;
 
 public class NoiseMapGeneratorTests
 {
+    public static TheoryData<int> GenerateSimplexWorleyBlendMap_InvalidSize_Data { get; } = new() { 0, -4 };
+
     [Fact]
     public void GenerateSimplexWorleyBlendMap_ReturnsExpectedLengthAndRange()
     {
@@ -30,8 +32,7 @@ public class NoiseMapGeneratorTests
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(-4)]
+    [MemberData(nameof(GenerateSimplexWorleyBlendMap_InvalidSize_Data))]
     public void GenerateSimplexWorleyBlendMap_InvalidSize_Throws(int size)
     {
         var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>

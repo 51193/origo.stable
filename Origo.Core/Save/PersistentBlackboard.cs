@@ -14,7 +14,7 @@ namespace Origo.Core.Save;
 /// </summary>
 public sealed class PersistentBlackboard : IBlackboard
 {
-    private readonly IDataSourceCodec _codec;
+    private readonly IDataSourceIoGateway _dataSourceIo;
     private readonly string _filePath;
     private readonly IFileSystem _fileSystem;
     private readonly IBlackboard _inner;
@@ -27,15 +27,15 @@ public sealed class PersistentBlackboard : IBlackboard
     public PersistentBlackboard(
         IFileSystem fileSystem,
         string filePath,
-        IDataSourceCodec codec,
+        IDataSourceIoGateway dataSourceIo,
         DataSourceConverterRegistry registry,
         IBlackboard inner)
     {
         _fileSystem = fileSystem;
         _filePath = filePath;
-        ArgumentNullException.ThrowIfNull(codec);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(registry);
-        _codec = codec;
+        _dataSourceIo = dataSourceIo;
         _registry = registry;
         ArgumentNullException.ThrowIfNull(inner);
         _inner = inner;
@@ -117,11 +117,10 @@ public sealed class PersistentBlackboard : IBlackboard
     {
         lock (_lock)
         {
-            if (!_fileSystem.Exists(_filePath))
+            if (!_dataSourceIo.Exists(_filePath))
                 return;
 
-            var json = _fileSystem.ReadAllText(_filePath);
-            using var node = _codec.Decode(json);
+            using var node = _dataSourceIo.ReadTree(_filePath);
             var dict = _registry.Read<IReadOnlyDictionary<string, TypedData>>(node);
             if (dict is not null)
                 _inner.DeserializeAll(dict);
@@ -134,7 +133,6 @@ public sealed class PersistentBlackboard : IBlackboard
 
         var data = _inner.SerializeAll();
         using var node = _registry.Write<IReadOnlyDictionary<string, TypedData>>(data);
-        var json = _codec.Encode(node);
-        _fileSystem.WriteAllText(_filePath, json, true);
+        _dataSourceIo.WriteTree(_filePath, node);
     }
 }

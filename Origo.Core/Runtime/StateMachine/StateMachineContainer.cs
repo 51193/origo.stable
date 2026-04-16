@@ -103,10 +103,9 @@ public sealed class StateMachineContainer
             }
     }
 
-    /// <summary>将所有状态机序列化为 DataSource 文本。</summary>
-    public string SerializeToDataSource(IDataSourceCodec codec, DataSourceConverterRegistry registry)
+    /// <summary>将所有状态机序列化为 DataSource 节点。</summary>
+    public DataSourceNode SerializeToNode(DataSourceConverterRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(codec);
         ArgumentNullException.ThrowIfNull(registry);
 
         var payload = new StateMachineContainerPayload();
@@ -123,23 +122,16 @@ public sealed class StateMachineContainer
             });
         }
 
-        using var node = registry.Write(payload);
-        return codec.Encode(node);
+        return registry.Write(payload);
     }
 
-    /// <summary>从 DataSource 文本恢复所有状态机（不触发钩子），配合 <see cref="FlushAllAfterLoad" /> 使用。</summary>
-    public void DeserializeWithoutHooks(string serializedText, IDataSourceCodec codec,
+    /// <summary>从 DataSource 节点恢复所有状态机（不触发钩子），配合 <see cref="FlushAllAfterLoad" /> 使用。</summary>
+    public void DeserializeFromNode(DataSourceNode serializedNode,
         DataSourceConverterRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(serializedText);
-        ArgumentNullException.ThrowIfNull(codec);
+        ArgumentNullException.ThrowIfNull(serializedNode);
         ArgumentNullException.ThrowIfNull(registry);
-
-        if (string.IsNullOrWhiteSpace(serializedText))
-            throw new InvalidOperationException("StateMachineContainer serialized text cannot be null/empty.");
-
-        using var node = codec.Decode(serializedText);
-        var payload = registry.Read<StateMachineContainerPayload>(node);
+        var payload = registry.Read<StateMachineContainerPayload>(serializedNode);
         if (payload?.Machines is null)
             throw new InvalidOperationException("StateMachineContainer payload.machines is required.");
 

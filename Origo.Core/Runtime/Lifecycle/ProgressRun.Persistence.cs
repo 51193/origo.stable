@@ -13,10 +13,9 @@ public sealed partial class ProgressRun
         var sessionBb = fgSession?.SessionBlackboard ?? new Blackboard.Blackboard();
 
         var serializer = new SaveContext(ProgressBlackboard, sessionBb, _progressRuntime.SndWorld);
-        var progressJson = serializer.SerializeProgress();
-        var smJson = ProgressScope.StateMachines.SerializeToDataSource(
-            _progressRuntime.JsonCodec, _progressRuntime.ConverterRegistry);
+        var progressNode = serializer.SerializeProgress();
+        var smNode = ProgressScope.StateMachines.SerializeToNode(_progressRuntime.ConverterRegistry);
 
-        _progressRuntime.StorageService.WriteProgressOnlyToCurrent(progressJson, smJson);
+        _progressRuntime.StorageService.WriteProgressOnlyToCurrent(progressNode, smNode);
     }
 }

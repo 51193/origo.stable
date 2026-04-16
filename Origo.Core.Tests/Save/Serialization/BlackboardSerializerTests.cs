@@ -14,14 +14,14 @@ public class BlackboardSerializerTests
     public void BlackboardSerializer_RoundTrip_PreservesData()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var serializer = new BlackboardSerializer(world.ConverterRegistry);
         var bb = new Blackboard.Blackboard();
         bb.Set("intKey", 42);
         bb.Set("strKey", "hello");
 
-        var json = serializer.Serialize(bb);
+        using var node = serializer.Serialize(bb);
         var bb2 = new Blackboard.Blackboard();
-        serializer.DeserializeInto(bb2, json);
+        serializer.DeserializeInto(bb2, node);
 
         Assert.Equal(42, bb2.TryGet<int>("intKey").value);
         Assert.Equal("hello", bb2.TryGet<string>("strKey").value);
@@ -31,10 +31,11 @@ public class BlackboardSerializerTests
     public void BlackboardSerializer_Serialize_EmptyBlackboard_ReturnsValidJson()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var serializer = new BlackboardSerializer(world.ConverterRegistry);
         var bb = new Blackboard.Blackboard();
 
-        var json = serializer.Serialize(bb);
+        using var node = serializer.Serialize(bb);
+        var json = TestFactory.JsonFromNode(node);
         Assert.NotNull(json);
         Assert.Contains("{", json);
     }
@@ -43,15 +44,15 @@ public class BlackboardSerializerTests
     public void BlackboardSerializer_DeserializeInto_OverwritesExisting()
     {
         var world = CreateWorld();
-        var serializer = new BlackboardSerializer(world.JsonCodec, world.ConverterRegistry);
+        var serializer = new BlackboardSerializer(world.ConverterRegistry);
         var bb = new Blackboard.Blackboard();
         bb.Set("key1", "old");
         bb.Set("key2", "keep");
 
         var source = new Blackboard.Blackboard();
         source.Set("key1", "new");
-        var json = serializer.Serialize(source);
-        serializer.DeserializeInto(bb, json);
+        using var node = serializer.Serialize(source);
+        serializer.DeserializeInto(bb, node);
 
         Assert.Equal("new", bb.TryGet<string>("key1").value);
         // DeserializeAll replaces all data

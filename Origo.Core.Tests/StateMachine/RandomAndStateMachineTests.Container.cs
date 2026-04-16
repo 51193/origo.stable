@@ -133,7 +133,7 @@ public partial class RandomAndStateMachineTests
     }
 
     [Fact]
-    public void StateMachineContainer_DeserializeWithoutHooks_ThrowsOnEmptyJson()
+    public void StateMachineContainer_DeserializeFromNode_ThrowsOnNullNode()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -144,8 +144,8 @@ public partial class RandomAndStateMachineTests
 
         var container = new StateMachineContainer(pool, ctx);
 
-        Assert.Throws<InvalidOperationException>(() =>
-            container.DeserializeWithoutHooks(" ", TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry()));
+        Assert.Throws<ArgumentNullException>(() =>
+            container.DeserializeFromNode(null!, TestFactory.CreateRegistry()));
     }
 
     [Fact]
@@ -165,9 +165,9 @@ public partial class RandomAndStateMachineTests
         sm.Push("p");
         sm.Push("q");
 
-        var json = c1.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        using var node = c1.SerializeToNode(TestFactory.CreateRegistry());
         var c2 = new StateMachineContainer(pool, ctx);
-        c2.DeserializeWithoutHooks(json, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        c2.DeserializeFromNode(node, TestFactory.CreateRegistry());
         c2.TryGet("ui", out var restored);
         Assert.NotNull(restored);
         Assert.Equal(new[] { "p", "q" }, restored!.Snapshot());
@@ -191,17 +191,17 @@ public partial class RandomAndStateMachineTests
         var container = new StateMachineContainer(pool, ctx);
 
         // Serialize an empty container, then deserialize back – no-op swap.
-        var emptyJson = container.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
-        container.DeserializeWithoutHooks(emptyJson, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        using var emptyNode = container.SerializeToNode(TestFactory.CreateRegistry());
+        container.DeserializeFromNode(emptyNode, TestFactory.CreateRegistry());
         Assert.False(container.TryGet("anything", out _));
 
         // Populate with a machine, serialize, then deserialize into the same container.
         var sm = container.CreateOrGet("nav", "sm.swap.push", "sm.swap.pop");
         sm.RestoreStackWithoutHooks(new List<string> { "a", "b" });
-        var json = container.SerializeToDataSource(TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        using var node = container.SerializeToNode(TestFactory.CreateRegistry());
 
         // Deserialize replaces old state atomically.
-        container.DeserializeWithoutHooks(json, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry());
+        container.DeserializeFromNode(node, TestFactory.CreateRegistry());
 
         Assert.True(container.TryGet("nav", out var restored));
         Assert.NotNull(restored);
@@ -292,19 +292,7 @@ public partial class RandomAndStateMachineTests
     }
 
     [Fact]
-    public void StateMachineContainer_DeserializeWithoutHooks_NullSerializedText_Throws()
-    {
-        var logger = new TestLogger();
-        var host = new TestSndSceneHost();
-        var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
-        var c = new StateMachineContainer(runtime.SndWorld.StrategyPool, ctx);
-        Assert.Throws<ArgumentNullException>(() =>
-            c.DeserializeWithoutHooks(null!, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry()));
-    }
-
-    [Fact]
-    public void StateMachineContainer_DeserializeWithoutHooks_DuplicateMachineKey_Throws()
+    public void StateMachineContainer_DeserializeFromNode_DuplicateMachineKey_Throws()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -322,9 +310,9 @@ public partial class RandomAndStateMachineTests
               ]
             }
             """;
+        using var node = TestFactory.NodeFromJson(json);
         var c = new StateMachineContainer(pool, ctx);
-        Assert.Throws<InvalidOperationException>(() =>
-            c.DeserializeWithoutHooks(json, TestFactory.CreateJsonCodec(), TestFactory.CreateRegistry()));
+        Assert.Throws<InvalidOperationException>(() => c.DeserializeFromNode(node, TestFactory.CreateRegistry()));
     }
 
     [StrategyIndex("sm.swap.push")]

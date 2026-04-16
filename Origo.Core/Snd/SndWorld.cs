@@ -23,20 +23,17 @@ public sealed class SndWorld
         TypeStringMapping typeMapping,
         ILogger logger,
         DataSourceConverterRegistry registry,
-        IDataSourceCodec jsonCodec,
-        IDataSourceCodec mapCodec)
+        IDataSourceIoGateway dataSourceIo)
     {
         ArgumentNullException.ThrowIfNull(typeMapping);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(jsonCodec);
-        ArgumentNullException.ThrowIfNull(mapCodec);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         _logger = logger;
         StrategyPool = new SndStrategyPool(logger);
         TypeMapping = typeMapping;
         ConverterRegistry = registry;
-        JsonCodec = jsonCodec;
-        MapCodec = mapCodec;
+        DataSourceIo = dataSourceIo;
         Mappings = new SndMappings();
     }
 
@@ -56,16 +53,7 @@ public sealed class SndWorld
     /// </summary>
     public DataSourceConverterRegistry ConverterRegistry { get; }
 
-    /// <summary>
-    ///     JSON 编解码器，用于 DataSourceNode 与 JSON 文本之间的双向转换。
-    ///     注意：尽管名称包含 'Json'，实际编解码通过 IDataSourceCodec 接口抽象，此属性在创建时注入。
-    /// </summary>
-    public IDataSourceCodec JsonCodec { get; }
-
-    /// <summary>
-    ///     Map 格式编解码器，用于 key: value 格式的简单文本文件（如 meta.map）。
-    /// </summary>
-    internal IDataSourceCodec MapCodec { get; }
+    public IDataSourceIoGateway DataSourceIo { get; }
 
     /// <summary>
     ///     SND 映射管理器，维护场景别名与模板别名的映射关系。
@@ -96,15 +84,19 @@ public sealed class SndWorld
         Mappings.LoadSceneAliases(fileSystem, mapFilePath, logger);
 
     public void LoadTemplates(IFileSystem fileSystem, string mapFilePath, ILogger logger) =>
-        Mappings.LoadTemplates(fileSystem, mapFilePath, JsonCodec, ConverterRegistry, logger);
+        Mappings.LoadTemplates(
+            fileSystem,
+            mapFilePath,
+            DataSourceFactory.CreateDefaultIoGateway(fileSystem),
+            ConverterRegistry,
+            logger);
 
     public IReadOnlyList<SndMetaData> ResolveMetaListFromJsonArray(DataSourceNode root) =>
         Mappings.ResolveMetaListFromJsonArray(root, ConverterRegistry);
 
-    public IReadOnlyDictionary<string, TypedData> DeserializeTypedDataMap(string serializedText)
+    public IReadOnlyDictionary<string, TypedData> ReadTypedDataMap(DataSourceNode node)
     {
-        ArgumentNullException.ThrowIfNull(serializedText);
-        using var node = JsonCodec.Decode(serializedText);
+        ArgumentNullException.ThrowIfNull(node);
         return ConverterRegistry.Read<IReadOnlyDictionary<string, TypedData>>(node);
     }
 
@@ -117,30 +109,23 @@ public sealed class SndWorld
         return new SndEntity(nodeFactory, StrategyPool, Mappings, context, logger);
     }
 
-    public string SerializeMeta(SndMetaData metaData)
-    {
-        using var node = ConverterRegistry.Write(metaData);
-        return JsonCodec.Encode(node);
-    }
+    public DataSourceNode WriteMetaNode(SndMetaData metaData) => ConverterRegistry.Write(metaData);
 
-    public SndMetaData DeserializeMeta(string serializedText)
+    public SndMetaData ReadMetaNode(DataSourceNode node)
     {
-        ArgumentNullException.ThrowIfNull(serializedText);
-        using var node = JsonCodec.Decode(serializedText);
+        ArgumentNullException.ThrowIfNull(node);
         return ConverterRegistry.Read<SndMetaData>(node);
     }
 
-    public string SerializeMetaList(IEnumerable<SndMetaData> metaDataList)
+    public DataSourceNode WriteMetaListNode(IEnumerable<SndMetaData> metaDataList)
     {
         var list = metaDataList as IReadOnlyList<SndMetaData> ?? metaDataList.ToList();
-        using var node = ConverterRegistry.Write(list);
-        return JsonCodec.Encode(node);
+        return ConverterRegistry.Write(list);
     }
 
-    public IReadOnlyList<SndMetaData> DeserializeMetaList(string serializedText)
+    public IReadOnlyList<SndMetaData> ReadMetaListNode(DataSourceNode node)
     {
-        ArgumentNullException.ThrowIfNull(serializedText);
-        using var node = JsonCodec.Decode(serializedText);
+        ArgumentNullException.ThrowIfNull(node);
         return ConverterRegistry.Read<IReadOnlyList<SndMetaData>>(node);
     }
 }

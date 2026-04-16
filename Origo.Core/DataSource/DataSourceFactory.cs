@@ -1,4 +1,5 @@
-using Origo.Core.DataSource.Codec;
+using System;
+using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.DataSource.Converters;
 using Origo.Core.Serialization;
 
@@ -68,7 +69,17 @@ public static class DataSourceFactory
         return registry;
     }
 
-    public static IDataSourceCodec CreateJsonCodec(bool writeIndented = true) => new JsonDataSourceCodec(writeIndented);
+    private static DataSourceIoOptions BuildDefaultIoOptions() =>
+        new DataSourceIoOptions()
+            .RegisterSuffix(".json", DataSourceCodecKind.Json)
+            .RegisterSuffix(".map", DataSourceCodecKind.Map);
 
-    public static IDataSourceCodec CreateMapCodec() => new MapDataSourceCodec();
+    public static IDataSourceIoGateway CreateIoGateway(IFileSystem fileSystem, bool writeIndented = true)
+    {
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        return new DataSourceIoGateway(fileSystem, BuildDefaultIoOptions(), writeIndented);
+    }
+
+    public static IDataSourceIoGateway CreateDefaultIoGateway(IFileSystem fileSystem, bool writeIndented = true) =>
+        CreateIoGateway(fileSystem, writeIndented);
 }

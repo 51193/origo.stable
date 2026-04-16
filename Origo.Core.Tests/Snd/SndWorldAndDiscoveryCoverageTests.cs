@@ -17,11 +17,12 @@ public class SndWorldAndDiscoveryCoverageTests
     }
 
     [Fact]
-    public void SndWorld_SerializeMetaList_NonListEnumerable_UsesToListPath()
+    public void SndWorld_WriteMetaListNode_NonListEnumerable_UsesToListPath()
     {
         var world = TestFactory.CreateSndWorld();
         var lazy = MetaYield();
-        var json = world.SerializeMetaList(lazy);
+        using var node = world.WriteMetaListNode(lazy);
+        var json = TestFactory.JsonFromNode(node);
         Assert.Contains("E1", json, StringComparison.Ordinal);
 
         static IEnumerable<SndMetaData> MetaYield()

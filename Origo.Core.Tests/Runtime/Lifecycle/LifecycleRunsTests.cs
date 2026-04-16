@@ -49,16 +49,17 @@ public class LifecycleRunsTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""",
-            ProgressStateMachinesJson = "{\"machines\":[]}",
+            ProgressNode = TestFactory.NodeFromJson(
+                """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}"),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["default"] = new()
                 {
                     LevelId = "default",
-                    SndSceneJson = "[]",
-                    SessionJson = """{"x":{"type":"Int32","data":3}}""",
-                    SessionStateMachinesJson = "{\"machines\":[]}"
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("""{"x":{"type":"Int32","data":3}}"""),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
                 }
             }
         };
@@ -71,7 +72,7 @@ public class LifecycleRunsTests
     }
 
     [Fact]
-    public void ProgressRun_LoadFromPayload_WithEmptyProgressJson_ThrowsMissingSessionTopology()
+    public void ProgressRun_LoadFromPayload_WithEmptyProgressNode_ThrowsMissingSessionTopology()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -84,16 +85,16 @@ public class LifecycleRunsTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = "{}",
-            ProgressStateMachinesJson = "{\"machines\":[]}",
+            ProgressNode = TestFactory.NodeFromJson("{}"),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}"),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["default"] = new()
                 {
                     LevelId = "default",
-                    SndSceneJson = "[]",
-                    SessionJson = "{}",
-                    SessionStateMachinesJson = "{\"machines\":[]}"
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
                 }
             }
         };
@@ -218,7 +219,7 @@ public class LifecycleRunsTests
 
         var payload = run1.SerializeToPayload();
         Assert.Equal("level1", payload.LevelId);
-        Assert.False(string.IsNullOrWhiteSpace(payload.SessionJson));
+        Assert.False(string.IsNullOrWhiteSpace(TestFactory.JsonFromNode(payload.SessionNode)));
 
         // Create second session and load the payload
         var bb2 = new Blackboard.Blackboard();
@@ -231,7 +232,7 @@ public class LifecycleRunsTests
     }
 
     [Fact]
-    public void ProgressRun_LoadFromPayload_MissingStateMachinesJson_Throws()
+    public void ProgressRun_LoadFromPayload_MissingProgressStateMachinesNode_Throws()
     {
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
@@ -244,8 +245,9 @@ public class LifecycleRunsTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""",
-            ProgressStateMachinesJson = null! // Missing — should throw
+            ProgressNode = TestFactory.NodeFromJson(
+                """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false"}}""")
+            // ProgressStateMachinesNode omitted → CreateNull() — should throw
         };
 
         Assert.Throws<InvalidOperationException>(() => progressRun.LoadFromPayload(payload));

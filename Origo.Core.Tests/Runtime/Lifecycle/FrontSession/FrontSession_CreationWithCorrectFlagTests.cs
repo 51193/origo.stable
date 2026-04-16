@@ -29,9 +29,9 @@ public class FrontSession_CreationWithCorrectFlagTests
         var payload = new LevelPayload
         {
             LevelId = "default",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = "{\"machines\":[]}"
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
         };
         ((SessionRun)ctx.SessionManager.ForegroundSession!).LoadFromPayload(payload);
 

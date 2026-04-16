@@ -19,16 +19,16 @@ public class SaveStorageAndPayloadTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"k":{"type":"Int32","data":1}}""",
-            ProgressStateMachinesJson = progressSm,
+            ProgressNode = TestFactory.NodeFromJson("""{"k":{"type":"Int32","data":1}}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson(progressSm),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["default"] = new()
                 {
                     LevelId = "default",
-                    SndSceneJson = "[]",
-                    SessionJson = """{"s":{"type":"String","data":"ok"}}""",
-                    SessionStateMachinesJson = sessionSm
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("""{"s":{"type":"String","data":"ok"}}"""),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson(sessionSm)
                 }
             }
         };
@@ -38,10 +38,19 @@ public class SaveStorageAndPayloadTests
 
         Assert.Equal("001", loaded.SaveId);
         Assert.Equal("default", loaded.ActiveLevelId);
-        Assert.Contains("\"k\"", loaded.ProgressJson);
-        Assert.Equal("[]", loaded.Levels["default"].SndSceneJson);
-        Assert.Equal(progressSm, loaded.ProgressStateMachinesJson);
-        Assert.Equal(sessionSm, loaded.Levels["default"].SessionStateMachinesJson);
+        Assert.Contains("\"k\"", TestFactory.JsonFromNode(loaded.ProgressNode));
+        Assert.Equal("[]", TestFactory.JsonFromNode(loaded.Levels["default"].SndSceneNode));
+        // Disk round-trip may re-encode with different whitespace; normalize via parse + encode.
+        Assert.Equal(CanonicalJsonLiteral(progressSm),
+            CanonicalJsonLiteral(TestFactory.JsonFromNode(loaded.ProgressStateMachinesNode)));
+        Assert.Equal(CanonicalJsonLiteral(sessionSm),
+            CanonicalJsonLiteral(TestFactory.JsonFromNode(loaded.Levels["default"].SessionStateMachinesNode)));
+    }
+
+    private static string CanonicalJsonLiteral(string json)
+    {
+        using var n = TestFactory.NodeFromJson(json);
+        return TestFactory.JsonFromNode(n);
     }
 
     [Fact]
@@ -71,18 +80,19 @@ public class SaveStorageAndPayloadTests
     }
 
     [Fact]
-    public void SaveStorageFacade_ReadProgressJsonFromSnapshot_Missing_ReturnsNull()
+    public void SaveStorageFacade_ReadProgressNodeFromSnapshot_Missing_ReturnsNull()
     {
         var fs = new TestFileSystem();
-        Assert.Null(SaveStorageFacade.ReadProgressJsonFromSnapshot(fs, "root", "missing"));
+        Assert.Null(SaveStorageFacade.ReadProgressNodeFromSnapshot(fs, "root", "missing"));
     }
 
     [Fact]
-    public void SaveStorageFacade_ReadProgressJsonFromSnapshot_WhenPresent_ReturnsContent()
+    public void SaveStorageFacade_ReadProgressNodeFromSnapshot_WhenPresent_ReturnsContent()
     {
         var fs = new TestFileSystem();
         fs.SeedFile("root/save_042/progress.json", """{"k":1}""");
-        var json = SaveStorageFacade.ReadProgressJsonFromSnapshot(fs, "root", "042");
+        using var node = SaveStorageFacade.ReadProgressNodeFromSnapshot(fs, "root", "042");
+        var json = TestFactory.JsonFromNode(node!);
         Assert.Contains("\"k\"", json, StringComparison.Ordinal);
     }
 
@@ -150,16 +160,16 @@ public class SaveStorageAndPayloadTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = "{}",
-            ProgressStateMachinesJson = """{"machines":[]}""",
+            ProgressNode = TestFactory.NodeFromJson("{}"),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}"""),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["default"] = new()
                 {
                     LevelId = "default",
-                    SndSceneJson = "[]",
-                    SessionJson = "{}",
-                    SessionStateMachinesJson = """{"machines":[]}"""
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
                 }
             }
         };
@@ -256,16 +266,16 @@ public class SaveStorageAndPayloadTests
         {
             SaveId = "1",
             ActiveLevelId = "d",
-            ProgressJson = "{}",
-            ProgressStateMachinesJson = """{"machines":[]}""",
+            ProgressNode = TestFactory.NodeFromJson("{}"),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}"""),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["d"] = new()
                 {
                     LevelId = "d",
-                    SndSceneJson = "[]",
-                    SessionJson = "{}",
-                    SessionStateMachinesJson = """{"machines":[]}"""
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
                 }
             }
         };
@@ -283,16 +293,16 @@ public class SaveStorageAndPayloadTests
         {
             SaveId = "001",
             ActiveLevelId = "default",
-            ProgressJson = """{"marker":"after_write"}""",
-            ProgressStateMachinesJson = progressSm,
+            ProgressNode = TestFactory.NodeFromJson("""{"marker":"after_write"}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson(progressSm),
             Levels = new Dictionary<string, LevelPayload>
             {
                 ["default"] = new()
                 {
                     LevelId = "default",
-                    SndSceneJson = "[]",
-                    SessionJson = "{}",
-                    SessionStateMachinesJson = progressSm
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson(progressSm)
                 }
             }
         };

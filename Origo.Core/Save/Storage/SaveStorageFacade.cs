@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Save.Meta;
 
@@ -92,15 +93,22 @@ internal static class SaveStorageFacade
     /// </summary>
     public static void
         WriteSavePayloadToCurrent(IFileSystem fileSystem, string saveRootPath, SaveGamePayload payload) =>
-        SavePayloadWriter.WriteToCurrent(fileSystem, saveRootPath, payload);
+        WriteSavePayloadToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath,
+            payload);
+
+    public static void
+        WriteSavePayloadToCurrent(IFileSystem fileSystem, IDataSourceIoGateway dataSourceIo, string saveRootPath,
+            SaveGamePayload payload) =>
+        SavePayloadWriter.WriteToCurrent(fileSystem, dataSourceIo, saveRootPath, payload);
 
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 活动目录（策略感知）。
     /// </summary>
     public static void
-        WriteSavePayloadToCurrent(IFileSystem fileSystem, string saveRootPath, SaveGamePayload payload,
+        WriteSavePayloadToCurrent(IFileSystem fileSystem, IDataSourceIoGateway dataSourceIo, string saveRootPath,
+            SaveGamePayload payload,
             ISavePathPolicy pathPolicy) =>
-        SavePayloadWriter.WriteToCurrent(fileSystem, saveRootPath, payload, pathPolicy);
+        SavePayloadWriter.WriteToCurrent(fileSystem, dataSourceIo, saveRootPath, payload, pathPolicy);
 
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 后，再将 <c>current/</c> 快照复制到 <c>save_{newSaveId}/</c>。
@@ -113,14 +121,25 @@ internal static class SaveStorageFacade
         SaveGamePayload payload,
         string newSaveId,
         ILogger logger) =>
-        WriteSavePayloadToCurrentThenSnapshot(
-            fileSystem, saveRootPath, payload, newSaveId, logger, new DefaultSavePathPolicy());
+        WriteSavePayloadToCurrentThenSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath, payload, newSaveId, logger, new DefaultSavePathPolicy());
+
+    public static void WriteSavePayloadToCurrentThenSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        SaveGamePayload payload,
+        string newSaveId,
+        ILogger logger) =>
+        WriteSavePayloadToCurrentThenSnapshot(fileSystem, dataSourceIo, saveRootPath, payload, newSaveId, logger,
+            new DefaultSavePathPolicy());
 
     /// <summary>
     ///     将存档 payload 写入 <c>current/</c> 后，再将 <c>current/</c> 快照复制到 <c>save_{newSaveId}/</c>（策略感知）。
     /// </summary>
     public static void WriteSavePayloadToCurrentThenSnapshot(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         SaveGamePayload payload,
         string newSaveId,
@@ -137,7 +156,7 @@ internal static class SaveStorageFacade
         fileSystem.CreateDirectory(currentAbs);
         fileSystem.WriteAllText(markerAbs, "", true);
 
-        WriteSavePayloadToCurrent(fileSystem, saveRootPath, payload, pathPolicy);
+        WriteSavePayloadToCurrent(fileSystem, dataSourceIo, saveRootPath, payload, pathPolicy);
 
         // WriteToCurrent deletes the marker; re-establish for the snapshot phase
         fileSystem.WriteAllText(markerAbs, "", true);
@@ -165,24 +184,27 @@ internal static class SaveStorageFacade
     /// </summary>
     public static void WriteLevelPayloadOnly(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload levelPayload,
         bool overwrite = true) =>
-        SavePayloadWriter.WriteLevelPayloadOnly(fileSystem, saveRootPath, baseDirectoryRel, levelPayload, overwrite);
+        SavePayloadWriter.WriteLevelPayloadOnly(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, levelPayload,
+            overwrite);
 
     /// <summary>
     ///     仅写入单个关卡的 payload 数据到指定基目录下（策略感知）。
     /// </summary>
     public static void WriteLevelPayloadOnly(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string baseDirectoryRel,
         LevelPayload levelPayload,
         ISavePathPolicy pathPolicy,
         bool overwrite = true) =>
-        SavePayloadWriter.WriteLevelPayloadOnly(fileSystem, saveRootPath, baseDirectoryRel, levelPayload, pathPolicy,
-            overwrite);
+        SavePayloadWriter.WriteLevelPayloadOnly(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, levelPayload,
+            pathPolicy, overwrite);
 
     /// <summary>
     ///     从 <c>current/</c> 活动目录读取完整的存档 payload。
@@ -193,19 +215,32 @@ internal static class SaveStorageFacade
         string saveId,
         string activeLevelId,
         ILogger? logger = null) =>
-        SavePayloadReader.ReadFromCurrent(fileSystem, saveRootPath, saveId, activeLevelId, logger);
+        ReadSavePayloadFromCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            saveId, activeLevelId, logger);
+
+    public static SaveGamePayload ReadSavePayloadFromCurrent(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId,
+        string activeLevelId,
+        ILogger? logger = null) =>
+        SavePayloadReader.ReadFromCurrent(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, logger);
 
     /// <summary>
     ///     从 <c>current/</c> 活动目录读取完整的存档 payload（策略感知）。
     /// </summary>
     public static SaveGamePayload ReadSavePayloadFromCurrent(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
         string activeLevelId,
         ISavePathPolicy pathPolicy,
         ILogger? logger = null) =>
-        SavePayloadReader.ReadFromCurrent(fileSystem, saveRootPath, saveId, activeLevelId, pathPolicy, logger);
+        SavePayloadReader.ReadFromCurrent(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, pathPolicy,
+            logger);
 
     /// <summary>
     ///     从指定存档槽的快照目录读取完整的存档 payload。
@@ -215,31 +250,58 @@ internal static class SaveStorageFacade
         string saveRootPath,
         string saveId,
         string activeLevelId) =>
-        SavePayloadReader.ReadFromSnapshot(fileSystem, saveRootPath, saveId, activeLevelId);
+        ReadSavePayloadFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            saveId, activeLevelId);
+
+    public static SaveGamePayload ReadSavePayloadFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId,
+        string activeLevelId) =>
+        SavePayloadReader.ReadFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId);
 
     /// <summary>
     ///     从指定存档槽的快照目录读取完整的存档 payload（策略感知）。
     /// </summary>
     public static SaveGamePayload ReadSavePayloadFromSnapshot(
         IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
         string activeLevelId,
         ISavePathPolicy pathPolicy) =>
-        SavePayloadReader.ReadFromSnapshot(fileSystem, saveRootPath, saveId, activeLevelId, pathPolicy);
+        SavePayloadReader.ReadFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, pathPolicy);
 
     /// <summary>
     ///     从指定存档槽的快照目录中仅读取 Progress 黑板 JSON。
     /// </summary>
-    public static string? ReadProgressJsonFromSnapshot(IFileSystem fileSystem, string saveRootPath, string saveId) =>
-        SavePayloadReader.ReadProgressJsonFromSnapshot(fileSystem, saveRootPath, saveId);
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
+        IFileSystem fileSystem,
+        string saveRootPath,
+        string saveId) =>
+        ReadProgressNodeFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+            saveRootPath,
+            saveId);
+
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId) =>
+        SavePayloadReader.ReadProgressNodeFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId);
 
     /// <summary>
     ///     从指定存档槽的快照目录中仅读取 Progress 黑板 JSON（策略感知）。
     /// </summary>
-    public static string? ReadProgressJsonFromSnapshot(
-        IFileSystem fileSystem, string saveRootPath, string saveId, ISavePathPolicy pathPolicy) =>
-        SavePayloadReader.ReadProgressJsonFromSnapshot(fileSystem, saveRootPath, saveId, pathPolicy);
+    public static DataSourceNode? ReadProgressNodeFromSnapshot(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string saveRootPath,
+        string saveId,
+        ISavePathPolicy pathPolicy) =>
+        SavePayloadReader.ReadProgressNodeFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, pathPolicy);
 
     /// <summary>
     ///     将 <c>current/</c> 目录完整复制为指定存档槽的快照。

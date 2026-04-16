@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace Origo.Core.DataSource.Codec;
+namespace Origo.Core.DataSource;
 
 /// <summary>
 ///     简单 key: value 格式的编解码器（.map 文件）。

@@ -26,9 +26,9 @@ public class LevelBuilderExtendedTests
         var payload = builder.Build();
 
         Assert.Equal("lvl1", payload.LevelId);
-        Assert.False(string.IsNullOrWhiteSpace(payload.SndSceneJson));
-        Assert.False(string.IsNullOrWhiteSpace(payload.SessionJson));
-        Assert.False(string.IsNullOrWhiteSpace(payload.SessionStateMachinesJson));
+        Assert.False(string.IsNullOrWhiteSpace(TestFactory.JsonFromNode(payload.SndSceneNode)));
+        Assert.False(string.IsNullOrWhiteSpace(TestFactory.JsonFromNode(payload.SessionNode)));
+        Assert.False(string.IsNullOrWhiteSpace(TestFactory.JsonFromNode(payload.SessionStateMachinesNode)));
     }
 
     [Fact]

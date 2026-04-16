@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Origo.Core.Abstractions.FileSystem;
@@ -120,9 +121,19 @@ public static class OrigoAutoInitializer
         IFileSystem fileSystem,
         ILogger logger)
     {
+        ArgumentNullException.ThrowIfNull(fileSystem);
+        return LoadAndSpawnFromFile(filePath, snd, DataSourceFactory.CreateDefaultIoGateway(fileSystem), logger);
+    }
+
+    public static int LoadAndSpawnFromFile(
+        string filePath,
+        SndRuntime snd,
+        IDataSourceIoGateway dataSourceIo,
+        ILogger logger)
+    {
         ArgumentNullException.ThrowIfNull(snd);
         ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(fileSystem);
+        ArgumentNullException.ThrowIfNull(dataSourceIo);
         var watch = Stopwatch.StartNew();
 
         if (string.IsNullOrWhiteSpace(filePath))
@@ -134,44 +145,41 @@ public static class OrigoAutoInitializer
             throw ex;
         }
 
-        if (!fileSystem.Exists(filePath))
+        DataSourceNode root;
+        try
         {
-            var ex = new InvalidOperationException($"Config file '{filePath}' not found.");
+            root = dataSourceIo.ReadTree(filePath);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or FileNotFoundException or DirectoryNotFoundException)
+        {
+            var notFound = new InvalidOperationException($"Config file '{filePath}' not found.", ex);
             logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                 .AddSuffix("filePath", filePath)
-                .Build($"Config file not found: {ex.Message}"));
-            throw ex;
+                .Build($"Config file not found: {notFound.Message}"));
+            throw notFound;
         }
 
-        var json = fileSystem.ReadAllText(filePath).Trim();
-        if (string.IsNullOrWhiteSpace(json))
+        using (root)
         {
-            var ex = new InvalidOperationException($"Config file '{filePath}' is empty.");
-            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+            if (root.Kind != DataSourceNodeKind.Array)
+            {
+                var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");
+                logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
+                    .AddSuffix("filePath", filePath)
+                    .Build($"Config json root is not array: {ex.Message}"));
+                throw ex;
+            }
+
+            var metaList = snd.World.ResolveMetaListFromJsonArray(root);
+            snd.SpawnMany(metaList);
+
+            watch.Stop();
+            logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
+                .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
                 .AddSuffix("filePath", filePath)
-                .Build($"Config file is empty: {ex.Message}"));
-            throw ex;
+                .Build($"Spawned entities from config: {metaList.Count}."));
+            return metaList.Count;
         }
-
-        using var root = snd.World.JsonCodec.Decode(json);
-        if (root.Kind != DataSourceNodeKind.Array)
-        {
-            var ex = new InvalidOperationException($"Config file '{filePath}' must be a JSON array.");
-            logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
-                .AddSuffix("filePath", filePath)
-                .Build($"Config json root is not array: {ex.Message}"));
-            throw ex;
-        }
-
-        var metaList = snd.World.ResolveMetaListFromJsonArray(root);
-        snd.SpawnMany(metaList);
-
-        watch.Stop();
-        logger.Log(LogLevel.Info, LogTag, new LogMessageBuilder()
-            .SetElapsedMs(watch.Elapsed.TotalMilliseconds)
-            .AddSuffix("filePath", filePath)
-            .Build($"Spawned entities from config: {metaList.Count}."));
-        return metaList.Count;
     }
 
     private static bool ShouldSkipAssembly(Assembly assembly, string[] skipPrefixes)

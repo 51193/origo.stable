@@ -7,6 +7,7 @@ using Origo.Core.Save.Serialization;
 using Origo.Core.Save.Storage;
 using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Scene;
+using Origo.Core.StateMachine;
 
 namespace Origo.Core.Snd;
 
@@ -129,15 +130,15 @@ public sealed class LevelBuilder
         _built = true;
 
         var sceneSerializer = new SndSceneSerializer(_sndWorld);
-        var blackboardSerializer = new BlackboardSerializer(
-            _sndWorld.JsonCodec, _sndWorld.ConverterRegistry);
+        var blackboardSerializer = new BlackboardSerializer(_sndWorld.ConverterRegistry);
+        var emptyStateMachinesNode = _sndWorld.ConverterRegistry.Write(new StateMachineContainerPayload());
 
         return new LevelPayload
         {
             LevelId = LevelId,
-            SndSceneJson = sceneSerializer.Serialize(_sceneHost),
-            SessionJson = blackboardSerializer.Serialize(_sessionBlackboard),
-            SessionStateMachinesJson = """{"machines":[]}"""
+            SndSceneNode = sceneSerializer.Serialize(_sceneHost),
+            SessionNode = blackboardSerializer.Serialize(_sessionBlackboard),
+            SessionStateMachinesNode = emptyStateMachinesNode
         };
     }
 

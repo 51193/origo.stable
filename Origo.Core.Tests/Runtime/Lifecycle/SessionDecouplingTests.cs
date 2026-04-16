@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Scene;
 using Origo.Core.Abstractions.StateMachine;
+using Origo.Core.DataSource;
 using Origo.Core.Save;
 using Origo.Core.Save.Meta;
 using Origo.Core.Save.Storage;
@@ -172,9 +173,9 @@ public class SessionDecouplingTests
         var payload = new LevelPayload
         {
             LevelId = "dungeon",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = """{"machines":[]}"""
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("""{"machines":[]}""")
         };
 
         // WriteLevelPayloadOnly should use the custom policy's GetCurrentDirectory / GetLevelDirectory.
@@ -370,9 +371,9 @@ public class SessionDecouplingTests
             _inner.WriteLevelPayloadOnlyToCurrent(levelPayload, overwrite);
         }
 
-        public void WriteProgressOnlyToCurrent(string progressJson, string progressStateMachinesJson,
+        public void WriteProgressOnlyToCurrent(DataSourceNode progressNode, DataSourceNode progressStateMachinesNode,
             bool overwrite = true) =>
-            _inner.WriteProgressOnlyToCurrent(progressJson, progressStateMachinesJson, overwrite);
+            _inner.WriteProgressOnlyToCurrent(progressNode, progressStateMachinesNode, overwrite);
 
         public SaveGamePayload ReadSavePayloadFromCurrent(string saveId, string activeLevelId,
             ILogger? logger = null) =>
@@ -381,8 +382,8 @@ public class SessionDecouplingTests
         public SaveGamePayload ReadSavePayloadFromSnapshot(string saveId, string activeLevelId) =>
             _inner.ReadSavePayloadFromSnapshot(saveId, activeLevelId);
 
-        public string? ReadProgressJsonFromSnapshot(string saveId) =>
-            _inner.ReadProgressJsonFromSnapshot(saveId);
+        public DataSourceNode? ReadProgressNodeFromSnapshot(string saveId) =>
+            _inner.ReadProgressNodeFromSnapshot(saveId);
 
         public LevelPayload? TryReadLevelPayloadFromCurrent(string levelId) =>
             _inner.TryReadLevelPayloadFromCurrent(levelId);

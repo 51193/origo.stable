@@ -17,7 +17,7 @@ public class SaveGamePayloadTests
         Assert.Equal(SaveGamePayload.CurrentFormatVersion, payload.FormatVersion);
         Assert.Equal(string.Empty, payload.SaveId);
         Assert.Equal(string.Empty, payload.ActiveLevelId);
-        Assert.Equal(string.Empty, payload.ProgressJson);
+        Assert.True(payload.ProgressNode.IsNull);
         Assert.NotNull(payload.Levels);
     }
 
@@ -26,8 +26,8 @@ public class SaveGamePayloadTests
     {
         var lp = new LevelPayload();
         Assert.Equal(string.Empty, lp.LevelId);
-        Assert.Equal(string.Empty, lp.SndSceneJson);
-        Assert.Equal(string.Empty, lp.SessionJson);
-        Assert.Equal(string.Empty, lp.SessionStateMachinesJson);
+        Assert.True(lp.SndSceneNode.IsNull);
+        Assert.True(lp.SessionNode.IsNull);
+        Assert.True(lp.SessionStateMachinesNode.IsNull);
     }
 }

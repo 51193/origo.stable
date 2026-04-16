@@ -159,11 +159,10 @@ public sealed class SessionRun : ISessionRun
         return new LevelPayload
         {
             LevelId = LevelId,
-            SndSceneJson = _saveContext.SerializeSndScene(_sceneHost),
-            SessionJson = _saveContext.SerializeSession(),
-            SessionStateMachinesJson =
-                _sessionScope.StateMachines.SerializeToDataSource(_saveContext.SndWorld.JsonCodec,
-                    _saveContext.SndWorld.ConverterRegistry)
+            SndSceneNode = _saveContext.SerializeSndScene(_sceneHost),
+            SessionNode = _saveContext.SerializeSession(),
+            SessionStateMachinesNode =
+                _sessionScope.StateMachines.SerializeToNode(_saveContext.SndWorld.ConverterRegistry)
         };
     }
 
@@ -178,19 +177,18 @@ public sealed class SessionRun : ISessionRun
         _logger.Log(LogLevel.Info, LogTag, $"Loading payload for level '{LevelId}'.");
 
         // 1. 恢复会话黑板
-        if (!string.IsNullOrWhiteSpace(payload.SessionJson))
-            _saveContext.DeserializeSession(payload.SessionJson);
+        if (!payload.SessionNode.IsNull)
+            _saveContext.DeserializeSession(payload.SessionNode);
 
         // 2. 恢复状态机（不触发钩子，等场景加载完毕后统一 Flush）
-        if (!string.IsNullOrWhiteSpace(payload.SessionStateMachinesJson))
-            _sessionScope.StateMachines.DeserializeWithoutHooks(
-                payload.SessionStateMachinesJson,
-                _saveContext.SndWorld.JsonCodec,
+        if (!payload.SessionStateMachinesNode.IsNull)
+            _sessionScope.StateMachines.DeserializeFromNode(
+                payload.SessionStateMachinesNode,
                 _saveContext.SndWorld.ConverterRegistry);
 
         // 3. 恢复 SND 场景实体
-        if (!string.IsNullOrWhiteSpace(payload.SndSceneJson))
-            _saveContext.DeserializeSndScene(_sceneHost, payload.SndSceneJson);
+        if (!payload.SndSceneNode.IsNull)
+            _saveContext.DeserializeSndScene(_sceneHost, payload.SndSceneNode);
 
         // 4. 统一触发 AfterLoad 钩子
         _sessionScope.StateMachines.FlushAllAfterLoad();
@@ -218,11 +216,10 @@ public sealed class SessionRun : ISessionRun
         var levelPayload = new LevelPayload
         {
             LevelId = LevelId,
-            SndSceneJson = _saveContext.SerializeSndScene(_sceneHost),
-            SessionJson = _saveContext.SerializeSession(),
-            SessionStateMachinesJson =
-                _sessionScope.StateMachines.SerializeToDataSource(_saveContext.SndWorld.JsonCodec,
-                    _saveContext.SndWorld.ConverterRegistry)
+            SndSceneNode = _saveContext.SerializeSndScene(_sceneHost),
+            SessionNode = _saveContext.SerializeSession(),
+            SessionStateMachinesNode =
+                _sessionScope.StateMachines.SerializeToNode(_saveContext.SndWorld.ConverterRegistry)
         };
 
         _storageService.WriteLevelPayloadOnlyToCurrent(levelPayload);

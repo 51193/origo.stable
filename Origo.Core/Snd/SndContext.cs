@@ -279,10 +279,10 @@ public sealed class SndContext : IStateMachineContext, ISndContext
             Runtime.ResetConsoleState();
             ShutdownCurrentProgressAndScene();
 
-            var progressJson = StorageService.ReadProgressJsonFromSnapshot(saveId);
-            if (progressJson is null)
+            using var progressNode = StorageService.ReadProgressNodeFromSnapshot(saveId);
+            if (progressNode is null)
                 throw new InvalidOperationException($"Missing required progress.json in save '{saveId}'.");
-            var progressDict = Runtime.SndWorld.DeserializeTypedDataMap(progressJson);
+            var progressDict = Runtime.SndWorld.ReadTypedDataMap(progressNode);
 
             if (!progressDict.TryGetValue(WellKnownKeys.SessionTopology, out var topologyData)
                 || topologyData.Data is not string rawTopology

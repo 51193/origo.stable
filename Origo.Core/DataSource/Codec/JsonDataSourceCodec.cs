@@ -2,7 +2,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace Origo.Core.DataSource.Codec;
+namespace Origo.Core.DataSource;
 
 /// <summary>
 ///     基于 System.Text.Json 的 JSON 编解码器，支持延迟展开。

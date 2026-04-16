@@ -69,9 +69,9 @@ public class SndTemplateResolverTests
     {
         var fs = new TestFileSystem();
         fs.SeedFile("templates/null.json", "{}");
+        var io = TestFactory.CreateIoGateway(fs);
         var resolver = new SndTemplateResolver(
-            fs,
-            TestFactory.CreateJsonCodec(),
+            io,
             new NullMetaConverter(),
             new Dictionary<string, string> { ["null_meta"] = "templates/null.json" });
 
@@ -82,7 +82,7 @@ public class SndTemplateResolverTests
     private static SndTemplateResolver CreateResolver(TestFileSystem fs, Dictionary<string, string> map)
     {
         var registry = TestFactory.CreateRegistry();
-        return new SndTemplateResolver(fs, TestFactory.CreateJsonCodec(), registry.Get<SndMetaData>(), map);
+        return new SndTemplateResolver(TestFactory.CreateIoGateway(fs), registry.Get<SndMetaData>(), map);
     }
 
     private sealed class NullMetaConverter : DataSourceConverter<SndMetaData>

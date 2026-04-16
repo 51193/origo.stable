@@ -27,6 +27,9 @@ public class BackgroundSessionTests
     private const string ProcessStrategyIndex = "test.process";
     private const string SessionContextStrategyIndex = "test.session_context";
 
+    public static TheoryData<string?> CreateBackgroundSession_InvalidLevelIds_Data { get; } =
+        CreateBackgroundSessionInvalidLevelIds();
+
     // ── Creation & basic state ────────────────────────────────────────
 
     [Fact]
@@ -46,9 +49,7 @@ public class BackgroundSessionTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
+    [MemberData(nameof(CreateBackgroundSession_InvalidLevelIds_Data))]
     public void CreateBackgroundSession_Throws_WhenLevelIdInvalid(string? levelId)
     {
         var (ctx, _) = CreateForegroundContext();
@@ -385,11 +386,14 @@ public class BackgroundSessionTests
         var payload = AsSessionRun(bg).SerializeToPayload();
 
         Assert.Equal("bg_level", payload.LevelId);
-        Assert.False(string.IsNullOrWhiteSpace(payload.SndSceneJson));
-        Assert.False(string.IsNullOrWhiteSpace(payload.SessionJson));
-        Assert.False(string.IsNullOrWhiteSpace(payload.SessionStateMachinesJson));
-        Assert.Contains("soldier_01", payload.SndSceneJson);
-        Assert.Contains("hp", payload.SessionJson);
+        var sndJson = TestFactory.JsonFromNode(payload.SndSceneNode);
+        var sessionJson = TestFactory.JsonFromNode(payload.SessionNode);
+        var smJson = TestFactory.JsonFromNode(payload.SessionStateMachinesNode);
+        Assert.False(string.IsNullOrWhiteSpace(sndJson));
+        Assert.False(string.IsNullOrWhiteSpace(sessionJson));
+        Assert.False(string.IsNullOrWhiteSpace(smJson));
+        Assert.Contains("soldier_01", sndJson);
+        Assert.Contains("hp", sessionJson);
     }
 
     [Fact]
@@ -815,6 +819,15 @@ public class BackgroundSessionTests
             StrategyMetaData = new StrategyMetaData { Indices = new List<string>(indices) },
             DataMetaData = new DataMetaData()
         };
+
+    private static TheoryData<string?> CreateBackgroundSessionInvalidLevelIds()
+    {
+        var d = new TheoryData<string?>();
+        d.Add(default(string?));
+        d.Add("");
+        d.Add("   ");
+        return d;
+    }
 
     // ── Test strategy implementations ─────────────────────────────────
 

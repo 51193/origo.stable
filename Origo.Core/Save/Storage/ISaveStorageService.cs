@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Origo.Core.Abstractions.Logging;
+using Origo.Core.DataSource;
 using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
@@ -38,8 +39,8 @@ public interface ISaveStorageService
 
     /// <summary>仅写入 Progress 相关文件到 current/ 目录。</summary>
     void WriteProgressOnlyToCurrent(
-        string progressJson,
-        string progressStateMachinesJson,
+        DataSourceNode progressNode,
+        DataSourceNode progressStateMachinesNode,
         bool overwrite = true);
 
     /// <summary>从 current/ 读取完整存档 payload。</summary>
@@ -53,8 +54,8 @@ public interface ISaveStorageService
         string saveId,
         string activeLevelId);
 
-    /// <summary>从 save_* 快照目录仅读取 Progress JSON。</summary>
-    string? ReadProgressJsonFromSnapshot(string saveId);
+    /// <summary>从 save_* 快照目录仅读取 Progress 节点。</summary>
+    DataSourceNode? ReadProgressNodeFromSnapshot(string saveId);
 
     /// <summary>从 current/ 中尝试读取指定关卡的 payload，不存在时返回 null。</summary>
     LevelPayload? TryReadLevelPayloadFromCurrent(string levelId);

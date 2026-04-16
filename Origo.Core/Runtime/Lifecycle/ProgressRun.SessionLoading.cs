@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Origo.Core.DataSource;
 using Origo.Core.Save;
 using Origo.Core.Save.Serialization;
 using Origo.Core.StateMachine;
@@ -26,14 +27,13 @@ public sealed partial class ProgressRun
         // ── Step 1: ProgressRun deserializes its own private data ──
         var saveContext = new SaveContext(
             ProgressBlackboard, new Blackboard.Blackboard(), _progressRuntime.SndWorld);
-        saveContext.DeserializeProgress(payload.ProgressJson);
+        saveContext.DeserializeProgress(payload.ProgressNode);
 
-        if (string.IsNullOrWhiteSpace(payload.ProgressStateMachinesJson))
-            throw new InvalidOperationException("Save payload missing required ProgressStateMachinesJson.");
+        if (payload.ProgressStateMachinesNode.IsNull)
+            throw new InvalidOperationException("Save payload missing required ProgressStateMachinesNode.");
 
-        ProgressScope.StateMachines.DeserializeWithoutHooks(
-            payload.ProgressStateMachinesJson,
-            _progressRuntime.JsonCodec,
+        ProgressScope.StateMachines.DeserializeFromNode(
+            payload.ProgressStateMachinesNode,
             _progressRuntime.ConverterRegistry);
 
         // ── Step 2: Read session topology from self-owned ProgressBlackBoard ──
@@ -138,20 +138,30 @@ public sealed partial class ProgressRun
 
     private void ValidateLevelPayload(string levelId, LevelPayload payload)
     {
-        if (string.IsNullOrWhiteSpace(payload.SndSceneJson))
+        if (IsNullOrInvalid(payload.SndSceneNode))
             throw new InvalidOperationException($"Target level '{levelId}' has invalid snd_scene.json (empty).");
-        if (string.IsNullOrWhiteSpace(payload.SessionJson))
+        if (IsNullOrInvalid(payload.SessionNode))
             throw new InvalidOperationException($"Target level '{levelId}' has invalid session.json (empty).");
-        if (string.IsNullOrWhiteSpace(payload.SessionStateMachinesJson))
+        if (IsNullOrInvalid(payload.SessionStateMachinesNode))
             throw new InvalidOperationException(
                 $"Target level '{levelId}' has invalid session_state_machines.json (empty).");
 
-        var smCodec = _progressRuntime.JsonCodec;
         var smRegistry = _progressRuntime.ConverterRegistry;
-        using var smNode = smCodec.Decode(payload.SessionStateMachinesJson);
-        _ = smRegistry.Read<StateMachineContainerPayload>(smNode)
+        _ = smRegistry.Read<StateMachineContainerPayload>(payload.SessionStateMachinesNode)
             ?? throw new InvalidOperationException(
                 $"Target level '{levelId}' has invalid session state machines json (null payload).");
+    }
+
+    private static bool IsNullOrInvalid(DataSourceNode node)
+    {
+        try
+        {
+            return node.IsNull;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     /// <summary>

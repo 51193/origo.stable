@@ -8,6 +8,22 @@ namespace Origo.Core.Tests;
 
 public class SavePathLayoutTests
 {
+    public static TheoryData<string, string> GetSaveDirectory_FormatsCorrectly_Data { get; } = new()
+    {
+        { "001", "save_001" },
+        { "abc", "save_abc" },
+        { "my-save", "save_my-save" }
+    };
+
+    public static TheoryData<string?> GetSaveDirectory_ThrowsOnInvalidId_Data { get; } = CreateInvalidSaveIds();
+
+    public static TheoryData<string, string> GetLevelDirectory_ThrowsOnInvalidArgs_Data { get; } = new()
+    {
+        { "", "level1" },
+        { "base", "" },
+        { "", "" }
+    };
+
     [Fact]
     public void SavePathLayout_GetCurrentDirectory_ReturnsCurrent() =>
         Assert.Equal("current", SavePathLayout.GetCurrentDirectory());
@@ -17,16 +33,12 @@ public class SavePathLayoutTests
         Assert.Equal("current", SavePathLayout.CurrentDirectoryName);
 
     [Theory]
-    [InlineData("001", "save_001")]
-    [InlineData("abc", "save_abc")]
-    [InlineData("my-save", "save_my-save")]
+    [MemberData(nameof(GetSaveDirectory_FormatsCorrectly_Data))]
     public void SavePathLayout_GetSaveDirectory_FormatsCorrectly(string saveId, string expected) =>
         Assert.Equal(expected, SavePathLayout.GetSaveDirectory(saveId));
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
+    [MemberData(nameof(GetSaveDirectory_ThrowsOnInvalidId_Data))]
     public void SavePathLayout_GetSaveDirectory_ThrowsOnInvalidId(string? saveId) =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetSaveDirectory(saveId!));
 
@@ -59,9 +71,7 @@ public class SavePathLayoutTests
         Assert.Equal("base/level_town", SavePathLayout.GetLevelDirectory("base", "town"));
 
     [Theory]
-    [InlineData("", "level1")]
-    [InlineData("base", "")]
-    [InlineData("", "")]
+    [MemberData(nameof(GetLevelDirectory_ThrowsOnInvalidArgs_Data))]
     public void SavePathLayout_GetLevelDirectory_ThrowsOnInvalidArgs(string baseDir, string levelId) =>
         Assert.Throws<ArgumentException>(() => SavePathLayout.GetLevelDirectory(baseDir, levelId));
 
@@ -103,6 +113,15 @@ public class SavePathLayoutTests
     [Fact]
     public void SavePathLayout_WriteInProgressMarkerName_Constant() =>
         Assert.Equal(".write_in_progress", SavePathLayout.WriteInProgressMarkerName);
+
+    private static TheoryData<string?> CreateInvalidSaveIds()
+    {
+        var d = new TheoryData<string?>();
+        d.Add(default(string?));
+        d.Add("");
+        d.Add("   ");
+        return d;
+    }
 }
 
 // ── SavePathResolver ───────────────────────────────────────────────────

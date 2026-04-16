@@ -15,24 +15,23 @@ internal sealed class SndSceneSerializer
         _world = world;
     }
 
-    public string Serialize(ISndSceneAccess sceneAccess)
+    public DataSourceNode Serialize(ISndSceneAccess sceneAccess)
     {
         ArgumentNullException.ThrowIfNull(sceneAccess);
         var metaList = sceneAccess.SerializeMetaList();
-        return _world.SerializeMetaList(metaList);
+        return _world.WriteMetaListNode(metaList);
     }
 
-    public void DeserializeInto(ISndSceneAccess sceneAccess, string serializedText, bool clearBeforeLoad)
+    public void DeserializeInto(ISndSceneAccess sceneAccess, DataSourceNode serializedNode, bool clearBeforeLoad)
     {
         ArgumentNullException.ThrowIfNull(sceneAccess);
-        ArgumentNullException.ThrowIfNull(serializedText);
+        ArgumentNullException.ThrowIfNull(serializedNode);
 
-        using var root = _world.JsonCodec.Decode(serializedText);
-        if (root.Kind != DataSourceNodeKind.Array)
+        if (serializedNode.Kind != DataSourceNodeKind.Array)
             throw new InvalidOperationException("SND 场景序列化数据必须为数组格式。");
 
         var metaList = _world.Mappings.ResolveMetaListFromJsonArray(
-            root,
+            serializedNode,
             _world.ConverterRegistry);
 
         if (clearBeforeLoad)

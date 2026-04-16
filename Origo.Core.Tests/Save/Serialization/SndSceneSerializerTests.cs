@@ -19,8 +19,9 @@ public class SndSceneSerializerTests
         var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
-        var json = serializer.Serialize(host);
-        Assert.NotNull(json);
+        using var node = serializer.Serialize(host);
+        var json = TestFactory.JsonFromNode(node);
+        Assert.NotNull(node);
         Assert.Contains("[", json);
     }
 
@@ -33,10 +34,10 @@ public class SndSceneSerializerTests
         var host1 = new TestSndSceneHost();
         host1.Spawn(new SndMetaData { Name = "entity1" });
 
-        var json = serializer.Serialize(host1);
+        using var node = serializer.Serialize(host1);
 
         var host2 = new TestSndSceneHost();
-        serializer.DeserializeInto(host2, json, true);
+        serializer.DeserializeInto(host2, node, true);
 
         var metaList = host2.SerializeMetaList();
         Assert.Single(metaList);
@@ -51,7 +52,8 @@ public class SndSceneSerializerTests
         var host = new TestSndSceneHost();
         host.Spawn(new SndMetaData { Name = "existing" });
 
-        serializer.DeserializeInto(host, "[]", true);
+        using var node = TestFactory.NodeFromJson("[]");
+        serializer.DeserializeInto(host, node, true);
         Assert.Equal(1, host.ClearAllCount);
     }
 
@@ -62,7 +64,8 @@ public class SndSceneSerializerTests
         var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
-        serializer.DeserializeInto(host, "[]", false);
+        using var node = TestFactory.NodeFromJson("[]");
+        serializer.DeserializeInto(host, node, false);
         Assert.Equal(0, host.ClearAllCount);
     }
 
@@ -73,7 +76,8 @@ public class SndSceneSerializerTests
         var serializer = new SndSceneSerializer(world);
         var host = new TestSndSceneHost();
 
-        Assert.ThrowsAny<Exception>(() => serializer.DeserializeInto(host, "{}", true));
+        using var node = TestFactory.NodeFromJson("{}");
+        Assert.ThrowsAny<Exception>(() => serializer.DeserializeInto(host, node, true));
     }
 
     [Fact]

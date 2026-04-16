@@ -37,9 +37,9 @@ public class ForegroundBackgroundContractTests
         var payload = new LevelPayload
         {
             LevelId = "bg",
-            SndSceneJson = "[]",
-            SessionJson = "{}",
-            SessionStateMachinesJson = "{\"machines\":[]}"
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("{}"),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
         };
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -78,10 +78,10 @@ public class ForegroundBackgroundContractTests
         Assert.NotNull(bgPayload);
         Assert.Equal(fg.LevelId, fgPayload.LevelId);
         Assert.Equal(bg.LevelId, bgPayload.LevelId);
-        Assert.NotNull(fgPayload.SndSceneJson);
-        Assert.NotNull(bgPayload.SndSceneJson);
-        Assert.NotNull(fgPayload.SessionStateMachinesJson);
-        Assert.NotNull(bgPayload.SessionStateMachinesJson);
+        Assert.False(fgPayload.SndSceneNode.IsNull);
+        Assert.False(bgPayload.SndSceneNode.IsNull);
+        Assert.False(fgPayload.SessionStateMachinesNode.IsNull);
+        Assert.False(bgPayload.SessionStateMachinesNode.IsNull);
     }
 
     [Fact]
@@ -91,9 +91,9 @@ public class ForegroundBackgroundContractTests
         var payload = new LevelPayload
         {
             LevelId = "test_level",
-            SndSceneJson = "[]",
-            SessionJson = """{"key1":{"type":"Int32","data":42}}""",
-            SessionStateMachinesJson = "{\"machines\":[]}"
+            SndSceneNode = TestFactory.NodeFromJson("[]"),
+            SessionNode = TestFactory.NodeFromJson("""{"key1":{"type":"Int32","data":42}}"""),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
         };
 
         // 前台

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions.Blackboard;
 using Origo.Core.Abstractions.Scene;
+using Origo.Core.DataSource;
 using Origo.Core.Runtime.Lifecycle;
 using Origo.Core.Save.Serialization;
 
@@ -35,22 +36,16 @@ internal sealed class SaveGamePayloadFactory
         string saveId,
         string currentLevelId,
         IReadOnlyDictionary<string, string>? customMeta,
-        string progressStateMachinesJson,
-        string sessionStateMachinesJson)
+        DataSourceNode progressStateMachinesNode,
+        DataSourceNode sessionStateMachinesNode)
     {
         ArgumentNullException.ThrowIfNull(sceneAccess);
         if (string.IsNullOrWhiteSpace(saveId))
             throw new ArgumentException("Save id cannot be null or whitespace.", nameof(saveId));
         if (string.IsNullOrWhiteSpace(currentLevelId))
             throw new ArgumentException("Current level id cannot be null or whitespace.", nameof(currentLevelId));
-        if (string.IsNullOrWhiteSpace(progressStateMachinesJson))
-            throw new ArgumentException(
-                "Progress state machines json cannot be null or whitespace (strict mode).",
-                nameof(progressStateMachinesJson));
-        if (string.IsNullOrWhiteSpace(sessionStateMachinesJson))
-            throw new ArgumentException(
-                "Session state machines json cannot be null or whitespace (strict mode).",
-                nameof(sessionStateMachinesJson));
+        ArgumentNullException.ThrowIfNull(progressStateMachinesNode);
+        ArgumentNullException.ThrowIfNull(sessionStateMachinesNode);
 
         var (foundTopology, rawTopology) = _progress.TryGet<string>(WellKnownKeys.SessionTopology);
         if (!foundTopology || string.IsNullOrWhiteSpace(rawTopology))
@@ -62,24 +57,24 @@ internal sealed class SaveGamePayloadFactory
             throw new InvalidOperationException(
                 $"Progress '{WellKnownKeys.SessionTopology}' foreground ('{progressActiveLevelId}') does not match currentLevelId ('{currentLevelId}').");
 
-        var progressJson = _blackboardSerializer.Serialize(_progress);
-        var sessionJson = _blackboardSerializer.Serialize(_session);
-        var sndSceneJson = _sceneSerializer.Serialize(sceneAccess);
+        var progressNode = _blackboardSerializer.Serialize(_progress);
+        var sessionNode = _blackboardSerializer.Serialize(_session);
+        var sndSceneNode = _sceneSerializer.Serialize(sceneAccess);
 
         var levelPayload = new LevelPayload
         {
             LevelId = currentLevelId,
-            SndSceneJson = sndSceneJson,
-            SessionJson = sessionJson,
-            SessionStateMachinesJson = sessionStateMachinesJson
+            SndSceneNode = sndSceneNode,
+            SessionNode = sessionNode,
+            SessionStateMachinesNode = sessionStateMachinesNode
         };
 
         return new SaveGamePayload
         {
             SaveId = saveId,
             ActiveLevelId = currentLevelId,
-            ProgressJson = progressJson,
-            ProgressStateMachinesJson = progressStateMachinesJson,
+            ProgressNode = progressNode,
+            ProgressStateMachinesNode = progressStateMachinesNode,
             CustomMeta = customMeta is null
                 ? null
                 : new Dictionary<string, string>(customMeta, StringComparer.Ordinal),

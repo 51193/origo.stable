@@ -6,6 +6,13 @@ namespace Origo.GodotAdapter.Tests.FileSystemTests;
 
 public class GodotFileSystemPathTests
 {
+    public static TheoryData<string> GodotPathHelper_Combine_WithTraversal_Data { get; } = new()
+    {
+        "../escape",
+        "foo/../bar",
+        "foo\\..\\bar"
+    };
+
     [Fact]
     public void GodotPathHelper_Combine_JoinsPaths()
     {
@@ -14,9 +21,7 @@ public class GodotFileSystemPathTests
     }
 
     [Theory]
-    [InlineData("../escape")]
-    [InlineData("foo/../bar")]
-    [InlineData("foo\\..\\bar")]
+    [MemberData(nameof(GodotPathHelper_Combine_WithTraversal_Data))]
     public void GodotPathHelper_Combine_WithTraversal_Throws(string relativePath) =>
         Assert.Throws<ArgumentException>(() => GodotPathHelper.Combine("res://root", relativePath));
 

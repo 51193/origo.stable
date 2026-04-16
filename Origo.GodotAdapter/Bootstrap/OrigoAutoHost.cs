@@ -89,10 +89,9 @@ public partial class OrigoAutoHost : Node
 
         var converterRegistry = DataSourceFactory.CreateDefaultRegistry(sharedTypeMapping);
         GodotJsonConverterRegistry.RegisterDataSourceConverters(converterRegistry);
-        var jsonCodec = DataSourceFactory.CreateJsonCodec();
-        var mapCodec = DataSourceFactory.CreateMapCodec();
+        var dataSourceIo = DataSourceFactory.CreateDefaultIoGateway(fileSystem);
 
-        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, jsonCodec, converterRegistry,
+        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, dataSourceIo, converterRegistry,
             new Blackboard());
         persistentBb.LoadFromDisk();
 
@@ -104,8 +103,7 @@ public partial class OrigoAutoHost : Node
             sndManager,
             sharedTypeMapping,
             converterRegistry,
-            jsonCodec,
-            mapCodec,
+            dataSourceIo,
             persistentBb,
             consoleInput,
             consoleOutputChannel
