@@ -20,13 +20,33 @@ public class AutoInitializerGuardTests
     }
 
     [Fact]
-    public void IsStatelessStrategyType_WithInstanceFields_ReturnsFalse_AndReportsFieldNames()
+    public void IsStatelessStrategyType_WithInvalidInstanceMembers_ReturnsFalse_AndReportsMemberNames()
     {
         var ok = OrigoAutoInitializer.IsStatelessStrategyType(
             typeof(StatefulAutoInitStrategy), out var mutableFieldNames);
 
         Assert.False(ok);
         Assert.Contains("_counter", mutableFieldNames, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IsStatelessStrategyType_WithWritableInstanceProperty_ReturnsFalse()
+    {
+        var ok = OrigoAutoInitializer.IsStatelessStrategyType(
+            typeof(PropertyStatefulAutoInitStrategy), out var invalidMembers);
+
+        Assert.False(ok);
+        Assert.Contains("Counter", invalidMembers, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SndWorld_RegisterStrategy_WithInvalidInstanceMembers_Throws()
+    {
+        var world = TestFactory.CreateSndWorld();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            world.RegisterStrategy(() => new PropertyStatefulAutoInitStrategy()));
+        Assert.Contains("invalid instance members", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -73,5 +93,12 @@ public class AutoInitializerGuardTests
         public const string IndexConst = "auto.init.stateless.local";
         private static int _counter;
         public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
+    }
+
+    [StrategyIndex(IndexConst)]
+    private sealed class PropertyStatefulAutoInitStrategy : EntityStrategyBase
+    {
+        public const string IndexConst = "auto.init.stateful.property.local";
+        public int Counter { get; set; }
     }
 }

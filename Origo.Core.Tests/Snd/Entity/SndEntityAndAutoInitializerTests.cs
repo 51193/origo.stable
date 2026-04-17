@@ -20,7 +20,8 @@ public class SndEntityAndAutoInitializerTests
         var context = CreateContext(logger);
         var nodeFactory = new TestNodeFactory();
         var events = new List<string>();
-        context.Runtime.SndWorld.RegisterStrategy(() => new LifecycleStrategy(events));
+        LifecycleStrategy.Bind(events);
+        context.Runtime.SndWorld.RegisterStrategy(() => new LifecycleStrategy());
 
         var entity = context.Runtime.SndWorld.CreateEntity(nodeFactory, context, logger);
         var meta = new SndMetaData
@@ -89,7 +90,8 @@ public class SndEntityAndAutoInitializerTests
         var logger = new TestLogger();
         var context = CreateContext(logger);
         var nodeFactory = new TestNodeFactory();
-        context.Runtime.SndWorld.RegisterStrategy(() => new LifecycleStrategy(new List<string>()));
+        LifecycleStrategy.Bind(new List<string>());
+        context.Runtime.SndWorld.RegisterStrategy(() => new LifecycleStrategy());
 
         var entity = context.Runtime.SndWorld.CreateEntity(nodeFactory, context, logger);
         entity.Spawn(new SndMetaData
@@ -207,18 +209,15 @@ public class SndEntityAndAutoInitializerTests
     [StrategyIndex(LifecycleStrategyIndex)]
     private sealed class LifecycleStrategy : EntityStrategyBase
     {
-        private readonly ICollection<string> _events;
+        private static ICollection<string>? EventSink { get; set; }
 
-        public LifecycleStrategy(ICollection<string> events)
-        {
-            _events = events;
-        }
+        public static void Bind(ICollection<string> events) => EventSink = events;
 
-        public override void AfterSpawn(ISndEntity entity, ISndContext ctx) => _events.Add("AfterSpawn");
-        public override void AfterAdd(ISndEntity entity, ISndContext ctx) => _events.Add("AfterAdd");
-        public override void BeforeRemove(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeRemove");
-        public override void BeforeSave(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeSave");
-        public override void BeforeQuit(ISndEntity entity, ISndContext ctx) => _events.Add("BeforeQuit");
+        public override void AfterSpawn(ISndEntity entity, ISndContext ctx) => EventSink?.Add("AfterSpawn");
+        public override void AfterAdd(ISndEntity entity, ISndContext ctx) => EventSink?.Add("AfterAdd");
+        public override void BeforeRemove(ISndEntity entity, ISndContext ctx) => EventSink?.Add("BeforeRemove");
+        public override void BeforeSave(ISndEntity entity, ISndContext ctx) => EventSink?.Add("BeforeSave");
+        public override void BeforeQuit(ISndEntity entity, ISndContext ctx) => EventSink?.Add("BeforeQuit");
     }
 }
 

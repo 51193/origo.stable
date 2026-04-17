@@ -4,7 +4,6 @@ using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.DataSource;
-using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
 
@@ -51,8 +50,15 @@ internal static class SavePayloadReader
         var markerRel = pathPolicy.GetWriteInProgressMarker(baseRel);
         var markerAbs = fileSystem.CombinePath(saveRootPath, markerRel);
         if (fileSystem.Exists(markerAbs))
-            (logger ?? NullLogger.Instance).Log(LogLevel.Warning, nameof(SavePayloadReader),
-                "Detected .write_in_progress marker in current/; save data may be corrupt from an interrupted write.");
+        {
+            var ex = new InvalidOperationException(
+                $"Detected write-in-progress marker at '{markerRel}' in current/; interrupted save write must be handled before loading.");
+            (logger ?? NullLogger.Instance).Log(
+                LogLevel.Error,
+                nameof(SavePayloadReader),
+                ex.Message);
+            throw ex;
+        }
 
         var progressRel = pathPolicy.GetProgressFile(baseRel);
         var progressSmRel = pathPolicy.GetProgressStateMachinesFile(baseRel);
@@ -169,11 +175,35 @@ internal static class SavePayloadReader
 
         var customMetaRel = pathPolicy.GetCustomMetaFile(baseDirectoryRel);
         var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
-        var customMeta = fileSystem.Exists(customMetaAbs)
-            ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(customMetaAbs), NullLogger.Instance)
-            : null;
+        var customMeta = TryReadStringMap(fileSystem, dataSourceIo, customMetaAbs);
 
         return (progressNode, progressStateMachinesNode, customMeta);
+    }
+
+    private static IReadOnlyDictionary<string, string>? TryReadStringMap(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string mapFileAbs)
+    {
+        if (!fileSystem.Exists(mapFileAbs))
+            return null;
+
+        using var root = dataSourceIo.ReadTree(mapFileAbs);
+        if (root.Kind != DataSourceNodeKind.Object)
+            throw new InvalidOperationException(
+                $"Expected map file '{mapFileAbs}' to decode as object node.");
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var key in root.Keys)
+        {
+            var valueNode = root[key];
+            if (valueNode.Kind is DataSourceNodeKind.Object or DataSourceNodeKind.Array)
+                throw new InvalidOperationException(
+                    $"Map file '{mapFileAbs}' key '{key}' must be scalar.");
+            result[key] = valueNode.AsString();
+        }
+
+        return result;
     }
 
     public static DataSourceNode? ReadProgressNodeFromSnapshot(

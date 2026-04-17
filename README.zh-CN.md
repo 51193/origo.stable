@@ -88,7 +88,7 @@ Origo 面向 **集成方**：稳定的边界与可观察的行为，优先于把
 - **与引擎解耦的 Core** —— `Origo.Core` 只依赖 .NET；一切引擎 API 由适配器项目中的接口实现承载。
 - **快速失败的契约** —— 存档 I/O、反序列化、策略解析等倾向显式报错，而非静默扭曲数据（见 [存档 I/O 契约](#save-system-contracts)）。
 - **统一的会话抽象** —— 前台与后台关卡共用 `ISessionRun`；差异在于注入的 `ISndSceneHost` 以及由谁驱动 Tick，而非两套领域模型。
-- **池化、无状态策略** —— 策略实例共享；在策略类型上挂实例字段视为错误，并由测试约束。
+- **池化、无状态策略** —— 策略实例共享；在策略类型上挂实例字段或可写实例属性都视为错误，并由测试约束。
 - **本文档的职责** —— 安装步骤、磁盘布局、公开 API 与集成契约；内部实现以源码与 `Origo.Core.Tests` 为准。
 - **占位类型是有意设计** —— `EmptySessionManager`、`NullNodeFactory` 等表达空对象 / 空操作边界，不是「未完成的玩法模块」。
 
@@ -108,6 +108,7 @@ Origo 面向 **集成方**：稳定的边界与可观察的行为，优先于把
 
 - **三个文件均不存在**（`snd_scene.json`、`session.json`、`session_state_machines.json`）：视为 **该关卡尚无存档**，API 可能返回 `null`；上层决定是否合法。
 - **仅部分文件存在**：视为 **损坏存档**，抛出 `InvalidOperationException`（含路径提示）；**不会**静默合并。
+- 若 `current/` 下存在 `.write_in_progress`：视为 **中断写入中间态**，读取 `current/` 直接抛出 `InvalidOperationException`；需先处理一致性后再重试。
 
 回归测试：`SaveStorageAndPayloadTests`（`ReadCurrent_ActiveLevelPartial_*`、`ReadCurrent_BackgroundLevelPartial_*`、`TryReadLevelPayloadFromCurrent_AllFilesAbsent_ReturnsNull`）。
 
@@ -317,7 +318,7 @@ flowchart TB
 5. **显式生命周期** —— `SystemRun` → `ProgressRun` → `SessionManager` → `SessionRun` 组成四层运行时层次
 6. **快速失败，无静默回退** —— 缺失数据、错误索引和无效状态会立即抛出异常
 7. **单向能力传递** —— 运行时能力严格向下流动，下层无法反向访问上层内部状态
-8. **结构化参数传递** —— 每一层构造函数仅接收 (Runtime, Parameters) 两个结构化参数，禁止零散参数
+8. **结构化分层构造协议** —— 在分层生命周期构造中（无论按“三层 + `SessionManager`”还是完整四层口径），向下调用必须只传一个参数结构体；每层必须持有本层 `*Runtime` 容器；子层需基于 `(parentRuntime, layerParameters)` 立即构建自身 Runtime，禁止零散参数穿透式传递
 
 ### 运行时层级架构
 
@@ -347,6 +348,13 @@ SessionRun（第四层）
   构造函数: (SessionManagerRuntime, SessionParameters)
   └─ SessionParameters = (LevelId, SessionBlackboard, SceneHost, IsFrontSession)
 ```
+
+**分层构造契约（强制）：**
+
+- 每层向下传递业务输入时，必须使用**单一结构化参数对象**，禁止把基础类型参数零散透传到调用链下游。
+- 每层都必须维护自己的 `*Runtime` 聚合容器，集中持有本层所需引用。
+- 父层构造子层时，只应传递 `(parentRuntime, layerParameters)`。
+- 子层在收到后应立即构建并固化自己的 Runtime，再继续向更下层扩展。
 
 **前台 Session 与后台 Session：**
 
@@ -434,7 +442,7 @@ Dispose
 
 ### 策略系统
 
-策略是 **共享、池化、无状态的对象**，通过点分命名空间索引注册。它们 **不能有实例字段**（注册时强制检查）。
+策略是 **共享、池化、无状态的对象**，通过点分命名空间索引注册。它们 **不能有实例字段或可写实例属性**（注册时强制检查）。
 
 #### 策略层次结构
 
@@ -460,13 +468,13 @@ public virtual void BeforeDead(ISndEntity entity, ISndContext ctx);
 
 #### 注册
 
-每个具体策略 **必须** 声明 `[StrategyIndex("dot.namespace")]`。如果缺少该特性、值为空或类型包含实例字段，发现阶段会立即失败。
+每个具体策略 **必须** 声明 `[StrategyIndex("dot.namespace")]`。如果缺少该特性、值为空或类型包含实例字段/可写实例属性，注册阶段会立即失败。
 
 ```csharp
 [StrategyIndex("combat.attack")]
 public sealed class AttackStrategy : EntityStrategyBase
 {
-    // 不允许实例字段 —— 状态应存储在实体 Data 或黑板中
+    // 不允许实例字段或可写实例属性 —— 状态应存储在实体 Data 或黑板中
     public override void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         var (found, cooldown) = entity.TryGetData<double>("attack_cooldown");
@@ -580,7 +588,7 @@ Origo 中的所有序列化均通过 **DataSource 抽象层**（`Origo.Core/Data
 | 类型 | 职责 |
 |------|------|
 | `DataSourceNode` | 不可变树节点：Object、Array、String、Number、Boolean、Null —— 惰性展开 |
-| `IDataSourceIoGateway` | DataSource 文件 I/O 中间层：读写文件并按后缀路由 codec |
+| `IDataSourceIoGateway` | Core 全局文件访问网关：输入路径、输出 `DataSourceNode`，并按后缀路由编解码 |
 | `DataSourceConverterRegistry` | 类型安全的领域对象 ↔ `DataSourceNode` 读写 |
 | `DataSourceConverter<T>` | 每种类型转换逻辑的抽象基类 |
 | `DataSourceFactory` | 工厂：默认 `DataSourceConverterRegistry`；**I/O** 经 `CreateIoGateway` / `CreateDefaultIoGateway` 获取网关（后缀路由为内部实现） |
@@ -590,6 +598,14 @@ Origo 中的所有序列化均通过 **DataSource 抽象层**（`Origo.Core/Data
 - **`JsonDataSourceCodec`** —— 内部包装 `System.Text.Json`；STJ 仅在此处出现
 - **`MapDataSourceCodec`** —— 简单的 `key: value` 行格式，用于 `.map` 文件
 - 编解码器实现与后缀路由配置均为 `Origo.Core.DataSource` 内部细节；外部模块通过 `DataSourceFactory` 取得 `IDataSourceIoGateway`，并仅经由该接口做文件读写。
+
+#### Gateway 边界规则（强制）
+
+`IDataSourceIoGateway` 是**硬性架构边界**，不是可选的便利层：
+
+- Core 内其他模块只应传入文件路径并消费 `DataSourceNode`，不应在业务代码中分支处理具体文件格式。
+- Core 中所有文件读写都必须经过该 Gateway，禁止旁路直接文件系统解析。
+- 格式路由与编解码决策必须集中在 Gateway 后方，确保持久化行为可预测、可审计。
 
 #### 工作原理
 
@@ -1252,6 +1268,7 @@ ProgressRun 仅使用 saveId 创建（内部空白 ProgressBlackboard）
 |------|------|
 | **延迟动作何时执行？** | 仅在调用 `FlushDeferredActionsForCurrentFrame()` 时执行（通常由适配层每帧调用一次） |
 | **执行顺序** | 业务延迟 → 系统延迟，严格按序 |
+| **单帧原子性原则** | 将每一帧视为逻辑原子边界。不要把关键流程状态放在跨帧悬挂的回调/闭包里；应把意图写入可恢复的运行时状态（`Data`、黑板、状态机），避免存读档或恢复流程丢失隐藏的内存进度 |
 | **重入守卫** | 同一时刻只允许一个生命周期工作流；重叠请求抛 `InvalidOperationException` |
 | **持久化计数器** | 在当前精简链路中，`GetPendingPersistenceRequestCount()` 恒定返回 `0` |
 
@@ -1330,7 +1347,6 @@ ProgressRun 仅使用 saveId 创建（内部空白 ProgressBlackboard）
 | `ISndSceneHost` | 场景实体操作：`Spawn`、`GetEntities`、`FindByName` |
 | `ISndEntity` | 由 `ISndDataAccess` + `ISndNodeAccess` + `ISndStrategyAccess` 组合 |
 | `IBlackboard` | 类型化键值存储，包含 `SerializeAll` / `DeserializeAll` |
-| `IDataSourceIoGateway` | 文件读写 + 后缀路由到 `DataSourceNode` 的中间层 |
 | `IDataSourceIoGateway` | 在文件边界读写 `DataSourceNode` 树 |
 | `ILogger` | `Log(LogLevel level, string tag, string message)`，含 `LogLevel` 枚举 |
 | `IScheduler` | 延迟操作调度 |
@@ -1349,7 +1365,7 @@ ProgressRun 仅使用 saveId 创建（内部空白 ProgressBlackboard）
 1. 创建继承 `EntityStrategyBase` 的类
 2. 添加 `[StrategyIndex("your.namespace")]` 注解
 3. 重写所需的生命周期方法
-4. 确保 **无实例字段** —— 类必须是无状态的
+4. 确保 **无实例字段或可写实例属性** —— 类必须是无状态的
 
 ```csharp
 [StrategyIndex("game.enemy_ai")]

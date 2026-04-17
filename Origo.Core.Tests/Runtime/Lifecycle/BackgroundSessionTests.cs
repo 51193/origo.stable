@@ -94,7 +94,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -109,7 +110,8 @@ public class BackgroundSessionTests
         var seenSessionLevelIds = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new SessionContextSpyStrategy(seenSessionLevelIds));
+            SessionContextSpyStrategy.Bind(seenSessionLevelIds);
+            world.RegisterStrategy(() => new SessionContextSpyStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg_ctx", "bg_ctx");
@@ -194,7 +196,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -213,7 +216,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -236,7 +240,8 @@ public class BackgroundSessionTests
         var processCount = 0;
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new ProcessCounterStrategy(() => processCount++));
+            ProcessCounterStrategy.Bind(() => processCount++);
+            world.RegisterStrategy(() => new ProcessCounterStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -290,7 +295,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -332,8 +338,10 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, fs) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
-            world.RegisterStrategy(() => new ProcessCounterStrategy(() => events.Add("Process")));
+            TrackingStrategy.Bind(events);
+            ProcessCounterStrategy.Bind(() => events.Add("Process"));
+            world.RegisterStrategy(() => new TrackingStrategy());
+            world.RegisterStrategy(() => new ProcessCounterStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("generated_level", "generated_level");
@@ -402,7 +410,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         // Create a source session, populate it, and serialize.
@@ -480,7 +489,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         // Build a payload from a source session.
@@ -523,7 +533,8 @@ public class BackgroundSessionTests
         var processCount = 0;
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new ProcessCounterStrategy(() => processCount++));
+            ProcessCounterStrategy.Bind(() => processCount++);
+            world.RegisterStrategy(() => new ProcessCounterStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -541,7 +552,8 @@ public class BackgroundSessionTests
         var events = new List<string>();
         var (ctx, _) = CreateForegroundContext(world =>
         {
-            world.RegisterStrategy(() => new TrackingStrategy(events));
+            TrackingStrategy.Bind(events);
+            world.RegisterStrategy(() => new TrackingStrategy());
         });
 
         using var bg = ctx.SessionManager.CreateBackgroundSession("bg", "bg");
@@ -834,62 +846,53 @@ public class BackgroundSessionTests
     [StrategyIndex(TrackingStrategyIndex)]
     private sealed class TrackingStrategy : EntityStrategyBase
     {
-        private readonly ICollection<string> _events;
+        private static ICollection<string>? EventSink { get; set; }
 
-        public TrackingStrategy(ICollection<string> events)
-        {
-            _events = events;
-        }
+        public static void Bind(ICollection<string> events) => EventSink = events;
 
         public override void AfterSpawn(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"AfterSpawn:{entity.Name}");
+            EventSink?.Add($"AfterSpawn:{entity.Name}");
 
         public override void AfterLoad(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"AfterLoad:{entity.Name}");
+            EventSink?.Add($"AfterLoad:{entity.Name}");
 
         public override void AfterAdd(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"AfterAdd:{entity.Name}");
+            EventSink?.Add($"AfterAdd:{entity.Name}");
 
         public override void BeforeRemove(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"BeforeRemove:{entity.Name}");
+            EventSink?.Add($"BeforeRemove:{entity.Name}");
 
         public override void BeforeSave(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"BeforeSave:{entity.Name}");
+            EventSink?.Add($"BeforeSave:{entity.Name}");
 
         public override void BeforeQuit(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"BeforeQuit:{entity.Name}");
+            EventSink?.Add($"BeforeQuit:{entity.Name}");
 
         public override void BeforeDead(ISndEntity entity, ISndContext ctx) =>
-            _events.Add($"BeforeDead:{entity.Name}");
+            EventSink?.Add($"BeforeDead:{entity.Name}");
     }
 
     [StrategyIndex(ProcessStrategyIndex)]
     private sealed class ProcessCounterStrategy : EntityStrategyBase
     {
-        private readonly Action _onProcess;
+        private static Action? ProcessCallback { get; set; }
 
-        public ProcessCounterStrategy(Action onProcess)
-        {
-            _onProcess = onProcess;
-        }
+        public static void Bind(Action onProcess) => ProcessCallback = onProcess;
 
-        public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _onProcess();
+        public override void Process(ISndEntity entity, double delta, ISndContext ctx) => ProcessCallback?.Invoke();
     }
 
     [StrategyIndex(SessionContextStrategyIndex)]
     private sealed class SessionContextSpyStrategy : EntityStrategyBase
     {
-        private readonly ICollection<string> _seen;
+        private static ICollection<string>? SeenSink { get; set; }
 
-        public SessionContextSpyStrategy(ICollection<string> seen)
-        {
-            _seen = seen;
-        }
+        public static void Bind(ICollection<string> seen) => SeenSink = seen;
 
         public override void Process(ISndEntity entity, double delta, ISndContext ctx)
         {
             if (ctx.CurrentSession is not null)
-                _seen.Add(ctx.CurrentSession.LevelId);
+                SeenSink?.Add(ctx.CurrentSession.LevelId);
         }
     }
 }

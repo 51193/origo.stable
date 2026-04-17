@@ -80,10 +80,10 @@ public static class OrigoAutoInitializer
                     throw ex;
                 }
 
-                if (!IsStatelessStrategyType(type, out var mutableFieldNames))
+                if (!SndStrategyPool.ValidateStrategyType(type, out var invalidMembers))
                 {
                     var ex = new InvalidOperationException(
-                        $"Strategy type '{type.FullName}' declares instance fields ({mutableFieldNames}); " +
+                        $"Strategy type '{type.FullName}' declares invalid instance members ({invalidMembers}); " +
                         "shared pooled strategies must be stateless.");
                     logger.Log(LogLevel.Error, LogTag, new LogMessageBuilder()
                         .Build($"Strategy state validation failed: {ex.Message}"));
@@ -196,23 +196,7 @@ public static class OrigoAutoInitializer
     }
 
     internal static bool IsStatelessStrategyType(Type strategyType, out string mutableFieldNames)
-    {
-        var baseType = typeof(BaseStrategy);
-        var names = new List<string>();
-        var t = strategyType;
-        while (t is not null && t != baseType && t != typeof(object))
-        {
-            var fields = t.GetFields(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                .Where(f => !f.IsStatic)
-                .Select(f => $"{t.Name}.{f.Name}");
-            names.AddRange(fields);
-            t = t.BaseType;
-        }
-
-        mutableFieldNames = string.Join(", ", names);
-        return names.Count == 0;
-    }
+        => SndStrategyPool.ValidateStrategyType(strategyType, out mutableFieldNames);
 
     private static string ResolveStrategyIndex(Type strategyType)
     {

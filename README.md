@@ -82,7 +82,7 @@ Origo is written for **integrators**: stable boundaries and observable behavior 
 - **Engine-free Core** — `Origo.Core` targets only .NET; any engine API stays behind interfaces implemented in an adapter project.
 - **Fail-fast contracts** — save I/O, deserialization, and strategy resolution prefer explicit errors over silent coercion (see [Save system contracts](#save-system-contracts)).
 - **One session abstraction** — foreground and background levels share `ISessionRun`; they differ by the injected `ISndSceneHost` and who ticks them, not by parallel type systems.
-- **Pooled, stateless strategies** — strategies are shared instances; instance fields on a strategy type are invalid and guarded by tests.
+- **Pooled, stateless strategies** — strategies are shared instances; instance fields and writable instance properties on a strategy type are invalid and guarded by tests.
 - **What belongs in this README** — setup, on-disk layout, public APIs, and integration contracts. Internals belong in source and `Origo.Core.Tests`.
 - **Placeholder types are intentional** — `EmptySessionManager`, `NullNodeFactory`, and similar types document null-object / no-op edges; they are not “unfinished gameplay modules”.
 
@@ -100,6 +100,7 @@ For each level on disk, reads use **strict** semantics:
 
 - If **none** of the three files exist (`snd_scene.json`, `session.json`, `session_state_machines.json`), the level is treated as **having no save yet** — APIs may return `null`; upper layers decide whether that is legal.
 - If **only some** files exist, data is treated as **corrupt** — `InvalidOperationException` is thrown (with path hints); there is **no** silent merge.
+- If `.write_in_progress` exists in `current/`, loading `current/` is treated as **interrupted write state** — `InvalidOperationException` is thrown; hosts must resolve consistency before retry.
 
 Regression coverage: `SaveStorageAndPayloadTests` (`ReadCurrent_ActiveLevelPartial_*`, `ReadCurrent_BackgroundLevelPartial_*`, `TryReadLevelPayloadFromCurrent_AllFilesAbsent_ReturnsNull`).
 
@@ -303,7 +304,7 @@ flowchart TB
 5. **Explicit lifecycles** — `SystemRun` → `ProgressRun` → `SessionManager` → `SessionRun` form a 4-layer runtime hierarchy
 6. **Fail-fast, no silent fallback** — missing data, bad indices, and invalid state throw immediately
 7. **One-way capability flow** — runtime abilities flow strictly downward; lower layers cannot access upper-layer internals
-8. **Structured parameter passing** — each layer constructor takes exactly (Runtime, Parameters); no scattered loose arguments
+8. **Structured construction protocol** — for layered lifecycle construction (whether you describe it as 3 layers + `SessionManager`, or full 4 layers), each downward call must carry exactly one parameter record, each layer must own its `*Runtime` container, and child layers must immediately build their own runtime from `(parentRuntime, layerParameters)`; no scattered argument tunneling
 
 ### Runtime Hierarchy
 
@@ -333,6 +334,13 @@ SessionRun (Layer 4)
   constructor: (SessionManagerRuntime, SessionParameters)
   └─ SessionParameters = (LevelId, SessionBlackboard, SceneHost, IsFrontSession)
 ```
+
+**Layer construction contract (mandatory):**
+
+- Downward business inputs are passed as **one structured parameter object** per layer; do not fan out loose primitives across call chains.
+- Each layer owns and maintains its own `*Runtime` aggregate for references needed by that layer.
+- Parent layers pass only `(parentRuntime, layerParameters)` into child construction.
+- Child layers build and freeze their own runtime immediately on construction before invoking deeper layers.
 
 **Front Session vs Background Session:**
 
@@ -418,7 +426,7 @@ Dispose
 
 ### Strategy System
 
-Strategies are **shared, pooled, stateless objects** registered by a dot-namespace index. They must have **no instance fields** (enforced at registration).
+Strategies are **shared, pooled, stateless objects** registered by a dot-namespace index. They must have **no instance fields or writable instance properties** (enforced at registration).
 
 #### Strategy Hierarchy
 
@@ -444,13 +452,13 @@ public virtual void BeforeDead(ISndEntity entity, ISndContext ctx);
 
 #### Registration
 
-Every concrete strategy **must** declare `[StrategyIndex("dot.namespace")]`. Discovery fails fast if the attribute is missing, empty, or the type has instance fields.
+Every concrete strategy **must** declare `[StrategyIndex("dot.namespace")]`. Registration fails fast if the attribute is missing, empty, or the type has instance fields / writable instance properties.
 
 ```csharp
 [StrategyIndex("combat.attack")]
 public sealed class AttackStrategy : EntityStrategyBase
 {
-    // No instance fields allowed — state goes in entity Data or blackboards
+    // No instance fields or writable instance properties — state goes in entity Data or blackboards
     public override void Process(ISndEntity entity, double delta, ISndContext ctx)
     {
         var (found, cooldown) = entity.TryGetData<double>("attack_cooldown");
@@ -564,7 +572,7 @@ All serialization in Origo goes through a **DataSource abstraction layer** (`Ori
 | Type | Responsibility |
 |------|----------------|
 | `DataSourceNode` | Immutable tree node: Object, Array, String, Number, Boolean, Null — with lazy expansion |
-| `IDataSourceIoGateway` | DataSource file I/O middleware: read/write files and route codecs by file suffix |
+| `IDataSourceIoGateway` | Core-wide file access gateway: path-in, `DataSourceNode`-out, with suffix-based codec routing |
 | `DataSourceConverterRegistry` | Type-safe read/write of domain objects ↔ `DataSourceNode` |
 | `DataSourceConverter<T>` | Abstract base for per-type conversion logic |
 | `DataSourceFactory` | Factory: default `DataSourceConverterRegistry`; **I/O** via `CreateIoGateway` / `CreateDefaultIoGateway` (suffix routing stays internal) |
@@ -574,6 +582,14 @@ All serialization in Origo goes through a **DataSource abstraction layer** (`Ori
 - **`JsonDataSourceCodec`** — wraps `System.Text.Json` internally; the only place STJ appears
 - **`MapDataSourceCodec`** — simple `key: value` line-based format for `.map` files
 - Codec implementations and suffix routing configuration are internal to `Origo.Core.DataSource`; external modules obtain `IDataSourceIoGateway` from `DataSourceFactory` and access files only through that interface.
+
+#### Gateway Boundary Rule (Mandatory)
+
+`IDataSourceIoGateway` is a **hard architectural wall**, not an optional convenience:
+
+- Other Core modules should pass only file paths and consume `DataSourceNode`; they must not branch on concrete file formats.
+- File reads/writes in Core must go through this gateway (no side-channel direct filesystem parsing).
+- Format routing and codec decisions stay centralized behind the gateway so persistence behavior remains deterministic and auditable.
 
 #### How It Works
 
@@ -1224,6 +1240,7 @@ ProgressRun created with saveId only (blank ProgressBlackboard)
 |----------|--------|
 | **When do deferred actions execute?** | Only when `FlushDeferredActionsForCurrentFrame()` is called (typically once per frame by the adapter) |
 | **Execution order** | Business deferred → System deferred, strictly sequential |
+| **Frame atomicity principle** | Treat each frame as an atomic logic boundary. Do not carry critical transient workflow state across frames via pending callbacks/closures; persist intent in durable runtime state (`Data`, blackboards, state machines) so save/load and recovery cannot drop hidden in-memory progress |
 | **Reentrancy guard** | Only one lifecycle workflow can be in-flight at a time; overlapping requests throw `InvalidOperationException` |
 | **Persistence counter** | `GetPendingPersistenceRequestCount()` always returns `0` in simplified flow |
 
@@ -1296,7 +1313,6 @@ All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
 | `ISndSceneHost` | Scene entity operations: `Spawn`, `GetEntities`, `FindByName` |
 | `ISndEntity` | Composed of `ISndDataAccess` + `ISndNodeAccess` + `ISndStrategyAccess` |
 | `IBlackboard` | Typed key-value store with `SerializeAll` / `DeserializeAll` |
-| `IDataSourceIoGateway` | Middleware for file read/write + suffix-based codec routing to `DataSourceNode` |
 | `IDataSourceIoGateway` | Read/write `DataSourceNode` tree at file boundary |
 | `ILogger` | `Log(LogLevel level, string tag, string message)` with `LogLevel` enum |
 | `IScheduler` | Deferred action scheduling |
@@ -1313,7 +1329,7 @@ All host-provided capabilities are declared in `Origo.Core/Abstractions/`:
 1. Create a class extending `EntityStrategyBase`
 2. Annotate with `[StrategyIndex("your.namespace")]`
 3. Override the lifecycle methods you need
-4. Ensure **no instance fields** — the class must be stateless
+4. Ensure **no instance fields or writable instance properties** — the class must be stateless
 
 ```csharp
 [StrategyIndex("game.enemy_ai")]

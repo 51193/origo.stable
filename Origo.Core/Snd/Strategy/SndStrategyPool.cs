@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
@@ -27,6 +28,11 @@ internal sealed class SndStrategyPool
     public void Register(Type strategyType, Func<BaseStrategy> factory)
     {
         ArgumentNullException.ThrowIfNull(strategyType);
+        ValidateStrategyType(strategyType, out var invalidMembers);
+        if (invalidMembers.Length > 0)
+            throw new InvalidOperationException(
+                $"Strategy type '{strategyType.FullName}' declares invalid instance members ({invalidMembers}); " +
+                "shared pooled strategies must be stateless.");
         var index = ResolveRequiredIndex(strategyType);
         ArgumentNullException.ThrowIfNull(factory);
         _factories[index] = factory;
@@ -101,5 +107,32 @@ internal sealed class SndStrategyPool
             throw new InvalidOperationException(
                 $"Strategy type '{strategyType.FullName}' has an empty StrategyIndexAttribute value.");
         return attr.Index;
+    }
+
+    internal static bool ValidateStrategyType(Type strategyType, out string invalidMembers)
+    {
+        ArgumentNullException.ThrowIfNull(strategyType);
+        var names = new List<string>();
+        var baseType = typeof(BaseStrategy);
+        var current = strategyType;
+        while (current is not null && current != baseType && current != typeof(object))
+        {
+            var fields = current.GetFields(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(f => !f.IsStatic)
+                .Select(f => $"{current.Name}.{f.Name}");
+            names.AddRange(fields);
+
+            var writableProperties = current.GetProperties(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(p => p.SetMethod is { IsStatic: false })
+                .Select(p => $"{current.Name}.{p.Name}");
+            names.AddRange(writableProperties);
+
+            current = current.BaseType;
+        }
+
+        invalidMembers = string.Join(", ", names);
+        return names.Count == 0;
     }
 }

@@ -249,6 +249,27 @@ public class SaveStorageAndPayloadTests
     }
 
     [Fact]
+    public void SaveStorageFacade_ReadCurrent_WhenWriteMarkerExists_Throws()
+    {
+        var fs = new TestFileSystem();
+        var root = "root";
+        var currentRel = SavePathLayout.GetCurrentDirectory();
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressFile(currentRel)), "{}");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetProgressStateMachinesFile(currentRel)),
+            """{"machines":[]}""");
+        var levelDir = SavePathLayout.GetLevelDirectory(currentRel, "default");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSndSceneFile(levelDir)), "[]");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSessionFile(levelDir)), "{}");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetLevelSessionStateMachinesFile(levelDir)),
+            """{"machines":[]}""");
+        fs.SeedFile(fs.CombinePath(root, SavePathLayout.GetWriteInProgressMarker(currentRel)), string.Empty);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            SaveStorageFacade.ReadSavePayloadFromCurrent(fs, root, "001", "default"));
+        Assert.Contains("write-in-progress marker", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SavePayloadReader_TryReadLevelPayloadFromCurrent_AllFilesAbsent_ReturnsNull()
     {
         var fs = new TestFileSystem();

@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.DataSource;
-using Origo.Core.Save.Meta;
 
 namespace Origo.Core.Save.Storage;
 
@@ -108,9 +108,9 @@ internal static class SavePayloadWriter
         var customMetaAbs = fileSystem.CombinePath(saveRootPath, customMetaRel);
         if (payload.CustomMeta is not null && payload.CustomMeta.Count > 0)
         {
-            var metaText = SaveMetaMapCodec.Serialize(payload.CustomMeta);
+            var mapNode = BuildStringMapNode(payload.CustomMeta);
             SavePathResolver.EnsureParentDirectory(fileSystem, customMetaAbs);
-            fileSystem.WriteAllText(customMetaAbs, metaText, true);
+            dataSourceIo.WriteTree(customMetaAbs, mapNode);
         }
         else if (fileSystem.Exists(customMetaAbs))
         {
@@ -203,5 +203,13 @@ internal static class SavePayloadWriter
             throw new InvalidOperationException("Missing required ProgressNode (strict mode).");
         if (progressStateMachinesNode.IsNull)
             throw new InvalidOperationException("Missing required ProgressStateMachinesNode (strict mode).");
+    }
+
+    private static DataSourceNode BuildStringMapNode(IReadOnlyDictionary<string, string> map)
+    {
+        var root = DataSourceNode.CreateObject();
+        foreach (var pair in map)
+            root.Add(pair.Key, DataSourceNode.CreateString(pair.Value));
+        return root;
     }
 }

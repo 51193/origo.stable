@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Origo.Core.Abstractions;
 using Origo.Core.Abstractions.FileSystem;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.DataSource;
@@ -72,6 +71,7 @@ internal static class SaveStorageFacade
         if (string.IsNullOrWhiteSpace(saveRootPath))
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
 
+        var dataSourceIo = DataSourceFactory.CreateDefaultIoGateway(fileSystem, false);
         var ids = EnumerateSaveIds(fileSystem, saveRootPath, pathPolicy);
         var list = new List<SaveMetaDataEntry>(ids.Count);
         foreach (var id in ids)
@@ -79,9 +79,7 @@ internal static class SaveStorageFacade
             var saveRel = pathPolicy.GetSaveDirectory(id);
             var metaRel = pathPolicy.GetCustomMetaFile(saveRel);
             var metaAbs = fileSystem.CombinePath(saveRootPath, metaRel);
-            var meta = fileSystem.Exists(metaAbs)
-                ? SaveMetaMapCodec.Parse(fileSystem.ReadAllText(metaAbs), NullLogger.Instance)
-                : new Dictionary<string, string>();
+            var meta = TryReadStringMap(fileSystem, dataSourceIo, metaAbs) ?? new Dictionary<string, string>();
             list.Add(new SaveMetaDataEntry { SaveId = id, MetaData = meta });
         }
 
@@ -378,5 +376,31 @@ internal static class SaveStorageFacade
             fileSystem.DeleteDirectory(saveAbs);
 
         fileSystem.Rename(tempAbs, saveAbs);
+    }
+
+    private static IReadOnlyDictionary<string, string>? TryReadStringMap(
+        IFileSystem fileSystem,
+        IDataSourceIoGateway dataSourceIo,
+        string mapFileAbs)
+    {
+        if (!fileSystem.Exists(mapFileAbs))
+            return null;
+
+        using var root = dataSourceIo.ReadTree(mapFileAbs);
+        if (root.Kind != DataSourceNodeKind.Object)
+            throw new InvalidOperationException(
+                $"Expected map file '{mapFileAbs}' to decode as object node.");
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var key in root.Keys)
+        {
+            var valueNode = root[key];
+            if (valueNode.Kind is DataSourceNodeKind.Object or DataSourceNodeKind.Array)
+                throw new InvalidOperationException(
+                    $"Map file '{mapFileAbs}' key '{key}' must be scalar.");
+            result[key] = valueNode.AsString();
+        }
+
+        return result;
     }
 }
