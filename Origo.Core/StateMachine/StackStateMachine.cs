@@ -39,7 +39,15 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         _ctx = ctx;
 
         _pushStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PushStrategyIndex);
-        _popStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PopStrategyIndex);
+        try
+        {
+            _popStrategy = _pool.GetStrategy<StateMachineStrategyBase>(PopStrategyIndex);
+        }
+        catch
+        {
+            _pool.ReleaseStrategy(PushStrategyIndex);
+            throw;
+        }
     }
 
     /// <summary>释放 Push/Pop 策略的池引用。</summary>

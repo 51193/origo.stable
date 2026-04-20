@@ -81,6 +81,41 @@ public class ProgressRunSessionLoadingEdgeTests
         Assert.ThrowsAny<Exception>(() => progressRun.LoadAndMountForeground("target"));
     }
 
+    [Fact]
+    public void LoadFromPayload_WhenBackgroundSessionLoadFails_ClearsMountedSessions()
+    {
+        var progressRun = CreateProgressRun();
+        var payload = new SaveGamePayload
+        {
+            SaveId = "001",
+            ActiveLevelId = "default",
+            ProgressNode = TestFactory.NodeFromJson(
+                """{"origo.session_topology":{"type":"String","data":"__foreground__=default=false,bg=bg=false"}}"""),
+            ProgressStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}"),
+            Levels = new Dictionary<string, LevelPayload>
+            {
+                ["default"] = new()
+                {
+                    LevelId = "default",
+                    SndSceneNode = TestFactory.NodeFromJson("[]"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
+                },
+                ["bg"] = new()
+                {
+                    LevelId = "bg",
+                    SndSceneNode = TestFactory.NodeFromJson("{}"),
+                    SessionNode = TestFactory.NodeFromJson("{}"),
+                    SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
+                }
+            }
+        };
+
+        Assert.ThrowsAny<Exception>(() => progressRun.LoadFromPayload(payload));
+        Assert.Null(progressRun.SessionManager.ForegroundSession);
+        Assert.False(progressRun.SessionManager.Contains("bg"));
+    }
+
     private static ProgressRun CreateProgressRun()
     {
         var logger = new TestLogger();

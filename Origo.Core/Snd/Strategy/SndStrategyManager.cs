@@ -95,9 +95,17 @@ internal sealed class SndStrategyManager
     private void Recover(IEnumerable<string> indices)
     {
         Release();
-        foreach (var index in indices)
-            _strategies.Add(new StrategyEntry
-                { Index = index, Strategy = _pool.GetStrategy<EntityStrategyBase>(index) });
+        try
+        {
+            foreach (var index in indices)
+                _strategies.Add(new StrategyEntry
+                    { Index = index, Strategy = _pool.GetStrategy<EntityStrategyBase>(index) });
+        }
+        catch
+        {
+            Release();
+            throw;
+        }
 
         _logger.Log(LogLevel.Info, LogTag,
             new LogMessageBuilder().Build($"Strategies recovered: {_strategies.Count}."));

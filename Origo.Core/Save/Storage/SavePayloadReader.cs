@@ -269,6 +269,7 @@ internal static class SavePayloadReader
             throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
 
         var currentRel = pathPolicy.GetCurrentDirectory();
+        ThrowIfWriteInProgressMarkerExists(fileSystem, saveRootPath, currentRel, pathPolicy);
         return TryReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, currentRel, levelId, pathPolicy);
     }
 
@@ -360,6 +361,19 @@ internal static class SavePayloadReader
     {
         return TryReadLevelPayload(fileSystem, dataSourceIo, saveRootPath, baseDirectoryRel, levelId, pathPolicy)
                ?? throw new InvalidOperationException($"Missing level '{levelId}'.");
+    }
+
+    private static void ThrowIfWriteInProgressMarkerExists(
+        IFileSystem fileSystem,
+        string saveRootPath,
+        string baseRel,
+        ISavePathPolicy pathPolicy)
+    {
+        var markerRel = pathPolicy.GetWriteInProgressMarker(baseRel);
+        var markerAbs = fileSystem.CombinePath(saveRootPath, markerRel);
+        if (fileSystem.Exists(markerAbs))
+            throw new InvalidOperationException(
+                $"Detected write-in-progress marker at '{markerRel}' in current/; interrupted save write must be handled before loading.");
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Origo.Core.Abstractions;
 using Origo.Core.Runtime.Console;
+using Origo.Core.Snd;
 using Origo.Core.Snd.Metadata;
 using Origo.Core.Snd.Scene;
 using Origo.Core.Snd.Strategy;
@@ -52,6 +53,24 @@ public class StrategyPoolAndRuntimeTests
         pool.GetStrategy<EntityStrategyBase>("demo");
         pool.ReleaseStrategy("demo");
         Assert.Throws<InvalidOperationException>(() => pool.ReleaseStrategy("demo"));
+    }
+
+    [Fact]
+    public void SndStrategyManager_Recover_WhenFailed_RollsBackAcquiredStrategies()
+    {
+        var pool = new SndStrategyPool(NullLogger.Instance);
+        pool.Register(() => new RecoverSafeStrategy());
+        var manager = new SndStrategyManager(pool, NullLogger.Instance);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            manager.Spawn(new[] { "recover.safe", "recover.missing" }, new DummySndEntity("dummy"),
+                NullSndContext.Instance));
+
+        var first = pool.GetStrategy<EntityStrategyBase>("recover.safe");
+        pool.ReleaseStrategy("recover.safe");
+        var second = pool.GetStrategy<EntityStrategyBase>("recover.safe");
+
+        Assert.NotSame(first, second);
     }
 
     [Fact]
@@ -122,6 +141,11 @@ public class StrategyPoolAndRuntimeTests
 
     [StrategyIndex("demo")]
     private sealed class DemoStrategy : EntityStrategyBase
+    {
+    }
+
+    [StrategyIndex("recover.safe")]
+    private sealed class RecoverSafeStrategy : EntityStrategyBase
     {
     }
 }

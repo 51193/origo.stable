@@ -303,18 +303,32 @@ public sealed class DataSourceNode : IDisposable
         // Expand first, then mark as expanded. If the expander throws,
         // the node stays in the lazy state and can be retried or disposed safely.
         var expanded = _expander!(_rawText!);
-
-        _kind = expanded._kind;
-        _value = expanded._value;
+        var nextOrderedKeys = new List<string>(expanded._orderedKeys.Count);
+        var nextObjectChildren =
+            new Dictionary<string, DataSourceNode>(expanded._orderedKeys.Count, StringComparer.Ordinal);
+        var nextArrayChildren = new List<DataSourceNode>(expanded._arrayChildren.Count);
 
         foreach (var key in expanded._orderedKeys)
         {
-            _objectChildren[key] = expanded._objectChildren[key];
+            nextObjectChildren[key] = expanded._objectChildren[key];
+            nextOrderedKeys.Add(key);
+        }
+
+        nextArrayChildren.AddRange(expanded._arrayChildren);
+
+        _kind = expanded._kind;
+        _value = expanded._value;
+        _objectChildren.Clear();
+        _orderedKeys.Clear();
+        _arrayChildren.Clear();
+
+        foreach (var key in nextOrderedKeys)
+        {
+            _objectChildren[key] = nextObjectChildren[key];
             _orderedKeys.Add(key);
         }
 
-        foreach (var child in expanded._arrayChildren)
-            _arrayChildren.Add(child);
+        _arrayChildren.AddRange(nextArrayChildren);
 
         // Mark expanded only after all state has been committed successfully.
         _expanded = true;

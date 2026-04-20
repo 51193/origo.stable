@@ -48,18 +48,24 @@ internal sealed class SndStrategyPool
     {
         if (_pool.TryGetValue(index, out var strategy))
         {
+            if (strategy is not TBase typed)
+                throw new InvalidOperationException(
+                    $"Strategy '{index}' instance type '{strategy.GetType().FullName}' is not assignable to '{typeof(TBase).FullName}'.");
             _refCounts[index]++;
-            return CastOrThrow<TBase>(strategy, index);
+            return typed;
         }
 
         if (_factories.TryGetValue(index, out var factory))
         {
             strategy = factory();
+            if (strategy is not TBase typed)
+                throw new InvalidOperationException(
+                    $"Strategy '{index}' instance type '{strategy.GetType().FullName}' is not assignable to '{typeof(TBase).FullName}'.");
             _pool[index] = strategy;
             _refCounts[index] = 1;
             _logger.Log(LogLevel.Info, nameof(SndStrategyPool),
                 new LogMessageBuilder().AddSuffix("strategyIndex", index).Build("Created new strategy instance."));
-            return CastOrThrow<TBase>(strategy, index);
+            return typed;
         }
 
         throw new InvalidOperationException($"Strategy factory for '{index}' not found.");

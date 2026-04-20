@@ -280,6 +280,39 @@ public class SaveStorageAndPayloadTests
     }
 
     [Fact]
+    public void SavePayloadReader_TryReadLevelPayloadFromCurrent_WhenWriteMarkerExists_Throws()
+    {
+        var fs = new TestFileSystem();
+        fs.SeedFile("root/current/level_default/snd_scene.json", "[]");
+        fs.SeedFile("root/current/level_default/session.json", "{}");
+        fs.SeedFile("root/current/level_default/session_state_machines.json", """{"machines":[]}""");
+        var markerRel = SavePathLayout.GetWriteInProgressMarker(SavePathLayout.GetCurrentDirectory());
+        fs.SeedFile(fs.CombinePath("root", markerRel), string.Empty);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            SavePayloadReader.TryReadLevelPayloadFromCurrent(fs, "root", "default"));
+        Assert.Contains("write-in-progress marker", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DefaultSaveStorageService_ResolveLevelPayload_WhenWriteMarkerExists_Throws()
+    {
+        var fs = new TestFileSystem();
+        var service = new DefaultSaveStorageService(fs, "root");
+        fs.SeedFile("root/current/level_default/snd_scene.json", "[]");
+        fs.SeedFile("root/current/level_default/session.json", "{}");
+        fs.SeedFile("root/current/level_default/session_state_machines.json", """{"machines":[]}""");
+        fs.SeedFile("root/save_001/level_default/snd_scene.json", "[]");
+        fs.SeedFile("root/save_001/level_default/session.json", "{}");
+        fs.SeedFile("root/save_001/level_default/session_state_machines.json", """{"machines":[]}""");
+        var markerRel = SavePathLayout.GetWriteInProgressMarker(SavePathLayout.GetCurrentDirectory());
+        fs.SeedFile(fs.CombinePath("root", markerRel), string.Empty);
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.ResolveLevelPayload("001", "default"));
+        Assert.Contains("write-in-progress marker", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WriteSavePayloadToCurrentThenSnapshot_NullLogger_Throws()
     {
         var fs = new TestFileSystem();

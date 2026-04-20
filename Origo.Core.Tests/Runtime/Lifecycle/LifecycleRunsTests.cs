@@ -232,6 +232,41 @@ public class LifecycleRunsTests
     }
 
     [Fact]
+    public void SessionRun_LoadFromPayload_WhenSceneLoadFails_ResetsSessionState()
+    {
+        var logger = new TestLogger();
+        var host = new TestSndSceneHost();
+        var runtime = TestFactory.CreateRuntime(logger, host);
+        var fs = new TestFileSystem();
+        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var systemRuntime = TestFactory.CreateSystemRuntime(logger, fs, "root", runtime);
+        var progressRuntime = new ProgressRuntime(systemRuntime, sndContext, sndContext);
+        var managerRuntime = new SessionManagerRuntime(progressRuntime, new Blackboard.Blackboard());
+        var run = new SessionRun(managerRuntime, new SessionParameters("level1", new Blackboard.Blackboard(), host));
+
+        run.SessionBlackboard.Set("before", 1);
+        host.Spawn(new SndMetaData
+        {
+            Name = "temp",
+            NodeMetaData = new NodeMetaData(),
+            StrategyMetaData = new StrategyMetaData()
+        });
+
+        var payload = new LevelPayload
+        {
+            LevelId = "level1",
+            SndSceneNode = TestFactory.NodeFromJson("{}"),
+            SessionNode = TestFactory.NodeFromJson("""{"after":{"type":"Int32","data":3}}"""),
+            SessionStateMachinesNode = TestFactory.NodeFromJson("{\"machines\":[]}")
+        };
+
+        Assert.ThrowsAny<Exception>(() => run.LoadFromPayload(payload));
+        Assert.Empty(host.SerializeMetaList());
+        Assert.False(run.SessionBlackboard.TryGet<int>("before").found);
+        Assert.False(run.SessionBlackboard.TryGet<int>("after").found);
+    }
+
+    [Fact]
     public void ProgressRun_LoadFromPayload_MissingProgressStateMachinesNode_Throws()
     {
         var logger = new TestLogger();

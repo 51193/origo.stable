@@ -46,8 +46,16 @@ public sealed partial class ProgressRun
 
         // ── Step 3: Delegate to SessionManager → SessionRun (Chain of Responsibility) ──
         _sessionManager.Clear();
-        foreach (var descriptor in topology)
-            MountSessionFromDescriptor(payload, descriptor);
+        try
+        {
+            foreach (var descriptor in topology)
+                MountSessionFromDescriptor(payload, descriptor);
+        }
+        catch
+        {
+            _sessionManager.Clear();
+            throw;
+        }
 
         var fg = ForegroundSession
                  ?? throw new InvalidOperationException("No active foreground session after topology restore.");

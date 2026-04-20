@@ -168,22 +168,30 @@ public sealed class SessionRun : ISessionRun
         ArgumentNullException.ThrowIfNull(payload);
         _logger.Log(LogLevel.Info, LogTag, $"Loading payload for level '{LevelId}'.");
 
-        // 1. 恢复会话黑板
-        if (!payload.SessionNode.IsNull)
-            _saveContext.DeserializeSession(payload.SessionNode);
+        try
+        {
+            // 1. 恢复会话黑板
+            if (!payload.SessionNode.IsNull)
+                _saveContext.DeserializeSession(payload.SessionNode);
 
-        // 2. 恢复状态机（不触发钩子，等场景加载完毕后统一 Flush）
-        if (!payload.SessionStateMachinesNode.IsNull)
-            _sessionScope.StateMachines.DeserializeFromNode(
-                payload.SessionStateMachinesNode,
-                _saveContext.SndWorld.ConverterRegistry);
+            // 2. 恢复状态机（不触发钩子，等场景加载完毕后统一 Flush）
+            if (!payload.SessionStateMachinesNode.IsNull)
+                _sessionScope.StateMachines.DeserializeFromNode(
+                    payload.SessionStateMachinesNode,
+                    _saveContext.SndWorld.ConverterRegistry);
 
-        // 3. 恢复 SND 场景实体
-        if (!payload.SndSceneNode.IsNull)
-            _saveContext.DeserializeSndScene(_sceneHost, payload.SndSceneNode);
+            // 3. 恢复 SND 场景实体
+            if (!payload.SndSceneNode.IsNull)
+                _saveContext.DeserializeSndScene(_sceneHost, payload.SndSceneNode);
 
-        // 4. 统一触发 AfterLoad 钩子
-        _sessionScope.StateMachines.FlushAllAfterLoad();
+            // 4. 统一触发 AfterLoad 钩子
+            _sessionScope.StateMachines.FlushAllAfterLoad();
+        }
+        catch
+        {
+            ResetAfterLoadFailure();
+            throw;
+        }
     }
 
     /// <summary>
@@ -212,6 +220,21 @@ public sealed class SessionRun : ISessionRun
             SessionStateMachinesNode =
                 _sessionScope.StateMachines.SerializeToNode(_saveContext.SndWorld.ConverterRegistry)
         };
+    }
+
+    private void ResetAfterLoadFailure()
+    {
+        try
+        {
+            _sessionScope.StateMachines.Clear();
+            _sceneHost.ClearAll();
+            _sessionScope.Blackboard.Clear();
+        }
+        catch (Exception ex)
+        {
+            _logger.Log(LogLevel.Warning, LogTag,
+                $"Failed to reset session state after load failure for level '{LevelId}': {ex.Message}");
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

@@ -1,5 +1,6 @@
 using System;
 using Origo.Core.Abstractions;
+using Origo.Core.Snd;
 using Origo.Core.Snd.Strategy;
 using Origo.Core.StateMachine;
 using Xunit;
@@ -17,6 +18,40 @@ public class StrategyPoolTypeSafetyAndExtensionTests
 
         Assert.Throws<InvalidOperationException>(() => pool.GetStrategy<StateMachineStrategyBase>("pool.entity"));
         Assert.Throws<InvalidOperationException>(() => pool.GetStrategy<EntityStrategyBase>("pool.sm"));
+    }
+
+    [Fact]
+    public void GetStrategy_WrongBranchGeneric_DoesNotLeakReferenceCount()
+    {
+        var pool = new SndStrategyPool(NullLogger.Instance);
+        pool.Register(() => new PoolEntityStrategy());
+
+        Assert.Throws<InvalidOperationException>(() => pool.GetStrategy<StateMachineStrategyBase>("pool.entity"));
+
+        var first = pool.GetStrategy<EntityStrategyBase>("pool.entity");
+        pool.ReleaseStrategy("pool.entity");
+        var second = pool.GetStrategy<EntityStrategyBase>("pool.entity");
+
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void StackStateMachine_WhenSecondAcquireFails_ReleasesFirstAcquire()
+    {
+        var pool = new SndStrategyPool(NullLogger.Instance);
+        pool.Register(() => new PoolStateMachineStrategy());
+        var runtime = TestFactory.CreateRuntime();
+        var fs = new TestFileSystem();
+        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new StackStateMachine("machine", "pool.sm", "missing.pop", pool, sndContext));
+
+        var first = pool.GetStrategy<StateMachineStrategyBase>("pool.sm");
+        pool.ReleaseStrategy("pool.sm");
+        var second = pool.GetStrategy<StateMachineStrategyBase>("pool.sm");
+
+        Assert.NotSame(first, second);
     }
 
     [Fact]
