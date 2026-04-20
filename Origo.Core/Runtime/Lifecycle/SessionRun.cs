@@ -155,15 +155,7 @@ public sealed class SessionRun : ISessionRun
     internal LevelPayload SerializeToPayload()
     {
         ThrowIfDisposed();
-
-        return new LevelPayload
-        {
-            LevelId = LevelId,
-            SndSceneNode = _saveContext.SerializeSndScene(_sceneHost),
-            SessionNode = _saveContext.SerializeSession(),
-            SessionStateMachinesNode =
-                _sessionScope.StateMachines.SerializeToNode(_saveContext.SndWorld.ConverterRegistry)
-        };
+        return BuildLevelPayload();
     }
 
     /// <summary>
@@ -202,18 +194,17 @@ public sealed class SessionRun : ISessionRun
     {
         ThrowIfDisposed();
         _logger.Log(LogLevel.Info, LogTag, $"Persisting level state for '{LevelId}'.");
-
-        var levelPayload = SerializeToPayload();
-
-        _storageService.WriteLevelPayloadOnlyToCurrent(levelPayload);
+        _storageService.WriteLevelPayloadOnlyToCurrent(BuildLevelPayload());
     }
 
     /// <summary>
     ///     Internal persistence that does not check disposed flag (called from Dispose).
     /// </summary>
-    private void PersistLevelStateInternal()
+    private void PersistLevelStateInternal() => _storageService.WriteLevelPayloadOnlyToCurrent(BuildLevelPayload());
+
+    private LevelPayload BuildLevelPayload()
     {
-        var levelPayload = new LevelPayload
+        return new LevelPayload
         {
             LevelId = LevelId,
             SndSceneNode = _saveContext.SerializeSndScene(_sceneHost),
@@ -221,8 +212,6 @@ public sealed class SessionRun : ISessionRun
             SessionStateMachinesNode =
                 _sessionScope.StateMachines.SerializeToNode(_saveContext.SndWorld.ConverterRegistry)
         };
-
-        _storageService.WriteLevelPayloadOnlyToCurrent(levelPayload);
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

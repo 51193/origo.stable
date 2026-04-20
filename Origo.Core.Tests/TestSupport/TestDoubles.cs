@@ -311,6 +311,10 @@ internal sealed class TestSndSceneHost : ISndSceneHost
         _metaList.Clear();
         _entities.Clear();
     }
+
+    public void ProcessAll(double delta)
+    {
+    }
 }
 
 internal sealed class DummySndEntity : ISndEntity
@@ -438,7 +442,8 @@ internal static class TestFactory
     {
         savePathPolicy ??= new DefaultSavePathPolicy();
         storageService ??= new DefaultSaveStorageService(fileSystem, saveRootPath, savePathPolicy);
-        return new SystemRuntime(logger, fileSystem, saveRootPath, runtime, storageService, savePathPolicy);
+        return new SystemRuntime(runtime,
+            new SystemParameters(logger, fileSystem, saveRootPath, storageService, savePathPolicy));
     }
 
     public static ProgressRun CreateProgressRun(

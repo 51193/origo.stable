@@ -49,7 +49,6 @@ public sealed partial class ProgressRun : IDisposable
 
         _sessionManager = new SessionManager(
             _progressRuntime,
-            new SessionManagerParameters(),
             ProgressScope.Blackboard);
 
         _progressRuntime.Logger.Log(LogLevel.Info, "ProgressRun",

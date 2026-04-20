@@ -25,4 +25,11 @@ public interface ISndSceneHost : ISndSceneAccess
     ///     根据实体名称查找对应实体。
     /// </summary>
     ISndEntity? FindByName(string name);
+
+    /// <summary>
+    ///     对所有存活实体执行 Process 帧更新。
+    ///     不支持帧更新的宿主实现应为空操作。
+    /// </summary>
+    /// <param name="delta">帧间隔时间（秒）。</param>
+    void ProcessAll(double delta);
 }

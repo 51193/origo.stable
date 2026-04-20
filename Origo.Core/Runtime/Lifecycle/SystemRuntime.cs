@@ -19,28 +19,22 @@ namespace Origo.Core.Runtime.Lifecycle;
 /// </summary>
 internal sealed class SystemRuntime
 {
-    internal SystemRuntime(
-        ILogger logger,
-        IFileSystem fileSystem,
-        string saveRootPath,
-        OrigoRuntime runtime,
-        ISaveStorageService storageService,
-        ISavePathPolicy savePathPolicy)
+    internal SystemRuntime(OrigoRuntime runtime, SystemParameters systemParams)
     {
-        ArgumentNullException.ThrowIfNull(logger);
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
         ArgumentNullException.ThrowIfNull(runtime);
-        ArgumentNullException.ThrowIfNull(storageService);
-        ArgumentNullException.ThrowIfNull(savePathPolicy);
+        ArgumentNullException.ThrowIfNull(systemParams.Logger);
+        ArgumentNullException.ThrowIfNull(systemParams.FileSystem);
+        if (string.IsNullOrWhiteSpace(systemParams.SaveRootPath))
+            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(systemParams));
+        ArgumentNullException.ThrowIfNull(systemParams.StorageService);
+        ArgumentNullException.ThrowIfNull(systemParams.SavePathPolicy);
 
-        Logger = logger;
-        FileSystem = fileSystem;
-        SaveRootPath = saveRootPath;
+        Logger = systemParams.Logger;
+        FileSystem = systemParams.FileSystem;
+        SaveRootPath = systemParams.SaveRootPath;
         Runtime = runtime;
-        StorageService = storageService;
-        SavePathPolicy = savePathPolicy;
+        StorageService = systemParams.StorageService;
+        SavePathPolicy = systemParams.SavePathPolicy;
     }
 
     internal ILogger Logger { get; }

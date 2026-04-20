@@ -54,7 +54,7 @@ public class ContextBoundaryTests
         ctx.EnqueueBusinessDeferred(() => { });
         ctx.FlushDeferredActionsForCurrentFrame();
         ctx.ProcessConsolePending();
-        ctx.RequestLoadMainMenuEntrySave();
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestLoadMainMenuEntrySave());
         Assert.Throws<InvalidOperationException>(() => ctx.CloneTemplate("t"));
     }
 

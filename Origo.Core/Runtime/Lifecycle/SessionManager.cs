@@ -27,8 +27,7 @@ internal sealed class SessionManager : ISessionManager
     // This avoids repeated casts from ISessionRun to SessionRun for internal operations
     // (serialize, load, persist), while public-facing members still return ISessionRun.
 
-    internal SessionManager(ProgressRuntime progressRuntime, SessionManagerParameters managerParams,
-        IBlackboard progressBlackboard)
+    internal SessionManager(ProgressRuntime progressRuntime, IBlackboard progressBlackboard)
     {
         ArgumentNullException.ThrowIfNull(progressRuntime);
         ArgumentNullException.ThrowIfNull(progressBlackboard);
@@ -105,10 +104,7 @@ internal sealed class SessionManager : ISessionManager
             if (!_sessions.TryGetValue(key, out var mounted) || !mounted.SyncProcess)
                 continue;
 
-            // FullMemorySndSceneHost.ProcessAll is a host-specific capability (not on ISndSceneHost)
-            // for background sessions. This type check is intentional — see README API reference.
-            if (mounted.Session.SceneHost is FullMemorySndSceneHost memHost)
-                memHost.ProcessAll(delta);
+            mounted.Session.SceneHost.ProcessAll(delta);
         }
     }
 

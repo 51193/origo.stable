@@ -95,5 +95,9 @@ public class SaveMetaMergerTests
         public IReadOnlyCollection<ISndEntity> GetEntities() => Array.Empty<ISndEntity>();
 
         public ISndEntity? FindByName(string name) => null;
+
+        public void ProcessAll(double delta)
+        {
+        }
     }
 }

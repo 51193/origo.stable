@@ -180,7 +180,7 @@ internal static class SavePayloadReader
         return (progressNode, progressStateMachinesNode, customMeta);
     }
 
-    private static IReadOnlyDictionary<string, string>? TryReadStringMap(
+    internal static IReadOnlyDictionary<string, string>? TryReadStringMap(
         IFileSystem fileSystem,
         IDataSourceIoGateway dataSourceIo,
         string mapFileAbs)

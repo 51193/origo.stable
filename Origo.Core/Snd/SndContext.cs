@@ -63,8 +63,9 @@ public sealed class SndContext : IStateMachineContext, ISndContext
         InitialStorageService =
             initialStorageService ?? new DefaultSaveStorageService(fileSystem, initialSaveRootPath, SavePathPolicy);
 
-        var systemRuntime = new SystemRuntime(
-            runtime.Logger, fileSystem, saveRootPath, runtime, StorageService, SavePathPolicy);
+        var systemParams = new SystemParameters(
+            runtime.Logger, fileSystem, saveRootPath, StorageService, SavePathPolicy);
+        var systemRuntime = new SystemRuntime(runtime, systemParams);
         _systemRun = new SystemRun(systemRuntime);
     }
 
@@ -273,12 +274,8 @@ public sealed class SndContext : IStateMachineContext, ISndContext
 
     private ProgressRun LoadOrContinueStrict(string saveId)
     {
-        BeginWorkflow();
-        try
+        return RunWorkflow(() =>
         {
-            Runtime.ResetConsoleState();
-            ShutdownCurrentProgressAndScene();
-
             using var progressNode = StorageService.ReadProgressNodeFromSnapshot(saveId);
             if (progressNode is null)
                 throw new InvalidOperationException($"Missing required progress.json in save '{saveId}'.");
@@ -301,21 +298,13 @@ public sealed class SndContext : IStateMachineContext, ISndContext
             progressRun.LoadFromPayload(payload);
             _systemRun.SetActiveSaveSlot(saveId);
             return progressRun;
-        }
-        finally
-        {
-            EndWorkflow();
-        }
+        });
     }
 
     private void ExecuteLoadInitialSaveNow()
     {
-        BeginWorkflow();
-        try
+        RunWorkflow(() =>
         {
-            Runtime.ResetConsoleState();
-            ShutdownCurrentProgressAndScene();
-
             var payload = InitialStorageService.ReadSavePayloadFromSnapshot(
                 SndDefaults.InitialSaveId,
                 SndDefaults.InitialLevelId);
@@ -328,21 +317,13 @@ public sealed class SndContext : IStateMachineContext, ISndContext
             SetProgressRun(progressRun);
             progressRun.LoadFromPayload(payload);
             SystemBlackboard.Set(WellKnownKeys.ActiveSaveId, string.Empty);
-        }
-        finally
-        {
-            EndWorkflow();
-        }
+        });
     }
 
     private void ExecuteLoadMainMenuEntrySaveNow()
     {
-        BeginWorkflow();
-        try
+        RunWorkflow(() =>
         {
-            Runtime.ResetConsoleState();
-            ShutdownCurrentProgressAndScene();
-
             var progressRun = CreateProgressRun(SndDefaults.InitialSaveId);
             SetProgressRun(progressRun);
             progressRun.LoadAndMountForeground(SndDefaults.MainMenuLevelId);
@@ -352,6 +333,32 @@ public sealed class SndContext : IStateMachineContext, ISndContext
                 Runtime.Snd,
                 FileSystem,
                 Runtime.Logger);
+        });
+    }
+
+    private void RunWorkflow(Action body)
+    {
+        BeginWorkflow();
+        try
+        {
+            Runtime.ResetConsoleState();
+            ShutdownCurrentProgressAndScene();
+            body();
+        }
+        finally
+        {
+            EndWorkflow();
+        }
+    }
+
+    private T RunWorkflow<T>(Func<T> body)
+    {
+        BeginWorkflow();
+        try
+        {
+            Runtime.ResetConsoleState();
+            ShutdownCurrentProgressAndScene();
+            return body();
         }
         finally
         {

@@ -9,6 +9,7 @@ namespace Origo.Core.Snd;
 
 /// <summary>
 ///     用于纯运行时单测场景的空上下文实现。
+///     变更操作（存读档、关卡切换等）显式失败以满足 §2.1 显式失败优先。
 /// </summary>
 internal sealed class NullSndContext : ISndContext
 {
@@ -50,32 +51,27 @@ internal sealed class NullSndContext : ISndContext
     public StateMachineContainer? GetProgressStateMachines() => null;
     public IReadOnlyList<string> ListSaves() => Array.Empty<string>();
 
-    public void RequestLoadGame(string saveId)
-    {
-    }
+    public void RequestLoadGame(string saveId) =>
+        throw new InvalidOperationException("NullSndContext does not support load operations.");
 
-    public void RequestSaveGame(string newSaveId)
-    {
-    }
+    public void RequestSaveGame(string newSaveId) =>
+        throw new InvalidOperationException("NullSndContext does not support save operations.");
 
-    public string RequestSaveGameAuto(string? newSaveId = null) => newSaveId ?? string.Empty;
+    public string RequestSaveGameAuto(string? newSaveId = null) =>
+        throw new InvalidOperationException("NullSndContext does not support save operations.");
 
-    public void SetContinueTarget(string saveId)
-    {
-    }
+    public void SetContinueTarget(string saveId) =>
+        throw new InvalidOperationException("NullSndContext does not support continue target operations.");
 
-    public void RequestSwitchForegroundLevel(string newLevelId)
-    {
-    }
+    public void RequestSwitchForegroundLevel(string newLevelId) =>
+        throw new InvalidOperationException("NullSndContext does not support level switching.");
 
     public bool HasContinueData() => false;
     public bool RequestContinueGame() => false;
 
-    public void RequestLoadInitialSave()
-    {
-    }
+    public void RequestLoadInitialSave() =>
+        throw new InvalidOperationException("NullSndContext does not support load operations.");
 
-    public void RequestLoadMainMenuEntrySave()
-    {
-    }
+    public void RequestLoadMainMenuEntrySave() =>
+        throw new InvalidOperationException("NullSndContext does not support load operations.");
 }

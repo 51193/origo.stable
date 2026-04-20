@@ -59,6 +59,12 @@ public sealed class MemorySndSceneHost : ISndSceneHost
         _metaList.Clear();
         _entities.Clear();
     }
+
+    /// <inheritdoc />
+    public void ProcessAll(double delta)
+    {
+        // No-op: MemorySndSceneHost does not support process updates.
+    }
 }
 
 /// <summary>

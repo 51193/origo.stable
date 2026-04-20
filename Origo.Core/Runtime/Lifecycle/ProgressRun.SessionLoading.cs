@@ -138,13 +138,9 @@ public sealed partial class ProgressRun
 
     private void ValidateLevelPayload(string levelId, LevelPayload payload)
     {
-        if (IsNullOrInvalid(payload.SndSceneNode))
-            throw new InvalidOperationException($"Target level '{levelId}' has invalid snd_scene.json (empty).");
-        if (IsNullOrInvalid(payload.SessionNode))
-            throw new InvalidOperationException($"Target level '{levelId}' has invalid session.json (empty).");
-        if (IsNullOrInvalid(payload.SessionStateMachinesNode))
-            throw new InvalidOperationException(
-                $"Target level '{levelId}' has invalid session_state_machines.json (empty).");
+        EnsureNodeValid(payload.SndSceneNode, levelId, "snd_scene.json");
+        EnsureNodeValid(payload.SessionNode, levelId, "session.json");
+        EnsureNodeValid(payload.SessionStateMachinesNode, levelId, "session_state_machines.json");
 
         var smRegistry = _progressRuntime.ConverterRegistry;
         _ = smRegistry.Read<StateMachineContainerPayload>(payload.SessionStateMachinesNode)
@@ -152,15 +148,22 @@ public sealed partial class ProgressRun
                 $"Target level '{levelId}' has invalid session state machines json (null payload).");
     }
 
-    private static bool IsNullOrInvalid(DataSourceNode node)
+    private static void EnsureNodeValid(DataSourceNode node, string levelId, string fileName)
     {
         try
         {
-            return node.IsNull;
+            if (node.IsNull)
+                throw new InvalidOperationException(
+                    $"Target level '{levelId}' has invalid {fileName} (empty).");
         }
-        catch
+        catch (InvalidOperationException)
         {
-            return true;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Target level '{levelId}' has invalid {fileName} (empty).", ex);
         }
     }
 

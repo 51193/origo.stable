@@ -100,6 +100,18 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
     public void ClearAll() => QuitAll();
 
     /// <summary>
+    ///     对所有存活实体执行 Process 帧更新。
+    /// </summary>
+    /// <param name="delta">帧间隔时间（秒）。</param>
+    public void ProcessAll(double delta)
+    {
+        // 基于快照迭代，允许 Process 中增删实体。
+        var snapshot = _entries.ToArray();
+        foreach (var entry in snapshot)
+            entry.Entity.Process(delta);
+    }
+
+    /// <summary>
     ///     绑定 <see cref="SndWorld" />，用于通过 <see cref="SndWorld.CreateEntity" /> 创建实体。
     ///     必须在首次 Spawn/Load 之前调用。
     /// </summary>
@@ -123,18 +135,6 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
         var entry = _entries[index];
         _entries.RemoveAt(index);
         entry.Entity.Dead();
-    }
-
-    /// <summary>
-    ///     对所有存活实体执行 Process 帧更新。
-    /// </summary>
-    /// <param name="delta">帧间隔时间（秒）。</param>
-    public void ProcessAll(double delta)
-    {
-        // 基于快照迭代，允许 Process 中增删实体。
-        var snapshot = _entries.ToArray();
-        foreach (var entry in snapshot)
-            entry.Entity.Process(delta);
     }
 
     private void QuitAll()

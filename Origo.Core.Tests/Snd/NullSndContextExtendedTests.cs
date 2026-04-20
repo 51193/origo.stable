@@ -1,3 +1,4 @@
+using System;
 using Origo.Core.Snd;
 using Xunit;
 
@@ -13,12 +14,12 @@ public class NullSndContextExtendedTests
     public void ListSaves_ReturnsEmpty() => Assert.Empty(NullSndContext.Instance.ListSaves());
 
     [Fact]
-    public void RequestSaveGameAuto_WithNull_ReturnsEmpty() =>
-        Assert.Equal(string.Empty, NullSndContext.Instance.RequestSaveGameAuto());
+    public void RequestSaveGameAuto_Throws() =>
+        Assert.Throws<InvalidOperationException>(() => NullSndContext.Instance.RequestSaveGameAuto());
 
     [Fact]
-    public void RequestSaveGameAuto_WithValue_ReturnsSameValue() =>
-        Assert.Equal("my_save", NullSndContext.Instance.RequestSaveGameAuto("my_save"));
+    public void RequestSaveGameAuto_WithValue_Throws() =>
+        Assert.Throws<InvalidOperationException>(() => NullSndContext.Instance.RequestSaveGameAuto("my_save"));
 
     [Fact]
     public void HasContinueData_ReturnsFalse() => Assert.False(NullSndContext.Instance.HasContinueData());
@@ -27,21 +28,20 @@ public class NullSndContextExtendedTests
     public void RequestContinueGame_ReturnsFalse() => Assert.False(NullSndContext.Instance.RequestContinueGame());
 
     [Fact]
-    public void VoidOperations_DoNotChangeObservableState()
+    public void MutationOperations_ThrowInvalidOperationException()
     {
-        var ex = Record.Exception(() =>
-        {
-            NullSndContext.Instance.RequestLoadGame("any");
-            NullSndContext.Instance.RequestSaveGame("any");
-            NullSndContext.Instance.SetContinueTarget("any");
-            NullSndContext.Instance.RequestSwitchForegroundLevel("level");
-            NullSndContext.Instance.RequestLoadInitialSave();
-            NullSndContext.Instance.RequestLoadMainMenuEntrySave();
-        });
+        var ctx = NullSndContext.Instance;
 
-        Assert.Null(ex);
-        Assert.False(NullSndContext.Instance.HasContinueData());
-        Assert.Empty(NullSndContext.Instance.ListSaves());
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestLoadGame("any"));
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestSaveGame("any"));
+        Assert.Throws<InvalidOperationException>(() => ctx.SetContinueTarget("any"));
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestSwitchForegroundLevel("level"));
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestLoadInitialSave());
+        Assert.Throws<InvalidOperationException>(() => ctx.RequestLoadMainMenuEntrySave());
+
+        // Read-only operations still safe
+        Assert.False(ctx.HasContinueData());
+        Assert.Empty(ctx.ListSaves());
     }
 }
 

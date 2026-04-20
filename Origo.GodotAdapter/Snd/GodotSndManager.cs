@@ -98,6 +98,14 @@ public partial class GodotSndManager : Node, ISndSceneHost, ISndContextAttachabl
         return entity;
     }
 
+    public void ProcessAll(double delta)
+    {
+        // Delegate to the Godot _Process-equivalent logic for non-Godot callers (e.g. background session ticking).
+        var snapshot = _entities.ToArray();
+        foreach (var entity in snapshot)
+            entity.ProcessSnd(delta);
+    }
+
     public GodotSndEntity SpawnFromMeta(SndMetaData metaData)
     {
         var staged = new List<GodotSndEntity>();

@@ -79,7 +79,8 @@ internal static class SaveStorageFacade
             var saveRel = pathPolicy.GetSaveDirectory(id);
             var metaRel = pathPolicy.GetCustomMetaFile(saveRel);
             var metaAbs = fileSystem.CombinePath(saveRootPath, metaRel);
-            var meta = TryReadStringMap(fileSystem, dataSourceIo, metaAbs) ?? new Dictionary<string, string>();
+            var meta = SavePayloadReader.TryReadStringMap(fileSystem, dataSourceIo, metaAbs) ??
+                       new Dictionary<string, string>();
             list.Add(new SaveMetaDataEntry { SaveId = id, MetaData = meta });
         }
 
@@ -376,31 +377,5 @@ internal static class SaveStorageFacade
             fileSystem.DeleteDirectory(saveAbs);
 
         fileSystem.Rename(tempAbs, saveAbs);
-    }
-
-    private static IReadOnlyDictionary<string, string>? TryReadStringMap(
-        IFileSystem fileSystem,
-        IDataSourceIoGateway dataSourceIo,
-        string mapFileAbs)
-    {
-        if (!fileSystem.Exists(mapFileAbs))
-            return null;
-
-        using var root = dataSourceIo.ReadTree(mapFileAbs);
-        if (root.Kind != DataSourceNodeKind.Object)
-            throw new InvalidOperationException(
-                $"Expected map file '{mapFileAbs}' to decode as object node.");
-
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var key in root.Keys)
-        {
-            var valueNode = root[key];
-            if (valueNode.Kind is DataSourceNodeKind.Object or DataSourceNodeKind.Array)
-                throw new InvalidOperationException(
-                    $"Map file '{mapFileAbs}' key '{key}' must be scalar.");
-            result[key] = valueNode.AsString();
-        }
-
-        return result;
     }
 }
