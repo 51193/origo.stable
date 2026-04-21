@@ -53,7 +53,7 @@ public class ProgressRunSessionLoadingEdgeTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         fs.SeedFile("root/current/level_target/snd_scene.json", " ");
@@ -71,7 +71,7 @@ public class ProgressRunSessionLoadingEdgeTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         fs.SeedFile("root/current/level_target/snd_scene.json", "[]");
@@ -122,7 +122,7 @@ public class ProgressRunSessionLoadingEdgeTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         return TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
     }
 }

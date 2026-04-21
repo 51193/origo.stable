@@ -13,12 +13,12 @@ public partial class OrigoDefaultEntry
             OrigoAutoInitializer.DiscoverAndRegisterStrategies(
                 Runtime.SndWorld, Runtime.Logger, GodotSkipPrefixes);
 
-        _sndContext = new SndContext(
+        _sndContext = new SndContext(new SndContextParameters(
             Runtime,
             SharedFileSystem,
             SaveRootPath,
             InitialSaveRootPath,
-            ConfigPath);
+            ConfigPath));
 
         // Runtime dependencies are already bound in OrigoAutoHost.CreateRuntime(); only bind lifecycle context here.
         SndManager.BindContext(_sndContext);

@@ -31,8 +31,8 @@ internal static class SaveStorageFacade
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
 
         if (!fileSystem.DirectoryExists(saveRootPath))
             return Array.Empty<string>();
@@ -68,10 +68,10 @@ internal static class SaveStorageFacade
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
 
-        var dataSourceIo = DataSourceFactory.CreateDefaultIoGateway(fileSystem, false);
+        var dataSourceIo = SaveStorageCommon.CreateIoGateway(fileSystem);
         var ids = EnumerateSaveIds(fileSystem, saveRootPath, pathPolicy);
         var list = new List<SaveMetaDataEntry>(ids.Count);
         foreach (var id in ids)
@@ -92,7 +92,7 @@ internal static class SaveStorageFacade
     /// </summary>
     public static void
         WriteSavePayloadToCurrent(IFileSystem fileSystem, string saveRootPath, SaveGamePayload payload) =>
-        WriteSavePayloadToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath,
+        WriteSavePayloadToCurrent(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem), saveRootPath,
             payload);
 
     public static void
@@ -120,7 +120,7 @@ internal static class SaveStorageFacade
         SaveGamePayload payload,
         string newSaveId,
         ILogger logger) =>
-        WriteSavePayloadToCurrentThenSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+        WriteSavePayloadToCurrentThenSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
             saveRootPath, payload, newSaveId, logger, new DefaultSavePathPolicy());
 
     public static void WriteSavePayloadToCurrentThenSnapshot(
@@ -214,7 +214,7 @@ internal static class SaveStorageFacade
         string saveId,
         string activeLevelId,
         ILogger? logger = null) =>
-        ReadSavePayloadFromCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+        ReadSavePayloadFromCurrent(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
             saveRootPath,
             saveId, activeLevelId, logger);
 
@@ -249,7 +249,7 @@ internal static class SaveStorageFacade
         string saveRootPath,
         string saveId,
         string activeLevelId) =>
-        ReadSavePayloadFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+        ReadSavePayloadFromSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
             saveRootPath,
             saveId, activeLevelId);
 
@@ -280,7 +280,7 @@ internal static class SaveStorageFacade
         IFileSystem fileSystem,
         string saveRootPath,
         string saveId) =>
-        ReadProgressNodeFromSnapshot(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+        ReadProgressNodeFromSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
             saveRootPath,
             saveId);
 
@@ -322,8 +322,8 @@ internal static class SaveStorageFacade
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
         if (string.IsNullOrWhiteSpace(newSaveId))
             throw new ArgumentException("New save id cannot be null or whitespace.", nameof(newSaveId));
 

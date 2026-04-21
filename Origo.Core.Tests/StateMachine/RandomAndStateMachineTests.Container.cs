@@ -17,7 +17,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -60,7 +60,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -103,7 +103,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopOrderProbeStrategy());
@@ -139,7 +139,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
 
         var container = new StateMachineContainer(pool, ctx);
@@ -155,7 +155,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -183,7 +183,7 @@ public partial class RandomAndStateMachineTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SwapTestPushStrategy());
         pool.Register(() => new SwapTestPopStrategy());
@@ -219,7 +219,7 @@ public partial class RandomAndStateMachineTests
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, new TestFileSystem(), "r", "i", "e.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -243,7 +243,7 @@ public partial class RandomAndStateMachineTests
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, new TestFileSystem(), "r", "i", "e.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -268,7 +268,7 @@ public partial class RandomAndStateMachineTests
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, new TestFileSystem(), "r", "i", "e.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());
@@ -297,7 +297,7 @@ public partial class RandomAndStateMachineTests
         var logger = new TestLogger();
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
-        var ctx = new SndContext(runtime, new TestFileSystem(), "r", "i", "e.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, new TestFileSystem(), "r", "i", "e.json"));
         var pool = runtime.SndWorld.StrategyPool;
         pool.Register(() => new SmPushStrategy());
         pool.Register(() => new SmPopStrategy());

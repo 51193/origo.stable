@@ -172,7 +172,8 @@ public class SessionManagerTests
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
         // Set up a progress run so ctx.SessionManager returns a per-instance manager
         // (avoids cross-test contamination via the static fallback).
         var progressRun = TestFactory.CreateProgressRun(

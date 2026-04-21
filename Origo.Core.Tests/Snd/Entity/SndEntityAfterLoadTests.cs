@@ -21,7 +21,7 @@ public class SndEntityAfterLoadTests
         runtime.SndWorld.RegisterStrategy(() => new AfterLoadProbeBStrategy());
 
         var fs = new TestFileSystem();
-        var ctx = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var nodeFactory = new TestNodeFactory();
 
         AfterLoadProbeAStrategy.Events = new List<string>();

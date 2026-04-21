@@ -19,7 +19,6 @@ internal sealed class SessionManager : ISessionManager
 {
     private const string LogTag = "SessionManager";
     private readonly SessionManagerRuntime _managerRuntime;
-    private readonly IBlackboard _progressBlackboard;
     private readonly Dictionary<string, MountedSession> _sessions = new(StringComparer.Ordinal);
 
     // NOTE: MountedSession stores SessionRun (concrete) rather than ISessionRun (interface)
@@ -32,7 +31,6 @@ internal sealed class SessionManager : ISessionManager
         ArgumentNullException.ThrowIfNull(progressRuntime);
         ArgumentNullException.ThrowIfNull(progressBlackboard);
         _managerRuntime = new SessionManagerRuntime(progressRuntime, progressBlackboard);
-        _progressBlackboard = progressBlackboard;
     }
 
     /// <summary>获取所有参与 Process 帧更新的会话的键列表。</summary>
@@ -52,7 +50,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (string.IsNullOrWhiteSpace(key))
             return null;
-        return _sessions.TryGetValue(key, out var mounted) ? mounted.Session : null;
+        return TryGetMountedSession(key)?.Session;
     }
 
     /// <inheritdoc />
@@ -60,7 +58,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (string.IsNullOrWhiteSpace(key))
             return false;
-        return _sessions.ContainsKey(key);
+        return TryGetMountedSession(key) is not null;
     }
 
     /// <inheritdoc />
@@ -82,14 +80,7 @@ internal sealed class SessionManager : ISessionManager
         if (!_sessions.Remove(key, out var mounted))
             return;
 
-        _managerRuntime.Logger.Log(LogLevel.Info, LogTag,
-            $"Destroying session '{key}' (level: {mounted.Session.LevelId}).");
-
-        // Clear mount tracking before Dispose to avoid re-entrant remove.
-        mounted.Session.MountKey = null;
-        mounted.Session.UnmountCallback = null;
-
-        mounted.Session.Dispose();
+        DisposeMountedSession(key, mounted);
     }
 
     /// <inheritdoc />
@@ -146,40 +137,25 @@ internal sealed class SessionManager : ISessionManager
     /// <summary>
     ///     将指定键的会话序列化为 <see cref="LevelPayload" />。
     /// </summary>
-    internal LevelPayload SerializeSession(string key)
-    {
-        if (!_sessions.TryGetValue(key, out var mounted))
-            throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        return mounted.Session.SerializeToPayload();
-    }
+    internal LevelPayload SerializeSession(string key) => RequireMountedSession(key).Session.SerializeToPayload();
 
     /// <summary>
     ///     将指定键的会话状态持久化到 current/ 目录。
     /// </summary>
-    internal void PersistSession(string key)
-    {
-        if (!_sessions.TryGetValue(key, out var mounted))
-            throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        mounted.Session.PersistLevelState();
-    }
+    internal void PersistSession(string key) => RequireMountedSession(key).Session.PersistLevelState();
 
     /// <summary>
     ///     从 <see cref="LevelPayload" /> 恢复指定键的会话状态。
     /// </summary>
-    internal void LoadSessionFromPayload(string key, LevelPayload payload)
-    {
-        if (!_sessions.TryGetValue(key, out var mounted))
-            throw new InvalidOperationException($"No session with key '{key}' is mounted.");
-        mounted.Session.LoadFromPayload(payload);
-    }
+    internal void LoadSessionFromPayload(string key, LevelPayload payload) =>
+        RequireMountedSession(key).Session.LoadFromPayload(payload);
 
     /// <summary>
     ///     清除所有后台会话（Dispose 并移除）。前台会话不受影响。
     /// </summary>
     internal void ClearBackground()
     {
-        var bgKeys = _sessions.Keys.Where(k =>
-            !string.Equals(k, ISessionManager.ForegroundKey, StringComparison.Ordinal)).ToArray();
+        var bgKeys = EnumerateManagedKeys(false);
         foreach (var key in bgKeys)
             DestroySession(key);
     }
@@ -189,7 +165,7 @@ internal sealed class SessionManager : ISessionManager
     /// </summary>
     internal void Clear()
     {
-        var keys = _sessions.Keys.ToArray();
+        var keys = EnumerateManagedKeys(true);
         foreach (var key in keys)
             DestroySession(key);
     }
@@ -245,7 +221,7 @@ internal sealed class SessionManager : ISessionManager
     {
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Session key cannot be null or whitespace.", nameof(key));
-        if (_sessions.ContainsKey(key))
+        if (TryGetMountedSession(key) is not null)
             throw new InvalidOperationException($"A session with key '{key}' is already mounted.");
     }
 
@@ -256,10 +232,10 @@ internal sealed class SessionManager : ISessionManager
 
         // If mounting foreground and old foreground exists, destroy old first.
         if (string.Equals(key, ISessionManager.ForegroundKey, StringComparison.Ordinal)
-            && _sessions.ContainsKey(key))
+            && TryGetMountedSession(key) is not null)
             DestroyForeground();
 
-        if (_sessions.ContainsKey(key))
+        if (TryGetMountedSession(key) is not null)
             throw new InvalidOperationException($"A session with key '{key}' is already mounted.");
 
         _sessions[key] = new MountedSession(session, syncProcess);
@@ -270,9 +246,30 @@ internal sealed class SessionManager : ISessionManager
         session.MountKey = key;
         session.UnmountCallback = run =>
         {
-            if (run.MountKey is not null && _sessions.ContainsKey(run.MountKey))
+            if (run.MountKey is not null && TryGetMountedSession(run.MountKey) is not null)
                 _sessions.Remove(run.MountKey);
         };
+    }
+
+    private MountedSession? TryGetMountedSession(string key) =>
+        _sessions.TryGetValue(key, out var mounted) ? mounted : null;
+
+    private MountedSession RequireMountedSession(string key) =>
+        TryGetMountedSession(key) ?? throw new InvalidOperationException($"No session with key '{key}' is mounted.");
+
+    private string[] EnumerateManagedKeys(bool includeForeground) =>
+        _sessions.Keys.Where(key =>
+                includeForeground || !string.Equals(key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
+            .ToArray();
+
+    private void DisposeMountedSession(string key, MountedSession mounted)
+    {
+        _managerRuntime.Logger.Log(LogLevel.Info, LogTag,
+            $"Destroying session '{key}' (level: {mounted.Session.LevelId}).");
+
+        mounted.Session.MountKey = null;
+        mounted.Session.UnmountCallback = null;
+        mounted.Session.Dispose();
     }
 
     private sealed record MountedSession(SessionRun Session, bool SyncProcess);

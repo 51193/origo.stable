@@ -39,7 +39,8 @@ public class BackgroundSession_StrategyContextReceivesBackgroundFlagTests
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
         return (ctx, fs);
     }
 

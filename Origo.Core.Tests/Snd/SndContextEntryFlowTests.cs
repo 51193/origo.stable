@@ -26,7 +26,8 @@ public class SndContextEntryFlowTests
             ]
             """);
 
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
         ctx.RequestLoadMainMenuEntrySave();
         ctx.FlushDeferredActionsForCurrentFrame();
 
@@ -43,7 +44,8 @@ public class SndContextEntryFlowTests
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
 
         runtime.Snd.Spawn(new SndMetaData
         {

@@ -203,7 +203,8 @@ public class SndEntityAndAutoInitializerTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        return new SndContext(runtime, fs, "user://saveRoot", "res://initial", "res://entry/entry.json");
+        return new SndContext(new SndContextParameters(runtime, fs, "user://saveRoot", "res://initial",
+            "res://entry/entry.json"));
     }
 
     [StrategyIndex(LifecycleStrategyIndex)]

@@ -23,12 +23,12 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
     public DefaultSaveStorageService(IFileSystem fileSystem, string saveRootPath, ISavePathPolicy? pathPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
         _fileSystem = fileSystem;
         _saveRootPath = saveRootPath;
         _pathPolicy = pathPolicy ?? new DefaultSavePathPolicy();
-        _ioGateway = DataSourceFactory.CreateDefaultIoGateway(fileSystem, false);
+        _ioGateway = SaveStorageCommon.CreateIoGateway(fileSystem);
     }
 
     public IReadOnlyList<string> EnumerateSaveIds() =>

@@ -18,7 +18,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         var run = progressRun.LoadAndMountForeground("default");
         run.SessionBlackboard.Set("foo", 1);
@@ -42,7 +42,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         var payload = new SaveGamePayload
@@ -78,7 +78,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         var payload = new SaveGamePayload
@@ -110,7 +110,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         progressRun.LoadAndMountForeground("a");
 
@@ -141,7 +141,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         progressRun.LoadAndMountForeground("a");
 
@@ -173,7 +173,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         Assert.False(progressRun.ProgressBlackboard.TryGet<string>(WellKnownKeys.SessionTopology).found);
 
@@ -192,7 +192,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         progressRun.LoadAndMountForeground("alpha");
         progressRun.ProgressBlackboard.Set(WellKnownKeys.SessionTopology, "__foreground__=wrong=false");
@@ -209,7 +209,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var systemRuntime = TestFactory.CreateSystemRuntime(logger, fs, "root", runtime);
         var progressRuntime = new ProgressRuntime(systemRuntime, sndContext, sndContext);
         var managerRuntime = new SessionManagerRuntime(progressRuntime, new Blackboard.Blackboard());
@@ -238,7 +238,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var systemRuntime = TestFactory.CreateSystemRuntime(logger, fs, "root", runtime);
         var progressRuntime = new ProgressRuntime(systemRuntime, sndContext, sndContext);
         var managerRuntime = new SessionManagerRuntime(progressRuntime, new Blackboard.Blackboard());
@@ -273,7 +273,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         var payload = new SaveGamePayload
@@ -297,7 +297,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var systemRuntime = TestFactory.CreateSystemRuntime(logger, fs, "root", runtime);
         var progressRuntime = new ProgressRuntime(systemRuntime, sndContext, sndContext);
         var managerRuntime = new SessionManagerRuntime(progressRuntime, new Blackboard.Blackboard());
@@ -316,7 +316,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         sndContext.SetProgressRun(progressRun);
 
@@ -335,7 +335,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         sndContext.SetProgressRun(progressRun);
 
@@ -357,7 +357,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         sndContext.SetProgressRun(progressRun);
 
@@ -391,7 +391,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
 
         var run = progressRun.LoadAndMountForeground("test_level");
@@ -408,7 +408,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
 
         var progressRun = TestFactory.CreateProgressRun("test_save", logger, fs, "root", runtime, sndContext);
 
@@ -424,7 +424,7 @@ public class LifecycleRunsTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
         var progressRun = TestFactory.CreateProgressRun("001", logger, fs, "root", runtime, sndContext);
         sndContext.SetProgressRun(progressRun);
 

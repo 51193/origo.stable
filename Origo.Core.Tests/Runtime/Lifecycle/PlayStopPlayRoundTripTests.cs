@@ -249,7 +249,8 @@ public class PlayStopPlayRoundTripTests
         var progressRun = TestFactory.CreateProgressRun(
             "001", new TestLogger(), new TestFileSystem(), "root",
             TestFactory.CreateRuntime(),
-            new SndContext(TestFactory.CreateRuntime(), new TestFileSystem(), "root", "initial", "entry.json"));
+            new SndContext(new SndContextParameters(TestFactory.CreateRuntime(), new TestFileSystem(), "root",
+                "initial", "entry.json")));
 
         Assert.Null(progressRun.SessionManager.ForegroundSession);
         Assert.Empty(progressRun.SessionManager.Keys);
@@ -348,7 +349,8 @@ public class PlayStopPlayRoundTripTests
         var runtime = TestFactory.CreateRuntime(logger, host);
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
         return (ctx, fs);
     }
 

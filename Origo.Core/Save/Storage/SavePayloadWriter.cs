@@ -13,7 +13,7 @@ internal static class SavePayloadWriter
         DataSourceNode progressNode,
         DataSourceNode progressStateMachinesNode,
         bool overwrite = true) =>
-        WriteProgressOnlyToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false),
+        WriteProgressOnlyToCurrent(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
             saveRootPath,
             progressNode, progressStateMachinesNode, overwrite);
 
@@ -39,8 +39,8 @@ internal static class SavePayloadWriter
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
         ValidateStrictProgressPayload(progressNode, progressStateMachinesNode);
 
         var currentRel = pathPolicy.GetCurrentDirectory();
@@ -62,7 +62,7 @@ internal static class SavePayloadWriter
         IFileSystem fileSystem,
         string saveRootPath,
         SaveGamePayload payload) =>
-        WriteToCurrent(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath, payload,
+        WriteToCurrent(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem), saveRootPath, payload,
             new DefaultSavePathPolicy());
 
     public static void WriteToCurrent(
@@ -83,8 +83,8 @@ internal static class SavePayloadWriter
         ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(payload);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
+        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+            "Save root path cannot be null or whitespace.");
 
         ValidateStrictProgressPayload(payload.ProgressNode, payload.ProgressStateMachinesNode);
 
@@ -134,7 +134,7 @@ internal static class SavePayloadWriter
         string baseDirectoryRel,
         LevelPayload level,
         bool overwrite = true) =>
-        WriteLevelPayloadOnly(fileSystem, DataSourceFactory.CreateDefaultIoGateway(fileSystem, false), saveRootPath,
+        WriteLevelPayloadOnly(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem), saveRootPath,
             baseDirectoryRel, level, overwrite);
 
     public static void WriteLevelPayloadOnly(

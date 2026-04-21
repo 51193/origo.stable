@@ -795,7 +795,8 @@ public class BackgroundSessionTests
 
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
 
         var progressRun = TestFactory.CreateProgressRun(
             "test_save", logger, fs, "root", runtime, ctx);

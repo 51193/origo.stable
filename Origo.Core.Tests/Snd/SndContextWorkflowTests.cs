@@ -257,7 +257,7 @@ public class SndContextWorkflowTests
         SeedTemplate(fs, "tmpl_a", "OriginalName");
         runtime.SndWorld.LoadTemplates(fs, "maps/templates.map", logger);
 
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial", "entry.json"));
         var cloned = ctx.CloneTemplate("tmpl_a", "NewName");
 
         Assert.Equal("NewName", cloned.Name);
@@ -273,7 +273,7 @@ public class SndContextWorkflowTests
         SeedTemplate(fs, "tmpl_b", "KeepMe");
         runtime.SndWorld.LoadTemplates(fs, "maps/templates.map", logger);
 
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial", "entry.json"));
         var cloned = ctx.CloneTemplate("tmpl_b");
         Assert.Equal("KeepMe", cloned.Name);
     }
@@ -399,14 +399,16 @@ public class SndContextWorkflowTests
     public void Constructor_ThrowsOnNullRuntime()
     {
         var fs = new TestFileSystem();
-        Assert.Throws<ArgumentNullException>(() => new SndContext(null!, fs, "root", "init", "e.json"));
+        Assert.Throws<ArgumentNullException>(() =>
+            new SndContext(new SndContextParameters(null!, fs, "root", "init", "e.json")));
     }
 
     [Fact]
     public void Constructor_ThrowsOnNullFileSystem()
     {
         var runtime = TestFactory.CreateRuntime();
-        Assert.Throws<ArgumentNullException>(() => new SndContext(runtime, null!, "root", "init", "e.json"));
+        Assert.Throws<ArgumentNullException>(() =>
+            new SndContext(new SndContextParameters(runtime, null!, "root", "init", "e.json")));
     }
 
     [Fact]
@@ -414,7 +416,8 @@ public class SndContextWorkflowTests
     {
         var runtime = TestFactory.CreateRuntime();
         var fs = new TestFileSystem();
-        Assert.Throws<ArgumentException>(() => new SndContext(runtime, fs, "", "init", "e.json"));
+        Assert.Throws<ArgumentException>(() =>
+            new SndContext(new SndContextParameters(runtime, fs, "", "init", "e.json")));
     }
 
     [Fact]
@@ -422,7 +425,8 @@ public class SndContextWorkflowTests
     {
         var runtime = TestFactory.CreateRuntime();
         var fs = new TestFileSystem();
-        Assert.Throws<ArgumentException>(() => new SndContext(runtime, fs, "root", "", "e.json"));
+        Assert.Throws<ArgumentException>(() =>
+            new SndContext(new SndContextParameters(runtime, fs, "root", "", "e.json")));
     }
 
     [Fact]
@@ -430,7 +434,8 @@ public class SndContextWorkflowTests
     {
         var runtime = TestFactory.CreateRuntime();
         var fs = new TestFileSystem();
-        Assert.Throws<ArgumentException>(() => new SndContext(runtime, fs, "root", "init", ""));
+        Assert.Throws<ArgumentException>(() =>
+            new SndContext(new SndContextParameters(runtime, fs, "root", "init", "")));
     }
 
     // ── SndContext initial state ──
@@ -473,7 +478,7 @@ public class SndContextWorkflowTests
         var host = new TestSndSceneHost();
         var runtime = TestFactory.CreateRuntime(logger, host);
         fs = new TestFileSystem();
-        return new SndContext(runtime, fs, "root", "res://initial", "entry.json");
+        return new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial", "entry.json"));
     }
 
     private static SndContext CreateContextWithConsole(
@@ -489,7 +494,7 @@ public class SndContextWorkflowTests
         var tm = new TypeStringMapping();
         var runtime = TestFactory.CreateRuntime(logger, host, tm, bb, input, output);
         fs = new TestFileSystem();
-        return new SndContext(runtime, fs, "root", "res://initial", "entry.json");
+        return new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial", "entry.json"));
     }
 
     private static void SetupProgressRun(SndContext ctx, TestFileSystem fs)

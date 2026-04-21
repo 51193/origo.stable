@@ -14,7 +14,7 @@ namespace Origo.Core.Tests;
 
 /// <summary>
 ///     契约测试：
-///     1. 验证 SndContext 构造函数将 ISavePathPolicy 正确传递给默认的 DefaultSaveStorageService；
+///     1. 验证 SndContext 参数对象将 ISavePathPolicy 正确传递给默认的 DefaultSaveStorageService；
 ///     2. 验证 DefaultSaveStorageService 的 所有 方法完整通过 ISavePathPolicy 拼装路径；
 ///     3. 验证会话状态机钩子中 ctx.SceneAccess 始终指向当前会话 SceneHost（前后台均成立）。
 /// </summary>
@@ -33,9 +33,11 @@ public class SavePathPolicyContractTests
         fs.SeedFile("res://entry/entry.json", "[]");
         var customPolicy = new TestPrefixedPathPolicy("cx_");
 
-        var ctx = new SndContext(
-            runtime, fs, "root", "res://initial", "res://entry/entry.json",
-            savePathPolicy: customPolicy);
+        var ctx = new SndContext(new SndContextParameters(
+            runtime, fs, "root", "res://initial", "res://entry/entry.json")
+        {
+            SavePathPolicy = customPolicy
+        });
 
         // Act: use the storage service (default-created by SndContext) to write a level payload.
         var payload = new LevelPayload
@@ -68,9 +70,11 @@ public class SavePathPolicyContractTests
         fs.SeedFile("res://entry/entry.json", "[]");
         var customPolicy = new TestPrefixedPathPolicy("ix_");
 
-        var ctx = new SndContext(
-            runtime, fs, "root", "res://initial", "res://entry/entry.json",
-            savePathPolicy: customPolicy);
+        var ctx = new SndContext(new SndContextParameters(
+            runtime, fs, "root", "res://initial", "res://entry/entry.json")
+        {
+            SavePathPolicy = customPolicy
+        });
 
         // Act: write through the initial storage service
         var payload = new LevelPayload
@@ -334,7 +338,8 @@ public class SavePathPolicyContractTests
 
         var fs = new TestFileSystem();
         fs.SeedFile("res://entry/entry.json", "[]");
-        var ctx = new SndContext(runtime, fs, "root", "res://initial", "res://entry/entry.json");
+        var ctx = new SndContext(new SndContextParameters(runtime, fs, "root", "res://initial",
+            "res://entry/entry.json"));
         return (ctx, fs);
     }
 

@@ -31,41 +31,25 @@ public sealed class SndContext : IStateMachineContext, ISndContext
     private ProgressRun? _progressRun;
     private bool _workflowInProgress;
 
-    public SndContext(
-        OrigoRuntime runtime,
-        IFileSystem fileSystem,
-        string saveRootPath,
-        string initialSaveRootPath,
-        string entryConfigPath,
-        ISaveStorageService? storageService = null,
-        ISaveStorageService? initialStorageService = null,
-        ISavePathPolicy? savePathPolicy = null)
+    public SndContext(SndContextParameters parameters)
     {
-        ArgumentNullException.ThrowIfNull(runtime);
-        ArgumentNullException.ThrowIfNull(fileSystem);
-        Runtime = runtime;
-        FileSystem = fileSystem;
+        ArgumentNullException.ThrowIfNull(parameters);
+        Runtime = parameters.Runtime;
+        FileSystem = parameters.FileSystem;
+        SaveRootPath = parameters.SaveRootPath;
+        InitialSaveRootPath = parameters.InitialSaveRootPath;
+        EntryConfigPath = parameters.EntryConfigPath;
 
-        if (string.IsNullOrWhiteSpace(saveRootPath))
-            throw new ArgumentException("Save root path cannot be null or whitespace.", nameof(saveRootPath));
-        if (string.IsNullOrWhiteSpace(initialSaveRootPath))
-            throw new ArgumentException("Initial save root path cannot be null or whitespace.",
-                nameof(initialSaveRootPath));
-        if (string.IsNullOrWhiteSpace(entryConfigPath))
-            throw new ArgumentException("Entry config path cannot be null or whitespace.", nameof(entryConfigPath));
-
-        SaveRootPath = saveRootPath;
-        InitialSaveRootPath = initialSaveRootPath;
-        EntryConfigPath = entryConfigPath;
-
-        SavePathPolicy = savePathPolicy ?? new DefaultSavePathPolicy();
-        StorageService = storageService ?? new DefaultSaveStorageService(fileSystem, saveRootPath, SavePathPolicy);
+        SavePathPolicy = parameters.SavePathPolicy ?? new DefaultSavePathPolicy();
+        StorageService =
+            parameters.StorageService ?? new DefaultSaveStorageService(FileSystem, SaveRootPath, SavePathPolicy);
         InitialStorageService =
-            initialStorageService ?? new DefaultSaveStorageService(fileSystem, initialSaveRootPath, SavePathPolicy);
+            parameters.InitialStorageService ??
+            new DefaultSaveStorageService(FileSystem, InitialSaveRootPath, SavePathPolicy);
 
         var systemParams = new SystemParameters(
-            runtime.Logger, fileSystem, saveRootPath, StorageService, SavePathPolicy);
-        var systemRuntime = new SystemRuntime(runtime, systemParams);
+            Runtime.Logger, FileSystem, SaveRootPath, StorageService, SavePathPolicy);
+        var systemRuntime = new SystemRuntime(Runtime, systemParams);
         _systemRun = new SystemRun(systemRuntime);
     }
 
@@ -139,18 +123,7 @@ public sealed class SndContext : IStateMachineContext, ISndContext
         if (string.IsNullOrWhiteSpace(saveId))
             throw new ArgumentException("Save id cannot be null or whitespace.", nameof(saveId));
 
-        Interlocked.Increment(ref _pendingPersistenceRequests);
-        EnqueueSystemDeferred(() =>
-        {
-            try
-            {
-                SetProgressRun(LoadOrContinueStrict(saveId));
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _pendingPersistenceRequests);
-            }
-        });
+        EnqueueTrackedSystemDeferred(() => SetProgressRun(LoadOrContinueStrict(saveId)));
     }
 
     public void RequestSaveGame(string newSaveId)
@@ -158,28 +131,20 @@ public sealed class SndContext : IStateMachineContext, ISndContext
         if (string.IsNullOrWhiteSpace(newSaveId))
             throw new ArgumentException("New save id cannot be null or whitespace.", nameof(newSaveId));
 
-        Interlocked.Increment(ref _pendingPersistenceRequests);
-        EnqueueSystemDeferred(() =>
+        EnqueueTrackedSystemDeferred(() =>
         {
+            BeginWorkflow();
             try
             {
-                BeginWorkflow();
-                try
-                {
-                    var progressRun = EnsureProgressRun();
-                    var payload = progressRun.BuildSavePayload(newSaveId);
-                    StorageService.WriteSavePayloadToCurrentThenSnapshot(payload, newSaveId, Runtime.Logger);
-                    progressRun.SetSaveId(newSaveId);
-                    _systemRun.SetActiveSaveSlot(newSaveId);
-                }
-                finally
-                {
-                    EndWorkflow();
-                }
+                var progressRun = EnsureProgressRun();
+                var payload = progressRun.BuildSavePayload(newSaveId);
+                StorageService.WriteSavePayloadToCurrentThenSnapshot(payload, newSaveId, Runtime.Logger);
+                progressRun.SetSaveId(newSaveId);
+                _systemRun.SetActiveSaveSlot(newSaveId);
             }
             finally
             {
-                Interlocked.Decrement(ref _pendingPersistenceRequests);
+                EndWorkflow();
             }
         });
     }
@@ -271,6 +236,23 @@ public sealed class SndContext : IStateMachineContext, ISndContext
     }
 
     internal void EnqueueSystemDeferred(Action action) => Runtime.EnqueueSystemDeferred(action);
+
+    private void EnqueueTrackedSystemDeferred(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        Interlocked.Increment(ref _pendingPersistenceRequests);
+        EnqueueSystemDeferred(() =>
+        {
+            try
+            {
+                action();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingPersistenceRequests);
+            }
+        });
+    }
 
     private ProgressRun LoadOrContinueStrict(string saveId)
     {

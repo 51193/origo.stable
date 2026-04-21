@@ -42,7 +42,7 @@ public class StrategyPoolTypeSafetyAndExtensionTests
         pool.Register(() => new PoolStateMachineStrategy());
         var runtime = TestFactory.CreateRuntime();
         var fs = new TestFileSystem();
-        var sndContext = new SndContext(runtime, fs, "root", "initial", "entry.json");
+        var sndContext = new SndContext(new SndContextParameters(runtime, fs, "root", "initial", "entry.json"));
 
         Assert.Throws<InvalidOperationException>(() =>
             new StackStateMachine("machine", "pool.sm", "missing.pop", pool, sndContext));
