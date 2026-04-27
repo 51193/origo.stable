@@ -57,13 +57,17 @@ public class SndEntityAfterLoadTests
         public static List<string>? Events { get; set; }
 
         public override void AfterLoad(ISndEntity entity, ISndContext ctx)
-            => Events?.Add("afterload:a");
+        {
+            Events?.Add("afterload:a");
+        }
     }
 
     [StrategyIndex(BIndex)]
     private sealed class AfterLoadProbeBStrategy : EntityStrategyBase
     {
-        public override void AfterLoad(ISndEntity entity, ISndContext ctx) =>
+        public override void AfterLoad(ISndEntity entity, ISndContext ctx)
+        {
             AfterLoadProbeAStrategy.Events?.Add("afterload:b");
+        }
     }
 }

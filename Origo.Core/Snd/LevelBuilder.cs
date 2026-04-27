@@ -21,7 +21,7 @@ namespace Origo.Core.Snd;
 ///         与 SessionRun 共享同一套存储抽象，不直接依赖 SavePathLayout 或静态 Writer。
 ///     </para>
 /// </summary>
-public sealed class LevelBuilder
+internal sealed class LevelBuilder
 {
     private readonly MemorySndSceneHost _sceneHost = new();
     private readonly Blackboard.Blackboard _sessionBlackboard = new();

@@ -125,7 +125,10 @@ public class SessionSndContextExtendedTests
             action();
         }
 
-        public void FlushDeferredActionsForCurrentFrame() => CallCount++;
+        public void FlushDeferredActionsForCurrentFrame()
+        {
+            CallCount++;
+        }
 
         public int GetPendingPersistenceRequestCount()
         {
@@ -149,7 +152,10 @@ public class SessionSndContextExtendedTests
             return true;
         }
 
-        public void ProcessConsolePending() => CallCount++;
+        public void ProcessConsolePending()
+        {
+            CallCount++;
+        }
 
         public long SubscribeConsoleOutput(Action<string> onLine)
         {
@@ -157,7 +163,10 @@ public class SessionSndContextExtendedTests
             return 1;
         }
 
-        public void UnsubscribeConsoleOutput(long subscriptionId) => CallCount++;
+        public void UnsubscribeConsoleOutput(long subscriptionId)
+        {
+            CallCount++;
+        }
 
         public StateMachineContainer? GetProgressStateMachines()
         {
@@ -171,8 +180,15 @@ public class SessionSndContextExtendedTests
             return Array.Empty<string>();
         }
 
-        public void RequestLoadGame(string saveId) => CallCount++;
-        public void RequestSaveGame(string newSaveId) => CallCount++;
+        public void RequestLoadGame(string saveId)
+        {
+            CallCount++;
+        }
+
+        public void RequestSaveGame(string newSaveId)
+        {
+            CallCount++;
+        }
 
         public string RequestSaveGameAuto(string? newSaveId = null)
         {
@@ -180,8 +196,15 @@ public class SessionSndContextExtendedTests
             return newSaveId ?? "auto";
         }
 
-        public void SetContinueTarget(string saveId) => CallCount++;
-        public void RequestSwitchForegroundLevel(string newLevelId) => CallCount++;
+        public void SetContinueTarget(string saveId)
+        {
+            CallCount++;
+        }
+
+        public void RequestSwitchForegroundLevel(string newLevelId)
+        {
+            CallCount++;
+        }
 
         public bool HasContinueData()
         {
@@ -195,8 +218,15 @@ public class SessionSndContextExtendedTests
             return false;
         }
 
-        public void RequestLoadInitialSave() => CallCount++;
-        public void RequestLoadMainMenuEntrySave() => CallCount++;
+        public void RequestLoadInitialSave()
+        {
+            CallCount++;
+        }
+
+        public void RequestLoadMainMenuEntrySave()
+        {
+            CallCount++;
+        }
     }
 
     private sealed class StubSessionRun(string levelId) : ISessionRun
@@ -205,7 +235,11 @@ public class SessionSndContextExtendedTests
         public ISndSceneHost SceneHost => throw new NotImplementedException();
         public string LevelId { get; } = levelId;
         public bool IsFrontSession => false;
-        public StateMachineContainer GetSessionStateMachines() => throw new NotImplementedException();
+
+        public StateMachineContainer GetSessionStateMachines()
+        {
+            throw new NotImplementedException();
+        }
 
         public void Dispose()
         {

@@ -16,7 +16,10 @@ public sealed class MemoryFileSystem : IFileSystem
     private readonly Dictionary<string, string> _files = new(StringComparer.Ordinal);
 
     /// <inheritdoc />
-    public bool Exists(string path) => _files.ContainsKey(Normalize(path));
+    public bool Exists(string path)
+    {
+        return _files.ContainsKey(Normalize(path));
+    }
 
     /// <inheritdoc />
     public bool DirectoryExists(string path)
@@ -103,8 +106,10 @@ public sealed class MemoryFileSystem : IFileSystem
     }
 
     /// <inheritdoc />
-    public string CombinePath(string basePath, string relativePath) =>
-        Normalize($"{Normalize(basePath).TrimEnd('/')}/{relativePath}");
+    public string CombinePath(string basePath, string relativePath)
+    {
+        return Normalize($"{Normalize(basePath).TrimEnd('/')}/{relativePath}");
+    }
 
     /// <inheritdoc />
     public string GetParentDirectory(string path)
@@ -196,7 +201,10 @@ public sealed class MemoryFileSystem : IFileSystem
             _directories.Remove(dir);
     }
 
-    private static string Normalize(string path) => path.Replace('\\', '/').Trim();
+    private static string Normalize(string path)
+    {
+        return path.Replace('\\', '/').Trim();
+    }
 
     private void EnsureParents(string filePath)
     {

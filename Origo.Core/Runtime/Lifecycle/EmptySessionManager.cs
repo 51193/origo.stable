@@ -19,13 +19,21 @@ internal sealed class EmptySessionManager : ISessionManager
 
     public IReadOnlyCollection<string> Keys => Array.Empty<string>();
 
-    public ISessionRun? TryGet(string key) => null;
+    public ISessionRun? TryGet(string key)
+    {
+        return null;
+    }
 
-    public bool Contains(string key) => false;
+    public bool Contains(string key)
+    {
+        return false;
+    }
 
-    public ISessionRun CreateBackgroundSession(string key, string levelId, bool syncProcess = false) =>
+    public ISessionRun CreateBackgroundSession(string key, string levelId, bool syncProcess = false)
+    {
         throw new InvalidOperationException(
             "No active ProgressRun. Cannot create sessions before loading a save or starting a new game.");
+    }
 
     public void DestroySession(string key)
     {

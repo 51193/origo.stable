@@ -2,7 +2,7 @@ using System;
 
 namespace Origo.GodotAdapter.FileSystem;
 
-internal static class GodotPathHelper
+internal static class GodotPathResolver
 {
     public static string Combine(string basePath, string relativePath)
     {

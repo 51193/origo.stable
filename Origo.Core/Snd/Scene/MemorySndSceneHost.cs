@@ -13,7 +13,7 @@ namespace Origo.Core.Snd.Scene;
 ///     用于 <see cref="LevelBuilder" /> 等 Core 层离线构建关卡场景，
 ///     以及单元测试中需要完全内存化的场景宿主。
 /// </summary>
-public sealed class MemorySndSceneHost : ISndSceneHost
+internal sealed class MemorySndSceneHost : ISndSceneHost
 {
     private readonly List<ISndEntity> _entities = new();
     private readonly List<SndMetaData> _metaList = new();
@@ -31,14 +31,22 @@ public sealed class MemorySndSceneHost : ISndSceneHost
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<ISndEntity> GetEntities() => _entities;
+    public IReadOnlyCollection<ISndEntity> GetEntities()
+    {
+        return _entities;
+    }
 
     /// <inheritdoc />
-    public ISndEntity? FindByName(string name) =>
-        _entities.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.Ordinal));
+    public ISndEntity? FindByName(string name)
+    {
+        return _entities.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.Ordinal));
+    }
 
     /// <inheritdoc />
-    public IReadOnlyList<SndMetaData> SerializeMetaList() => _metaList.ToArray();
+    public IReadOnlyList<SndMetaData> SerializeMetaList()
+    {
+        return _metaList.ToArray();
+    }
 
     /// <inheritdoc />
     public void LoadFromMetaList(IEnumerable<SndMetaData> metaList)
@@ -71,7 +79,7 @@ public sealed class MemorySndSceneHost : ISndSceneHost
 ///     纯内存 <see cref="ISndEntity" /> 实现，用于 <see cref="MemorySndSceneHost" />。
 ///     支持基本的键值数据存取，不绑定任何引擎节点。
 /// </summary>
-public sealed class MemorySndEntity : ISndEntity
+internal sealed class MemorySndEntity : ISndEntity
 {
     private readonly Dictionary<string, object?> _data = new(StringComparer.Ordinal);
 
@@ -85,11 +93,16 @@ public sealed class MemorySndEntity : ISndEntity
     public string Name { get; }
 
     /// <inheritdoc />
-    public void SetData<T>(string name, T value) => _data[name] = value;
+    public void SetData<T>(string name, T value)
+    {
+        _data[name] = value;
+    }
 
     /// <inheritdoc />
-    public T GetData<T>(string name) =>
-        _data.TryGetValue(name, out var value) && value is T cast ? cast : default!;
+    public T GetData<T>(string name)
+    {
+        return _data.TryGetValue(name, out var value) && value is T cast ? cast : default!;
+    }
 
     /// <inheritdoc />
     public (bool found, T? value) TryGetData<T>(string name)
@@ -113,12 +126,17 @@ public sealed class MemorySndEntity : ISndEntity
     }
 
     /// <inheritdoc />
-    public INodeHandle GetNode(string name) =>
+    public INodeHandle GetNode(string name)
+    {
         throw new InvalidOperationException(
             $"MemorySndEntity does not support node access. Node '{name}' requested.");
+    }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<string> GetNodeNames() => Array.Empty<string>();
+    public IReadOnlyCollection<string> GetNodeNames()
+    {
+        return Array.Empty<string>();
+    }
 
     /// <inheritdoc />
     public void AddStrategy(string index)

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
 
-namespace Origo.Core.Utils.DataStructures;
+namespace Origo.Core.Scheduling;
 
 /// <summary>
 ///     线程安全的延迟执行队列，可在调度器或主循环中按批次执行入队的 Action。

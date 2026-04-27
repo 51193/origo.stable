@@ -13,8 +13,14 @@ public static class DataSourceFactory
     public static DataSourceConverterRegistry CreateDefaultRegistry(TypeStringMapping typeMapping)
     {
         var registry = new DataSourceConverterRegistry();
+        RegisterPrimitives(registry);
+        RegisterPrimitiveArrays(registry);
+        RegisterDomainConverters(registry, typeMapping);
+        return registry;
+    }
 
-        // Primitives
+    private static void RegisterPrimitives(DataSourceConverterRegistry registry)
+    {
         registry.Register(new StringDataSourceConverter());
         registry.Register(new ByteDataSourceConverter());
         registry.Register(new SByteDataSourceConverter());
@@ -29,8 +35,10 @@ public static class DataSourceFactory
         registry.Register(new DecimalDataSourceConverter());
         registry.Register(new CharDataSourceConverter());
         registry.Register(new BooleanDataSourceConverter());
+    }
 
-        // Primitive arrays
+    private static void RegisterPrimitiveArrays(DataSourceConverterRegistry registry)
+    {
         registry.Register(new ByteArrayDataSourceConverter());
         registry.Register(new SByteArrayDataSourceConverter());
         registry.Register(new Int16ArrayDataSourceConverter());
@@ -45,8 +53,10 @@ public static class DataSourceFactory
         registry.Register(new BooleanArrayDataSourceConverter());
         registry.Register(new CharArrayDataSourceConverter());
         registry.Register(new StringArrayDataSourceConverter());
+    }
 
-        // Domain converters
+    private static void RegisterDomainConverters(DataSourceConverterRegistry registry, TypeStringMapping typeMapping)
+    {
         var typedDataConverter = new TypedDataConverter(typeMapping, registry);
         registry.Register(typedDataConverter);
 
@@ -65,14 +75,14 @@ public static class DataSourceFactory
         registry.Register(new BlackboardDataConverter(typedDataConverter));
         registry.Register(new StringDictionaryConverter());
         registry.Register(new StateMachineContainerPayloadConverter());
-
-        return registry;
     }
 
-    private static DataSourceIoOptions BuildDefaultIoOptions() =>
-        new DataSourceIoOptions()
+    private static DataSourceIoOptions BuildDefaultIoOptions()
+    {
+        return new DataSourceIoOptions()
             .RegisterSuffix(".json", DataSourceCodecKind.Json)
             .RegisterSuffix(".map", DataSourceCodecKind.Map);
+    }
 
     public static IDataSourceIoGateway CreateIoGateway(IFileSystem fileSystem, bool writeIndented = true)
     {
@@ -80,6 +90,8 @@ public static class DataSourceFactory
         return new DataSourceIoGateway(fileSystem, BuildDefaultIoOptions(), writeIndented);
     }
 
-    public static IDataSourceIoGateway CreateDefaultIoGateway(IFileSystem fileSystem, bool writeIndented = true) =>
-        CreateIoGateway(fileSystem, writeIndented);
+    public static IDataSourceIoGateway CreateDefaultIoGateway(IFileSystem fileSystem, bool writeIndented = true)
+    {
+        return CreateIoGateway(fileSystem, writeIndented);
+    }
 }

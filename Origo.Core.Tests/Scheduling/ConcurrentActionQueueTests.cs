@@ -1,10 +1,8 @@
 using System;
-using Origo.Core.Utils.DataStructures;
+using Origo.Core.Scheduling;
 using Xunit;
 
 namespace Origo.Core.Tests;
-
-// ── KeyValueFileParser ─────────────────────────────────────────────────
 
 public class ConcurrentActionQueueTests
 {
@@ -67,8 +65,10 @@ public class ConcurrentActionQueueTests
     }
 
     [Fact]
-    public void ConcurrentActionQueue_Constructor_ThrowsOnNullLogger() =>
+    public void ConcurrentActionQueue_Constructor_ThrowsOnNullLogger()
+    {
         Assert.Throws<ArgumentNullException>(() => new ConcurrentActionQueue(null!));
+    }
 
     [Fact]
     public void ConcurrentActionQueue_ExecuteAll_PropagatesException()
@@ -78,5 +78,3 @@ public class ConcurrentActionQueueTests
         Assert.Throws<InvalidOperationException>(() => queue.ExecuteAll());
     }
 }
-
-// ── LogMessageBuilder ──────────────────────────────────────────────────

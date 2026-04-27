@@ -5,7 +5,6 @@ using Origo.Core.Abstractions.Logging;
 using Origo.Core.DataSource;
 using Origo.Core.Logging;
 using Origo.Core.Snd.Metadata;
-using Origo.Core.Utils;
 
 namespace Origo.Core.Snd;
 
@@ -169,6 +168,8 @@ internal sealed class SndMappings
         return list;
     }
 
-    private static bool IsExplicitResourcePath(string id) =>
-        id.Contains(UriLikeSchemeSeparator, StringComparison.Ordinal);
+    private static bool IsExplicitResourcePath(string id)
+    {
+        return id.Contains(UriLikeSchemeSeparator, StringComparison.Ordinal);
+    }
 }

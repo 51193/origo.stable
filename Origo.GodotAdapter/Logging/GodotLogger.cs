@@ -16,5 +16,8 @@ public sealed class GodotLogger : ILogger
         _handler = handler;
     }
 
-    public void Log(LogLevel level, string tag, string message) => _handler?.Invoke(level, tag, message);
+    public void Log(LogLevel level, string tag, string message)
+    {
+        _handler?.Invoke(level, tag, message);
+    }
 }

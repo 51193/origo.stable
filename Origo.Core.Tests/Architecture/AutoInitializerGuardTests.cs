@@ -84,7 +84,11 @@ public class AutoInitializerGuardTests
     {
         public const string IndexConst = "auto.init.stateful.local";
         private int _counter;
-        public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
+
+        public override void Process(ISndEntity entity, double delta, ISndContext ctx)
+        {
+            _counter++;
+        }
     }
 
     [StrategyIndex(IndexConst)]
@@ -92,7 +96,11 @@ public class AutoInitializerGuardTests
     {
         public const string IndexConst = "auto.init.stateless.local";
         private static int _counter;
-        public override void Process(ISndEntity entity, double delta, ISndContext ctx) => _counter++;
+
+        public override void Process(ISndEntity entity, double delta, ISndContext ctx)
+        {
+            _counter++;
+        }
     }
 
     [StrategyIndex(IndexConst)]

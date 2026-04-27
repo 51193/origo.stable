@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Logging;
 
-namespace Origo.Core.Utils;
+namespace Origo.Core.DataSource;
 
 /// <summary>
 ///     解析按行的 <c>key: value</c> 文本（忽略空行与 <c>#</c> 注释行）。

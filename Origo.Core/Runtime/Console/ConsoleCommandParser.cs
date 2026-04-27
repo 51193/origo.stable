@@ -34,45 +34,8 @@ public static class ConsoleCommandParser
         var command = tokens[0];
         var rest = tokens.Count > 1 ? tokens.GetRange(1, tokens.Count - 1) : new List<string>();
 
-        var anyEquals = false;
-        foreach (var t in rest)
-            if (t.Contains('=', StringComparison.Ordinal))
-            {
-                anyEquals = true;
-                break;
-            }
-
-        if (anyEquals)
-        {
-            var named = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var t in rest)
-            {
-                var eq = t.IndexOf('=');
-                if (eq <= 0 || eq == t.Length - 1)
-                {
-                    error = $"Invalid named argument '{t}'. Expected key=value.";
-                    return false;
-                }
-
-                var key = t.Substring(0, eq).Trim();
-                var value = t.Substring(eq + 1).Trim();
-                if (key.Length == 0)
-                {
-                    error = $"Invalid named argument '{t}'. Key cannot be empty.";
-                    return false;
-                }
-
-                named[key] = value;
-            }
-
-            invocation = new CommandInvocation
-            {
-                Command = command,
-                PositionalArgs = Array.Empty<string>(),
-                NamedArgs = named
-            };
-            return true;
-        }
+        if (HasNamedArgument(rest))
+            return TryParseNamed(command, rest, out invocation, out error);
 
         invocation = new CommandInvocation
         {
@@ -80,6 +43,50 @@ public static class ConsoleCommandParser
             PositionalArgs = rest,
             NamedArgs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         };
+        return true;
+    }
+
+    private static bool HasNamedArgument(List<string> tokens)
+    {
+        foreach (var t in tokens)
+            if (t.Contains('=', StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+
+    private static bool TryParseNamed(string command, List<string> rest,
+        out CommandInvocation? invocation, out string? error)
+    {
+        var named = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in rest)
+        {
+            var eq = t.IndexOf('=');
+            if (eq <= 0 || eq == t.Length - 1)
+            {
+                invocation = null;
+                error = $"Invalid named argument '{t}'. Expected key=value.";
+                return false;
+            }
+
+            var key = t.Substring(0, eq).Trim();
+            var value = t.Substring(eq + 1).Trim();
+            if (key.Length == 0)
+            {
+                invocation = null;
+                error = $"Invalid named argument '{t}'. Key cannot be empty.";
+                return false;
+            }
+
+            named[key] = value;
+        }
+
+        invocation = new CommandInvocation
+        {
+            Command = command,
+            PositionalArgs = Array.Empty<string>(),
+            NamedArgs = named
+        };
+        error = null;
         return true;
     }
 

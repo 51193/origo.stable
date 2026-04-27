@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Origo.Core.Utils.DataStructures;
+using Origo.Core.Scheduling;
 using Xunit;
 
 namespace Origo.Core.Tests;

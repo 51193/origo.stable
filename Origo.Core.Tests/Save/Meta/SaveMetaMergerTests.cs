@@ -73,13 +73,18 @@ public class SaveMetaMergerTests
             _action = action;
         }
 
-        public void Contribute(in SaveMetaBuildContext context, IDictionary<string, string> target) =>
+        public void Contribute(in SaveMetaBuildContext context, IDictionary<string, string> target)
+        {
             _action(context, target);
+        }
     }
 
     private sealed class NullSceneHost : ISndSceneHost
     {
-        public IReadOnlyList<SndMetaData> SerializeMetaList() => Array.Empty<SndMetaData>();
+        public IReadOnlyList<SndMetaData> SerializeMetaList()
+        {
+            return Array.Empty<SndMetaData>();
+        }
 
         public void LoadFromMetaList(IEnumerable<SndMetaData> metaList)
         {
@@ -89,12 +94,20 @@ public class SaveMetaMergerTests
         {
         }
 
-        public ISndEntity Spawn(SndMetaData metaData) =>
+        public ISndEntity Spawn(SndMetaData metaData)
+        {
             throw new NotSupportedException();
+        }
 
-        public IReadOnlyCollection<ISndEntity> GetEntities() => Array.Empty<ISndEntity>();
+        public IReadOnlyCollection<ISndEntity> GetEntities()
+        {
+            return Array.Empty<ISndEntity>();
+        }
 
-        public ISndEntity? FindByName(string name) => null;
+        public ISndEntity? FindByName(string name)
+        {
+            return null;
+        }
 
         public void ProcessAll(double delta)
         {

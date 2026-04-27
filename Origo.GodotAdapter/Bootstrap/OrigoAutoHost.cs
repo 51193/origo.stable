@@ -77,26 +77,11 @@ public partial class OrigoAutoHost : Node
         logger.Log(LogLevel.Info, LogTag,
             new LogMessageBuilder().Build("CreateRuntime begin."));
 
-        SharedFileSystem = new GodotFileSystem();
-        var sndManager = new GodotSndManager();
-        AddChild(sndManager);
-        SndManager = sndManager;
-
-        var fileSystem = SharedFileSystem;
-        var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
-        var sharedTypeMapping = new TypeStringMapping();
-        GodotJsonConverterRegistry.RegisterTypeMappings(sharedTypeMapping);
-
-        var converterRegistry = DataSourceFactory.CreateDefaultRegistry(sharedTypeMapping);
-        GodotJsonConverterRegistry.RegisterDataSourceConverters(converterRegistry);
-        var dataSourceIo = DataSourceFactory.CreateDefaultIoGateway(fileSystem);
-
-        var persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, dataSourceIo, converterRegistry,
-            new Blackboard());
-        persistentBb.LoadFromDisk();
-
-        var consoleInput = new ConsoleInputQueue();
-        var consoleOutputChannel = new ConsoleOutputChannel();
+        var fileSystem = new GodotFileSystem();
+        SharedFileSystem = fileSystem;
+        var sndManager = CreateAndSetupSndManager(fileSystem, logger, out var sharedTypeMapping,
+            out var converterRegistry, out var dataSourceIo, out var persistentBb,
+            out var consoleInput, out var consoleOutputChannel);
 
         var runtime = new OrigoRuntime(
             logger,
@@ -117,6 +102,7 @@ public partial class OrigoAutoHost : Node
         var consolePump = new OrigoConsolePump { Runtime = runtime };
         AddChild(consolePump);
 
+        var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
         createWatch.Stop();
         logger.Log(LogLevel.Info, LogTag,
             new LogMessageBuilder()
@@ -124,6 +110,38 @@ public partial class OrigoAutoHost : Node
                 .AddSuffix("filePath", systemBbPath)
                 .Build("CreateRuntime completed."));
         return runtime;
+    }
+
+    private GodotSndManager CreateAndSetupSndManager(
+        IFileSystem fileSystem,
+        GodotLogger logger,
+        out TypeStringMapping sharedTypeMapping,
+        out DataSourceConverterRegistry converterRegistry,
+        out IDataSourceIoGateway dataSourceIo,
+        out PersistentBlackboard persistentBb,
+        out ConsoleInputQueue consoleInput,
+        out ConsoleOutputChannel consoleOutputChannel)
+    {
+        var sndManager = new GodotSndManager();
+        AddChild(sndManager);
+        SndManager = sndManager;
+
+        var systemBbPath = fileSystem.CombinePath(SystemBlackboardSaveRoot, "system.json");
+        sharedTypeMapping = new TypeStringMapping();
+        GodotJsonConverterRegistry.RegisterTypeMappings(sharedTypeMapping);
+
+        converterRegistry = DataSourceFactory.CreateDefaultRegistry(sharedTypeMapping);
+        GodotJsonConverterRegistry.RegisterDataSourceConverters(converterRegistry);
+        dataSourceIo = DataSourceFactory.CreateDefaultIoGateway(fileSystem);
+
+        persistentBb = new PersistentBlackboard(fileSystem, systemBbPath, dataSourceIo, converterRegistry,
+            new Blackboard());
+        persistentBb.LoadFromDisk();
+
+        consoleInput = new ConsoleInputQueue();
+        consoleOutputChannel = new ConsoleOutputChannel();
+
+        return sndManager;
     }
 
     private static GodotLogger CreateBootstrapLogger()

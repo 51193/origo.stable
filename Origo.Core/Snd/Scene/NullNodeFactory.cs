@@ -11,8 +11,10 @@ namespace Origo.Core.Snd.Scene;
 internal sealed class NullNodeFactory : INodeFactory
 {
     /// <inheritdoc />
-    public INodeHandle Create(string logicalName, string resourceId) =>
-        new NullNodeHandle(logicalName);
+    public INodeHandle Create(string logicalName, string resourceId)
+    {
+        return new NullNodeHandle(logicalName);
+    }
 }
 
 /// <summary>

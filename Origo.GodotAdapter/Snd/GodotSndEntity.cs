@@ -174,7 +174,10 @@ public partial class GodotSndEntity : Node, ISndEntity
         return _entity!.SerializeMetaData();
     }
 
-    public void ProcessSnd(double delta) => _entity?.Process(delta);
+    public void ProcessSnd(double delta)
+    {
+        _entity?.Process(delta);
+    }
 
     private void EnsureEntity()
     {

@@ -80,11 +80,14 @@ public class MemorySndSceneHostTests
         Assert.Equal(2, list.Count);
     }
 
-    private static SndMetaData MakeMeta(string name) => new()
+    private static SndMetaData MakeMeta(string name)
     {
-        Name = name,
-        NodeMetaData = new NodeMetaData(),
-        StrategyMetaData = new StrategyMetaData(),
-        DataMetaData = new DataMetaData()
-    };
+        return new SndMetaData
+        {
+            Name = name,
+            NodeMetaData = new NodeMetaData(),
+            StrategyMetaData = new StrategyMetaData(),
+            DataMetaData = new DataMetaData()
+        };
+    }
 }

@@ -20,7 +20,10 @@ internal static class SavePathLayout
     /// <summary>
     ///     获取活动存档目录的相对路径（即 <c>current</c>）。
     /// </summary>
-    public static string GetCurrentDirectory() => CurrentDirectoryName;
+    public static string GetCurrentDirectory()
+    {
+        return CurrentDirectoryName;
+    }
 
     /// <summary>
     ///     根据存档 ID 获取对应快照目录的相对路径（如 <c>save_001</c>）。

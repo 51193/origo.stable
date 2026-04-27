@@ -54,8 +54,10 @@ public class SaveStorageAndPayloadTests
     }
 
     [Fact]
-    public void SaveStorageFacade_EnumerateSaveIds_NullFileSystem_Throws() =>
+    public void SaveStorageFacade_EnumerateSaveIds_NullFileSystem_Throws()
+    {
         Assert.Throws<ArgumentNullException>(() => SaveStorageFacade.EnumerateSaveIds(null!, "root"));
+    }
 
     [Fact]
     public void SaveStorageFacade_SnapshotCurrentToSave_WhitespaceSaveRoot_Throws()
@@ -401,12 +403,25 @@ public class SaveStorageAndPayloadTests
             _failTargetSubstring = failTargetSubstring;
         }
 
-        public bool Exists(string path) => _inner.Exists(path);
-        public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
-        public string ReadAllText(string path) => _inner.ReadAllText(path);
+        public bool Exists(string path)
+        {
+            return _inner.Exists(path);
+        }
+
+        public bool DirectoryExists(string path)
+        {
+            return _inner.DirectoryExists(path);
+        }
+
+        public string ReadAllText(string path)
+        {
+            return _inner.ReadAllText(path);
+        }
 
         public void WriteAllText(string path, string content, bool overwrite)
-            => _inner.WriteAllText(path, content, overwrite);
+        {
+            _inner.WriteAllText(path, content, overwrite);
+        }
 
         public void Copy(string sourcePath, string destinationPath, bool overwrite)
         {
@@ -416,25 +431,48 @@ public class SaveStorageAndPayloadTests
         }
 
         public IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
-            => _inner.EnumerateFiles(directoryPath, searchPattern, recursive);
+        {
+            return _inner.EnumerateFiles(directoryPath, searchPattern, recursive);
+        }
 
-        public void CreateDirectory(string directoryPath) => _inner.CreateDirectory(directoryPath);
-        public void Delete(string path) => _inner.Delete(path);
+        public void CreateDirectory(string directoryPath)
+        {
+            _inner.CreateDirectory(directoryPath);
+        }
+
+        public void Delete(string path)
+        {
+            _inner.Delete(path);
+        }
 
         public string CombinePath(string basePath, string relativePath)
-            => _inner.CombinePath(basePath, relativePath);
+        {
+            return _inner.CombinePath(basePath, relativePath);
+        }
 
-        public string GetParentDirectory(string path) => _inner.GetParentDirectory(path);
+        public string GetParentDirectory(string path)
+        {
+            return _inner.GetParentDirectory(path);
+        }
 
         public IEnumerable<string> EnumerateDirectories(string directoryPath)
-            => _inner.EnumerateDirectories(directoryPath);
+        {
+            return _inner.EnumerateDirectories(directoryPath);
+        }
 
         public void Rename(string sourcePath, string destinationPath)
-            => _inner.Rename(sourcePath, destinationPath);
+        {
+            _inner.Rename(sourcePath, destinationPath);
+        }
 
         public void DeleteDirectory(string directoryPath)
-            => _inner.DeleteDirectory(directoryPath);
+        {
+            _inner.DeleteDirectory(directoryPath);
+        }
 
-        public void SeedFile(string path, string content) => _inner.SeedFile(path, content);
+        public void SeedFile(string path, string content)
+        {
+            _inner.SeedFile(path, content);
+        }
     }
 }

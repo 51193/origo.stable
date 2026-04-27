@@ -54,8 +54,10 @@ public sealed class StateMachineContainer
     }
 
     /// <summary>按 key 查找已有的状态机实例。</summary>
-    public bool TryGet(string machineKey, out StackStateMachine? machine) =>
-        _machines.TryGetValue(machineKey, out machine);
+    public bool TryGet(string machineKey, out StackStateMachine? machine)
+    {
+        return _machines.TryGetValue(machineKey, out machine);
+    }
 
     /// <summary>按 key 移除并释放一个状态机。</summary>
     public void Remove(string machineKey)
@@ -135,7 +137,13 @@ public sealed class StateMachineContainer
         if (payload?.Machines is null)
             throw new InvalidOperationException("StateMachineContainer payload.machines is required.");
 
-        // Build new state first; only replace after full validation succeeds.
+        var (newOrder, newMachines) = ValidateAndCreateMachines(payload);
+        AtomicSwapAndDisposeOld(newOrder, newMachines);
+    }
+
+    private (List<string> order, Dictionary<string, StackStateMachine> machines)
+        ValidateAndCreateMachines(StateMachineContainerPayload payload)
+    {
         var newOrder = new List<string>(payload.Machines.Count);
         var newMachines = new Dictionary<string, StackStateMachine>(payload.Machines.Count, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -155,7 +163,6 @@ public sealed class StateMachineContainer
                 if (entry.Stack is null)
                     throw new InvalidOperationException($"StateMachineEntry '{entry.Key}' stack is required.");
 
-                // Constructing StackStateMachine acquires strategies from the pool; dispose on any failure.
                 var sm = new StackStateMachine(entry.Key, entry.PushIndex, entry.PopIndex, _pool, _ctx);
                 sm.RestoreStackWithoutHooks(entry.Stack);
                 newMachines[entry.Key] = sm;
@@ -169,7 +176,13 @@ public sealed class StateMachineContainer
             throw;
         }
 
-        // Atomically swap: save old state, replace with new, then dispose old.
+        return (newOrder, newMachines);
+    }
+
+    private void AtomicSwapAndDisposeOld(
+        List<string> newOrder,
+        Dictionary<string, StackStateMachine> newMachines)
+    {
         var oldMachines = new Dictionary<string, StackStateMachine>(_machines, StringComparer.Ordinal);
         _machines.Clear();
         _machineOrder.Clear();

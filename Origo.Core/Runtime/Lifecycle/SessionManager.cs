@@ -132,23 +132,34 @@ internal sealed class SessionManager : ISessionManager
     /// <summary>
     ///     销毁当前前台会话（若存在）。
     /// </summary>
-    internal void DestroyForeground() => DestroySession(ISessionManager.ForegroundKey);
+    internal void DestroyForeground()
+    {
+        DestroySession(ISessionManager.ForegroundKey);
+    }
 
     /// <summary>
     ///     将指定键的会话序列化为 <see cref="LevelPayload" />。
     /// </summary>
-    internal LevelPayload SerializeSession(string key) => RequireMountedSession(key).Session.SerializeToPayload();
+    internal LevelPayload SerializeSession(string key)
+    {
+        return RequireMountedSession(key).Session.SerializeToPayload();
+    }
 
     /// <summary>
     ///     将指定键的会话状态持久化到 current/ 目录。
     /// </summary>
-    internal void PersistSession(string key) => RequireMountedSession(key).Session.PersistLevelState();
+    internal void PersistSession(string key)
+    {
+        RequireMountedSession(key).Session.PersistLevelState();
+    }
 
     /// <summary>
     ///     从 <see cref="LevelPayload" /> 恢复指定键的会话状态。
     /// </summary>
-    internal void LoadSessionFromPayload(string key, LevelPayload payload) =>
+    internal void LoadSessionFromPayload(string key, LevelPayload payload)
+    {
         RequireMountedSession(key).Session.LoadFromPayload(payload);
+    }
 
     /// <summary>
     ///     清除所有后台会话（Dispose 并移除）。前台会话不受影响。
@@ -174,17 +185,21 @@ internal sealed class SessionManager : ISessionManager
     ///     获取指定键的会话是否参与 Process 帧更新。
     ///     若键不存在则返回 false。
     /// </summary>
-    internal bool GetSyncProcess(string key) =>
-        !string.IsNullOrWhiteSpace(key) && _sessions.TryGetValue(key, out var mounted) && mounted.SyncProcess;
+    internal bool GetSyncProcess(string key)
+    {
+        return !string.IsNullOrWhiteSpace(key) && _sessions.TryGetValue(key, out var mounted) && mounted.SyncProcess;
+    }
 
     /// <summary>
     ///     获取所有已挂载的后台会话（不含前台）。
     /// </summary>
-    internal IReadOnlyList<KeyValuePair<string, ISessionRun>> GetBackgroundSessions() =>
-        _sessions
+    internal IReadOnlyList<KeyValuePair<string, ISessionRun>> GetBackgroundSessions()
+    {
+        return _sessions
             .Where(kvp => !string.Equals(kvp.Key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
             .Select(kvp => new KeyValuePair<string, ISessionRun>(kvp.Key, kvp.Value.Session))
             .ToArray();
+    }
 
     /// <summary>
     ///     将所有后台会话序列化为 LevelPayload 字典（key → LevelPayload）。
@@ -251,16 +266,23 @@ internal sealed class SessionManager : ISessionManager
         };
     }
 
-    private MountedSession? TryGetMountedSession(string key) =>
-        _sessions.TryGetValue(key, out var mounted) ? mounted : null;
+    private MountedSession? TryGetMountedSession(string key)
+    {
+        return _sessions.TryGetValue(key, out var mounted) ? mounted : null;
+    }
 
-    private MountedSession RequireMountedSession(string key) =>
-        TryGetMountedSession(key) ?? throw new InvalidOperationException($"No session with key '{key}' is mounted.");
+    private MountedSession RequireMountedSession(string key)
+    {
+        return TryGetMountedSession(key) ??
+               throw new InvalidOperationException($"No session with key '{key}' is mounted.");
+    }
 
-    private string[] EnumerateManagedKeys(bool includeForeground) =>
-        _sessions.Keys.Where(key =>
+    private string[] EnumerateManagedKeys(bool includeForeground)
+    {
+        return _sessions.Keys.Where(key =>
                 includeForeground || !string.Equals(key, ISessionManager.ForegroundKey, StringComparison.Ordinal))
             .ToArray();
+    }
 
     private void DisposeMountedSession(string key, MountedSession mounted)
     {

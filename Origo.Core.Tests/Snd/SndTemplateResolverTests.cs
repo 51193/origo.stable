@@ -87,9 +87,14 @@ public class SndTemplateResolverTests
 
     private sealed class NullMetaConverter : DataSourceConverter<SndMetaData>
     {
-        public override SndMetaData Read(DataSourceNode node) => null!;
+        public override SndMetaData Read(DataSourceNode node)
+        {
+            return null!;
+        }
 
-        public override DataSourceNode Write(SndMetaData value) =>
-            DataSourceNode.CreateNull();
+        public override DataSourceNode Write(SndMetaData value)
+        {
+            return DataSourceNode.CreateNull();
+        }
     }
 }

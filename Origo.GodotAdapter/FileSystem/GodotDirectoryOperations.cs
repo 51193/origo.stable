@@ -8,9 +8,15 @@ namespace Origo.GodotAdapter.FileSystem;
 
 internal static class GodotDirectoryOperations
 {
-    public static bool Exists(string path) => DirAccess.DirExistsAbsolute(path);
+    public static bool Exists(string path)
+    {
+        return DirAccess.DirExistsAbsolute(path);
+    }
 
-    public static void Create(string directoryPath) => DirAccess.MakeDirRecursiveAbsolute(directoryPath);
+    public static void Create(string directoryPath)
+    {
+        DirAccess.MakeDirRecursiveAbsolute(directoryPath);
+    }
 
     public static IEnumerable<string> EnumerateFiles(string directoryPath, string searchPattern, bool recursive)
     {
@@ -48,7 +54,7 @@ internal static class GodotDirectoryOperations
 
     public static void Rename(string sourcePath, string destinationPath)
     {
-        using var dir = DirAccess.Open(GodotPathHelper.GetParentDirectory(sourcePath));
+        using var dir = DirAccess.Open(GodotPathResolver.GetParentDirectory(sourcePath));
         if (dir is null)
             throw new DirectoryNotFoundException(
                 $"Cannot open parent directory for rename: {sourcePath}");
@@ -82,7 +88,7 @@ internal static class GodotDirectoryOperations
             DeleteRecursive($"{normalizedDir}/{subdir}");
 
         // Delete the directory itself
-        var parent = DirAccess.Open(GodotPathHelper.GetParentDirectory(directoryPath));
+        var parent = DirAccess.Open(GodotPathResolver.GetParentDirectory(directoryPath));
         if (parent is not null)
             using (parent)
             {

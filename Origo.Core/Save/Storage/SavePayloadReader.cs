@@ -14,14 +14,16 @@ internal static class SavePayloadReader
         string saveRootPath,
         string saveId,
         string activeLevelId,
-        ILogger? logger = null) =>
-        ReadFromCurrent(
+        ILogger? logger = null)
+    {
+        return ReadFromCurrent(
             fileSystem,
-            SaveStorageCommon.CreateIoGateway(fileSystem),
+            SaveStorageGatewayFactory.CreateIoGateway(fileSystem),
             saveRootPath,
             saveId,
             activeLevelId,
             logger);
+    }
 
     public static SaveGamePayload ReadFromCurrent(
         IFileSystem fileSystem,
@@ -29,9 +31,12 @@ internal static class SavePayloadReader
         string saveRootPath,
         string saveId,
         string activeLevelId,
-        ILogger? logger = null) =>
-        ReadFromCurrent(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy(),
+        ILogger? logger = null)
+    {
+        return ReadFromCurrent(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId,
+            new DefaultSavePathPolicy(),
             logger);
+    }
 
     public static SaveGamePayload ReadFromCurrent(
         IFileSystem fileSystem,
@@ -87,17 +92,22 @@ internal static class SavePayloadReader
         IFileSystem fileSystem,
         string saveRootPath,
         string saveId,
-        string activeLevelId) =>
-        ReadFromSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem), saveRootPath, saveId,
+        string activeLevelId)
+    {
+        return ReadFromSnapshot(fileSystem, SaveStorageGatewayFactory.CreateIoGateway(fileSystem), saveRootPath, saveId,
             activeLevelId);
+    }
 
     public static SaveGamePayload ReadFromSnapshot(
         IFileSystem fileSystem,
         IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
         string saveId,
-        string activeLevelId) =>
-        ReadFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId, new DefaultSavePathPolicy());
+        string activeLevelId)
+    {
+        return ReadFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, activeLevelId,
+            new DefaultSavePathPolicy());
+    }
 
     public static SaveGamePayload ReadFromSnapshot(
         IFileSystem fileSystem,
@@ -168,7 +178,7 @@ internal static class SavePayloadReader
     private static void ValidateSaveRoot(IFileSystem fileSystem, string saveRootPath)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+        SaveStorageGatewayFactory.ValidateRootPath(saveRootPath, nameof(saveRootPath),
             "Save root path cannot be null or whitespace.");
     }
 
@@ -232,17 +242,22 @@ internal static class SavePayloadReader
     public static DataSourceNode? ReadProgressNodeFromSnapshot(
         IFileSystem fileSystem,
         string saveRootPath,
-        string saveId) =>
-        ReadProgressNodeFromSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
+        string saveId)
+    {
+        return ReadProgressNodeFromSnapshot(fileSystem, SaveStorageGatewayFactory.CreateIoGateway(fileSystem),
             saveRootPath,
             saveId);
+    }
 
     public static DataSourceNode? ReadProgressNodeFromSnapshot(
         IFileSystem fileSystem,
         IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
-        string saveId) =>
-        ReadProgressNodeFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId, new DefaultSavePathPolicy());
+        string saveId)
+    {
+        return ReadProgressNodeFromSnapshot(fileSystem, dataSourceIo, saveRootPath, saveId,
+            new DefaultSavePathPolicy());
+    }
 
     public static DataSourceNode? ReadProgressNodeFromSnapshot(
         IFileSystem fileSystem,
@@ -254,7 +269,7 @@ internal static class SavePayloadReader
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(dataSourceIo);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+        SaveStorageGatewayFactory.ValidateRootPath(saveRootPath, nameof(saveRootPath),
             "Save root path cannot be null or whitespace.");
 
         var saveRel = pathPolicy.GetSaveDirectory(saveId);
@@ -267,17 +282,22 @@ internal static class SavePayloadReader
     public static LevelPayload? TryReadLevelPayloadFromCurrent(
         IFileSystem fileSystem,
         string saveRootPath,
-        string levelId) =>
-        TryReadLevelPayloadFromCurrent(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
+        string levelId)
+    {
+        return TryReadLevelPayloadFromCurrent(fileSystem, SaveStorageGatewayFactory.CreateIoGateway(fileSystem),
             saveRootPath,
             levelId);
+    }
 
     public static LevelPayload? TryReadLevelPayloadFromCurrent(
         IFileSystem fileSystem,
         IDataSourceIoGateway dataSourceIo,
         string saveRootPath,
-        string levelId) =>
-        TryReadLevelPayloadFromCurrent(fileSystem, dataSourceIo, saveRootPath, levelId, new DefaultSavePathPolicy());
+        string levelId)
+    {
+        return TryReadLevelPayloadFromCurrent(fileSystem, dataSourceIo, saveRootPath, levelId,
+            new DefaultSavePathPolicy());
+    }
 
     public static LevelPayload? TryReadLevelPayloadFromCurrent(
         IFileSystem fileSystem,
@@ -288,7 +308,7 @@ internal static class SavePayloadReader
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+        SaveStorageGatewayFactory.ValidateRootPath(saveRootPath, nameof(saveRootPath),
             "Save root path cannot be null or whitespace.");
 
         var currentRel = pathPolicy.GetCurrentDirectory();
@@ -300,18 +320,22 @@ internal static class SavePayloadReader
         IFileSystem fileSystem,
         string snapshotRootPath,
         string saveId,
-        string levelId) =>
-        TryReadLevelPayloadFromSnapshot(fileSystem, SaveStorageCommon.CreateIoGateway(fileSystem),
+        string levelId)
+    {
+        return TryReadLevelPayloadFromSnapshot(fileSystem, SaveStorageGatewayFactory.CreateIoGateway(fileSystem),
             snapshotRootPath, saveId, levelId);
+    }
 
     public static LevelPayload? TryReadLevelPayloadFromSnapshot(
         IFileSystem fileSystem,
         IDataSourceIoGateway dataSourceIo,
         string snapshotRootPath,
         string saveId,
-        string levelId) =>
-        TryReadLevelPayloadFromSnapshot(fileSystem, dataSourceIo, snapshotRootPath, saveId, levelId,
+        string levelId)
+    {
+        return TryReadLevelPayloadFromSnapshot(fileSystem, dataSourceIo, snapshotRootPath, saveId, levelId,
             new DefaultSavePathPolicy());
+    }
 
     public static LevelPayload? TryReadLevelPayloadFromSnapshot(
         IFileSystem fileSystem,
@@ -323,7 +347,7 @@ internal static class SavePayloadReader
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(pathPolicy);
-        SaveStorageCommon.ValidateRootPath(snapshotRootPath, nameof(snapshotRootPath),
+        SaveStorageGatewayFactory.ValidateRootPath(snapshotRootPath, nameof(snapshotRootPath),
             "Snapshot root path cannot be null or whitespace.");
 
         var saveRel = pathPolicy.GetSaveDirectory(saveId);
@@ -463,8 +487,10 @@ internal static class SavePayloadReader
         private static LevelFile CreateLevelFile(
             IFileSystem fileSystem,
             string relativePath,
-            string absolutePath) =>
-            new(relativePath, absolutePath, fileSystem.Exists(absolutePath));
+            string absolutePath)
+        {
+            return new LevelFile(relativePath, absolutePath, fileSystem.Exists(absolutePath));
+        }
     }
 
     private sealed record LevelFile(string RelativePath, string AbsolutePath, bool Exists);

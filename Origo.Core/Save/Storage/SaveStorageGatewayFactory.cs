@@ -4,7 +4,7 @@ using Origo.Core.DataSource;
 
 namespace Origo.Core.Save.Storage;
 
-internal static class SaveStorageCommon
+internal static class SaveStorageGatewayFactory
 {
     internal static IDataSourceIoGateway CreateIoGateway(IFileSystem fileSystem)
     {

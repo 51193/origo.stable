@@ -73,7 +73,10 @@ public class StrategyPoolTypeSafetyAndExtensionTests
     [StrategyIndex("ext.domain.probe")]
     private sealed class ExtensionDomainConcreteStrategy : ExtensionDomainStrategyBase
     {
-        public override string ProbeValue() => "ok";
+        public override string ProbeValue()
+        {
+            return "ok";
+        }
     }
 
     [StrategyIndex("pool.entity")]

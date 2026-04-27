@@ -196,7 +196,9 @@ public static class OrigoAutoInitializer
     }
 
     internal static bool IsStatelessStrategyType(Type strategyType, out string mutableFieldNames)
-        => SndStrategyPool.ValidateStrategyType(strategyType, out mutableFieldNames);
+    {
+        return SndStrategyPool.ValidateStrategyType(strategyType, out mutableFieldNames);
+    }
 
     private static string ResolveStrategyIndex(Type strategyType)
     {

@@ -8,7 +8,7 @@ namespace Origo.Core.Runtime.Console;
 /// <summary>
 ///     基于字典的手动命令路由。
 /// </summary>
-public sealed class ConsoleCommandRouter
+internal sealed class ConsoleCommandRouter
 {
     private readonly Dictionary<string, IConsoleCommandHandler> _handlers =
         new(StringComparer.OrdinalIgnoreCase);
@@ -25,8 +25,10 @@ public sealed class ConsoleCommandRouter
     /// <summary>
     ///     返回所有已注册命令名称（有序）。
     /// </summary>
-    public IReadOnlyList<string> GetRegisteredNames() =>
-        _handlers.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+    public IReadOnlyList<string> GetRegisteredNames()
+    {
+        return _handlers.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
     /// <summary>
     ///     返回所有已注册的命令处理器（有序）。

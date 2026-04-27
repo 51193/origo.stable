@@ -11,8 +11,10 @@ namespace Origo.Core.Tests;
 public class MemorySndEntityTests
 {
     [Fact]
-    public void Constructor_ThrowsOnNullName() =>
+    public void Constructor_ThrowsOnNullName()
+    {
         Assert.Throws<ArgumentNullException>(() => new MemorySndEntity(null!));
+    }
 
     [Fact]
     public void Name_ReturnsConstructedName()

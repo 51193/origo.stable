@@ -20,7 +20,7 @@ namespace Origo.Core.Snd.Scene;
 ///         即注入此宿主实例。
 ///     </para>
 /// </summary>
-public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachableSceneHost
+internal sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachableSceneHost
 {
     private readonly List<MemoryEntityEntry> _entries = new();
     private readonly ILogger _logger;
@@ -63,13 +63,17 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<ISndEntity> GetEntities() =>
-        _entries.Select(e => (ISndEntity)e.Entity).ToArray();
+    public IReadOnlyCollection<ISndEntity> GetEntities()
+    {
+        return _entries.Select(e => (ISndEntity)e.Entity).ToArray();
+    }
 
     /// <inheritdoc />
-    public ISndEntity? FindByName(string name) =>
-        _entries.FirstOrDefault(e =>
+    public ISndEntity? FindByName(string name)
+    {
+        return _entries.FirstOrDefault(e =>
             string.Equals(e.Entity.Name, name, StringComparison.Ordinal))?.Entity;
+    }
 
     /// <inheritdoc />
     public IReadOnlyList<SndMetaData> SerializeMetaList()
@@ -97,7 +101,10 @@ public sealed class FullMemorySndSceneHost : ISndSceneHost, ISndContextAttachabl
     }
 
     /// <inheritdoc />
-    public void ClearAll() => QuitAll();
+    public void ClearAll()
+    {
+        QuitAll();
+    }
 
     /// <summary>
     ///     对所有存活实体执行 Process 帧更新。

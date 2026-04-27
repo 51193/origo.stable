@@ -5,12 +5,12 @@ namespace Origo.Core.StateMachine;
 /// <summary>
 ///     可序列化的状态机容器快照（存档 / 读档）。
 /// </summary>
-public sealed class StateMachineContainerPayload
+internal sealed class StateMachineContainerPayload
 {
     public List<StateMachineEntryPayload> Machines { get; set; } = new();
 }
 
-public sealed class StateMachineEntryPayload
+internal sealed class StateMachineEntryPayload
 {
     public string Key { get; set; } = string.Empty;
 

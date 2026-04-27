@@ -13,7 +13,7 @@ namespace Origo.Core.Save.Storage;
 ///     内部委托给 <see cref="SavePayloadWriter" /> / <see cref="SavePayloadReader" /> 的策略感知重载，
 ///     持有 <see cref="IFileSystem" />、saveRootPath 与路径策略，使调用方无需重复传递。
 /// </summary>
-public sealed class DefaultSaveStorageService : ISaveStorageService
+internal sealed class DefaultSaveStorageService : ISaveStorageService
 {
     private readonly IFileSystem _fileSystem;
     private readonly IDataSourceIoGateway _ioGateway;
@@ -23,36 +23,46 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
     public DefaultSaveStorageService(IFileSystem fileSystem, string saveRootPath, ISavePathPolicy? pathPolicy = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
-        SaveStorageCommon.ValidateRootPath(saveRootPath, nameof(saveRootPath),
+        SaveStorageGatewayFactory.ValidateRootPath(saveRootPath, nameof(saveRootPath),
             "Save root path cannot be null or whitespace.");
         _fileSystem = fileSystem;
         _saveRootPath = saveRootPath;
         _pathPolicy = pathPolicy ?? new DefaultSavePathPolicy();
-        _ioGateway = SaveStorageCommon.CreateIoGateway(fileSystem);
+        _ioGateway = SaveStorageGatewayFactory.CreateIoGateway(fileSystem);
     }
 
-    public IReadOnlyList<string> EnumerateSaveIds() =>
-        SaveStorageFacade.EnumerateSaveIds(_fileSystem, _saveRootPath, _pathPolicy);
+    public IReadOnlyList<string> EnumerateSaveIds()
+    {
+        return SaveStorageFacade.EnumerateSaveIds(_fileSystem, _saveRootPath, _pathPolicy);
+    }
 
-    public IReadOnlyList<SaveMetaDataEntry> EnumerateSavesWithMetaData() =>
-        SaveStorageFacade.EnumerateSavesWithMetaData(_fileSystem, _saveRootPath, _pathPolicy);
+    public IReadOnlyList<SaveMetaDataEntry> EnumerateSavesWithMetaData()
+    {
+        return SaveStorageFacade.EnumerateSavesWithMetaData(_fileSystem, _saveRootPath, _pathPolicy);
+    }
 
-    public void WriteSavePayloadToCurrent(SaveGamePayload payload) =>
+    public void WriteSavePayloadToCurrent(SaveGamePayload payload)
+    {
         SavePayloadWriter.WriteToCurrent(_fileSystem, _ioGateway, _saveRootPath, payload, _pathPolicy);
+    }
 
     public void WriteSavePayloadToCurrentThenSnapshot(
         SaveGamePayload payload,
         string newSaveId,
-        ILogger logger) =>
+        ILogger logger)
+    {
         SaveStorageFacade.WriteSavePayloadToCurrentThenSnapshot(
             _fileSystem, _ioGateway, _saveRootPath, payload, newSaveId, logger, _pathPolicy);
+    }
 
     public void WriteLevelPayloadOnly(
         string baseDirectoryRel,
         LevelPayload levelPayload,
-        bool overwrite = true) =>
+        bool overwrite = true)
+    {
         SavePayloadWriter.WriteLevelPayloadOnly(
             _fileSystem, _ioGateway, _saveRootPath, baseDirectoryRel, levelPayload, _pathPolicy, overwrite);
+    }
 
     public void WriteLevelPayloadOnlyToCurrent(LevelPayload levelPayload, bool overwrite = true)
     {
@@ -63,31 +73,46 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
     public void WriteProgressOnlyToCurrent(
         DataSourceNode progressNode,
         DataSourceNode progressStateMachinesNode,
-        bool overwrite = true) =>
+        bool overwrite = true)
+    {
         SavePayloadWriter.WriteProgressOnlyToCurrent(
             _fileSystem, _ioGateway, _saveRootPath, progressNode, progressStateMachinesNode, _pathPolicy, overwrite);
+    }
 
     public SaveGamePayload ReadSavePayloadFromCurrent(
         string saveId,
         string activeLevelId,
-        ILogger? logger = null) =>
-        SavePayloadReader.ReadFromCurrent(
+        ILogger? logger = null)
+    {
+        return SavePayloadReader.ReadFromCurrent(
             _fileSystem, _ioGateway, _saveRootPath, saveId, activeLevelId, _pathPolicy, logger);
+    }
 
     public SaveGamePayload ReadSavePayloadFromSnapshot(
         string saveId,
-        string activeLevelId) =>
-        SavePayloadReader.ReadFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId, activeLevelId, _pathPolicy);
+        string activeLevelId)
+    {
+        return SavePayloadReader.ReadFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId, activeLevelId,
+            _pathPolicy);
+    }
 
-    public DataSourceNode? ReadProgressNodeFromSnapshot(string saveId) =>
-        SavePayloadReader.ReadProgressNodeFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId, _pathPolicy);
+    public DataSourceNode? ReadProgressNodeFromSnapshot(string saveId)
+    {
+        return SavePayloadReader.ReadProgressNodeFromSnapshot(_fileSystem, _ioGateway, _saveRootPath, saveId,
+            _pathPolicy);
+    }
 
-    public LevelPayload? TryReadLevelPayloadFromCurrent(string levelId) =>
-        SavePayloadReader.TryReadLevelPayloadFromCurrent(_fileSystem, _ioGateway, _saveRootPath, levelId, _pathPolicy);
+    public LevelPayload? TryReadLevelPayloadFromCurrent(string levelId)
+    {
+        return SavePayloadReader.TryReadLevelPayloadFromCurrent(_fileSystem, _ioGateway, _saveRootPath, levelId,
+            _pathPolicy);
+    }
 
-    public LevelPayload? TryReadLevelPayloadFromSnapshot(string saveId, string levelId) =>
-        SavePayloadReader.TryReadLevelPayloadFromSnapshot(
+    public LevelPayload? TryReadLevelPayloadFromSnapshot(string saveId, string levelId)
+    {
+        return SavePayloadReader.TryReadLevelPayloadFromSnapshot(
             _fileSystem, _ioGateway, _saveRootPath, saveId, levelId, _pathPolicy);
+    }
 
     public LevelPayload? ResolveLevelPayload(string saveId, string levelId)
     {
@@ -98,8 +123,10 @@ public sealed class DefaultSaveStorageService : ISaveStorageService
         return TryReadLevelPayloadFromSnapshot(saveId, levelId);
     }
 
-    public void SnapshotCurrentToSave(string newSaveId) =>
+    public void SnapshotCurrentToSave(string newSaveId)
+    {
         SaveStorageFacade.SnapshotCurrentToSave(_fileSystem, _saveRootPath, newSaveId, _pathPolicy);
+    }
 
     public void DeleteCurrentDirectory()
     {

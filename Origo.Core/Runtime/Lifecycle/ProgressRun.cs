@@ -91,7 +91,10 @@ public sealed partial class ProgressRun : IDisposable
     }
 
     /// <inheritdoc />
-    public StateMachineContainer GetProgressStateMachines() => ProgressScope.StateMachines;
+    public StateMachineContainer GetProgressStateMachines()
+    {
+        return ProgressScope.StateMachines;
+    }
 
     internal void SetSaveId(string saveId)
     {

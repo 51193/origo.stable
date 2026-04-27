@@ -6,7 +6,7 @@ namespace Origo.GodotAdapter.Tests.FileSystemTests;
 
 public class GodotFileSystemPathTests
 {
-    public static TheoryData<string> GodotPathHelper_Combine_WithTraversal_Data { get; } = new()
+    public static TheoryData<string> GodotPathResolver_Combine_WithTraversal_Data { get; } = new()
     {
         "../escape",
         "foo/../bar",
@@ -14,21 +14,23 @@ public class GodotFileSystemPathTests
     };
 
     [Fact]
-    public void GodotPathHelper_Combine_JoinsPaths()
+    public void GodotPathResolver_Combine_JoinsPaths()
     {
-        var combined = GodotPathHelper.Combine("user://origo_saves", "current/system.json");
+        var combined = GodotPathResolver.Combine("user://origo_saves", "current/system.json");
         Assert.Equal("user://origo_saves/current/system.json", combined);
     }
 
     [Theory]
-    [MemberData(nameof(GodotPathHelper_Combine_WithTraversal_Data))]
-    public void GodotPathHelper_Combine_WithTraversal_Throws(string relativePath) =>
-        Assert.Throws<ArgumentException>(() => GodotPathHelper.Combine("res://root", relativePath));
+    [MemberData(nameof(GodotPathResolver_Combine_WithTraversal_Data))]
+    public void GodotPathResolver_Combine_WithTraversal_Throws(string relativePath)
+    {
+        Assert.Throws<ArgumentException>(() => GodotPathResolver.Combine("res://root", relativePath));
+    }
 
     [Fact]
-    public void GodotPathHelper_GetParentDirectory_HandlesTrailingSlash()
+    public void GodotPathResolver_GetParentDirectory_HandlesTrailingSlash()
     {
-        var parent = GodotPathHelper.GetParentDirectory("res://origo/maps/");
+        var parent = GodotPathResolver.GetParentDirectory("res://origo/maps/");
         Assert.Equal("res://origo", parent);
     }
 

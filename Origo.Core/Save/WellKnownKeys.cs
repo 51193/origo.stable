@@ -1,6 +1,6 @@
 namespace Origo.Core.Save;
 
-public static class WellKnownKeys
+internal static class WellKnownKeys
 {
     public const string ActiveSaveId = "origo.active_save_id";
     public const string SessionTopology = "origo.session_topology";

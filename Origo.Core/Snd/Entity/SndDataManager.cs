@@ -91,7 +91,10 @@ internal sealed class SndDataManager
         return (false, default);
     }
 
-    public T GetData<T>(string name) => GetRequiredData<T>(name);
+    public T GetData<T>(string name)
+    {
+        return GetRequiredData<T>(name);
+    }
 
     public T GetRequiredData<T>(string name)
     {

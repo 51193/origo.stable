@@ -169,5 +169,8 @@ public sealed class StackStateMachine : IStateMachine, IDisposable
         }
     }
 
-    private string? PeekTopOrNull() => _stack.Count == 0 ? null : _stack[^1];
+    private string? PeekTopOrNull()
+    {
+        return _stack.Count == 0 ? null : _stack[^1];
+    }
 }

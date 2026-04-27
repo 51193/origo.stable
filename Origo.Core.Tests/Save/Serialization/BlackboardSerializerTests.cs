@@ -8,7 +8,10 @@ namespace Origo.Core.Tests;
 
 public class BlackboardSerializerTests
 {
-    private static SndWorld CreateWorld() => TestFactory.CreateSndWorld();
+    private static SndWorld CreateWorld()
+    {
+        return TestFactory.CreateSndWorld();
+    }
 
     [Fact]
     public void BlackboardSerializer_RoundTrip_PreservesData()

@@ -1,7 +1,6 @@
 using System;
 using Origo.Core.Abstractions.Logging;
 using Origo.Core.Abstractions.Runtime;
-using Origo.Core.Utils.DataStructures;
 
 namespace Origo.Core.Scheduling;
 
@@ -9,7 +8,7 @@ namespace Origo.Core.Scheduling;
 ///     基于 ConcurrentActionQueue 的简单调度器实现。
 ///     宿主环境负责在合适的时间调用 Tick 执行排队的动作。
 /// </summary>
-public sealed class ActionScheduler : IScheduler
+internal sealed class ActionScheduler : IScheduler
 {
     private readonly ConcurrentActionQueue _queue;
 
@@ -18,12 +17,21 @@ public sealed class ActionScheduler : IScheduler
         _queue = new ConcurrentActionQueue(logger);
     }
 
-    public void Enqueue(Action action) => _queue.Enqueue(action);
+    public void Enqueue(Action action)
+    {
+        _queue.Enqueue(action);
+    }
 
     /// <summary>
     ///     由宿主循环调用，用于执行已排队的所有动作。
     /// </summary>
-    public int Tick() => _queue.ExecuteAll();
+    public int Tick()
+    {
+        return _queue.ExecuteAll();
+    }
 
-    public void Clear() => _queue.Clear();
+    public void Clear()
+    {
+        _queue.Clear();
+    }
 }
